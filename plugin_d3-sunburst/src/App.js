@@ -85,17 +85,19 @@ function getChart(data, ref) {
   );
 
   const label = g
-    .append("g")
-    .attr("pointer-events", "none")
-    .attr("text-anchor", "middle")
-    .style("user-select", "none")
-    .selectAll("text")
-    .data(root.descendants().slice(1))
-    .join("text")
-    .attr("dy", "0.35em")
-    .attr("fill-opacity", (d) => +labelVisible(d.current))
-    .attr("transform", (d) => labelTransform(d.current))
-    .text((d) => d.data.name);
+  .append("g")
+  .attr("font-size", "20px")  // Set attribute for font size
+  .style("font-size", "20px") // Set style for font size
+  .attr("pointer-events", "none")
+  .attr("text-anchor", "middle")
+  .style("user-select", "none")
+  .selectAll("text")
+  .data(root.descendants().slice(1))
+  .join("text")
+  .attr("dy", "0.35em")
+  .attr("fill-opacity", (d) => +labelVisible(d.current))
+  .attr("transform", (d) => labelTransform(d.current))
+  .text((d) => d.data.name);
 
   const parent = g
     .append("circle")
