@@ -1,6 +1,1 @@
-# Readme for Simple Stock Prices 
-
-This project will rended a high chart candlestick chart of stock prices, that are hard coded in app.js.
-
-Please refer to this Sigma QuickStart for instructions.
-
+For information on how to use this project, [please refer to Sigma QuickStarts.](https://quickstarts.sigmacomputing.com/guide/administration_plugins/index.html?index=..%2F..index#0)
