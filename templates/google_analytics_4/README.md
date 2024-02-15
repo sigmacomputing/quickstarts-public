@@ -1,1 +1,0 @@
-For information on how to use this project, [please refer to Sigma QuickStarts.](https://quickstarts.sigmacomputing.com/guide/google_analytics_4_template_setup/index.html?index=..%2F..index#1)
