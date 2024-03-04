@@ -1022,8 +1022,8 @@ try {
           cost_per_query.query_id,
           cost_per_query.compute_cost,
           cost_per_query.compute_credits,
-          cost_per_query.cloud_services_cost,     -- these will be inaccurate but do include the credit adjustment                                                                          
-          cost_per_query.cloud_services_credits,     -- these will be inaccurate but do include the credit adjustment                                                                                                                                                    
+          cost_per_query.cloud_services_cost,                                                                              
+          cost_per_query.cloud_services_credits,                                                                                                                                                         
           cost_per_query.query_cost,
           cost_per_query.query_credits,
           cost_per_query.execution_start_time,
