@@ -16,6 +16,7 @@
 *   Prereqs: To run this script the following is required:
 *           - Ability to use the SYSADMIN role (just briefly, to give the proper privileges to another role)
 *           - The name of the role used in your Sigma connection
+*           - Verify that there is data in the views in the SNOWFLAKE.ORGANIZATION_USAGE schema
 *************************************************************************************/
 
 
