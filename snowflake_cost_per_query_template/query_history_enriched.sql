@@ -574,6 +574,8 @@ order by query_history.start_time
 )
 ;
 
+
+alter table query_history_enriched cluster by (start_time::date);
 ---------------------------------------------------------------------------------------------------------
 -- 3. Grant the Sigma service role select access on this table
 ---------------------------------------------------------------------------------------------------------
