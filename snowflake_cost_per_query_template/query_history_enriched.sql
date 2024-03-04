@@ -2,7 +2,7 @@
 *  
 *   Name: query_history_enriched.sql
 *   Dev:  Oscar Bashaw (setup and incremental materialization), Select.dev (wrote the query_history_enriched calculation)
-*   Date: Nov 29 2023
+*   Date: Mar 4 2024
 *   Summary: create query_history_enriched table and set up incremental materialization (inserts)
 *   Desc: This series of commands will do the following:
 *           1. Set session variables
@@ -58,15 +58,14 @@ use warehouse identifier($materialization_warehouse_name);
 -- 2. Create the query_history_enriched table that includes all queries started on or before yesterday
 ---------------------------------------------------------------------------------------------------------
 create or replace table query_history_enriched as (
-with
-query_history as (
+with query_history as (
     select
         *
     from snowflake.account_usage.query_history 
-    where end_time < date_trunc(day, getdate())   
-),
+    where end_time < getdate()
+)
 
-dates_base as (
+, dates_base as (
     select date_day as date from (    
         with rawdata as (
             with p as (
@@ -95,6 +94,10 @@ dates_base as (
                 p9.generated_number * power(2, 9)
                  + 
                 p10.generated_number * power(2, 10)
+                 + 
+                p11.generated_number * power(2, 11)
+                 +
+                p12.generated_number * power(2, 12)
                 + 1
                 as generated_number
                 from
@@ -119,10 +122,14 @@ dates_base as (
                 p as p9
                  cross join 
                 p as p10
+                 cross join
+                p as p11 
+                 cross join
+                p as p12
             )
             select *
             from unioned
-            where generated_number <= 2000
+            where generated_number <= 10000
             order by generated_number
         ),
 
@@ -149,9 +156,9 @@ dates_base as (
 
 
     )
-),
+)
 
-rate_sheet_daily_base as (
+, rate_sheet_daily_base as (
     select
         date,
         usage_type,
@@ -161,9 +168,9 @@ rate_sheet_daily_base as (
     from snowflake.organization_usage.rate_sheet_daily
     where
         account_locator = current_account()
-),
+)
 
-remaining_balance_daily_without_contract_view as (
+, remaining_balance_daily_without_contract_view as (
     select
         date,
         organization_name,
@@ -175,9 +182,9 @@ remaining_balance_daily_without_contract_view as (
     from snowflake.organization_usage.remaining_balance_daily
 
     qualify row_number() over (partition by date order by contract_number desc) = 1
-),
+)
 
-stop_thresholds as (
+, stop_thresholds as (
     select min(date) as start_date
     from rate_sheet_daily_base
 
@@ -185,58 +192,58 @@ stop_thresholds as (
 
     select min(date) as start_date
     from remaining_balance_daily_without_contract_view
-),
+)
 
-date_range as (
+, date_range as (
     select
         max(start_date) as start_date,
         current_date as end_date
     from stop_thresholds
-),
+)
 
-remaining_balance_daily as (
+, remaining_balance_daily as (
     select
         date,
         free_usage_balance + capacity_balance + on_demand_consumption_balance + rollover_balance as remaining_balance,
         remaining_balance < 0 as is_account_in_overage
     from remaining_balance_daily_without_contract_view
-),
+)
 
-latest_remaining_balance_daily as (
+, latest_remaining_balance_daily as (
     select
         date,
         remaining_balance,
         is_account_in_overage
     from remaining_balance_daily
     qualify row_number() over (order by date desc) = 1
-),
+)
 
-rate_sheet_daily as (
+, rate_sheet_daily as (
     select rate_sheet_daily_base.*
     from rate_sheet_daily_base
     inner join date_range
         on rate_sheet_daily_base.date between date_range.start_date and date_range.end_date
-),
+)
 
-rates_date_range_w_usage_types as (
+, rates_date_range_w_usage_types as (
     select
         date_range.start_date,
         date_range.end_date,
         usage_types.usage_type
     from date_range
     cross join (select distinct usage_type from rate_sheet_daily) as usage_types
-),
+)
 
-base as (
+, base as (
     select
         db.date,
         dr.usage_type
     from dates_base as db
     inner join rates_date_range_w_usage_types as dr
         on db.date between dr.start_date and dr.end_date
-),
+)
 
-rates_w_overage as (
+, rates_w_overage as (
     select
         base.date,
         base.usage_type,
@@ -271,9 +278,9 @@ rates_w_overage as (
     left join rate_sheet_daily
         on base.date = rate_sheet_daily.date
             and base.usage_type = rate_sheet_daily.usage_type
-),
+)
 
-rates as (
+, rates as (
     select
         date,
         usage_type,
@@ -284,9 +291,9 @@ rates as (
         is_overage_rate
     from rates_w_overage
     qualify row_number() over (partition by date, service_type, associated_usage_type order by rate_priority desc) = 1
-),
+)
 
-daily_rates as (
+, daily_rates as (
     select
         date,
         associated_usage_type as usage_type,
@@ -297,14 +304,14 @@ daily_rates as (
         row_number() over (partition by service_type, associated_usage_type order by date desc) = 1 as is_latest_rate
     from rates
     order by date
-),
+)
 
-stop_threshold as (
+, stop_threshold as (
     select max(end_time) as latest_ts
     from snowflake.account_usage.warehouse_metering_history
-),
+)
 
-filtered_queries as (
+, filtered_queries as (
     select
         query_id,
         query_text as original_query_text,
@@ -322,10 +329,10 @@ filtered_queries as (
         end_time
     from snowflake.account_usage.query_history
     where end_time <= (select latest_ts from stop_threshold)
-    and start_time < date_trunc(day, getdate()) -- may not need this
-),
+    and end_time <= getdate()
+)
 
-hours_list as (
+, hours_list as (
     select
         dateadd(
             'hour',
@@ -334,10 +341,9 @@ hours_list as (
         ) as hour_start,
         dateadd('hour', '+1', hour_start) as hour_end
     from table(generator(rowcount => (24 * 730)))
-),
+)
 
--- 1 row per hour a query ran
-query_hours as (
+, query_hours as (
     select
         hours_list.hour_start,
         hours_list.hour_end,
@@ -347,9 +353,9 @@ query_hours as (
         on hours_list.hour_start >= date_trunc('hour', queries.execution_start_time)
             and hours_list.hour_start < queries.end_time
             and queries.ran_on_warehouse
-),
+)
 
-query_seconds_per_hour as (
+, query_seconds_per_hour as (
     select
         *,
         datediff('millisecond', greatest(execution_start_time, hour_start), least(end_time, hour_end)) as num_milliseconds_query_ran,
@@ -357,18 +363,18 @@ query_seconds_per_hour as (
         div0(num_milliseconds_query_ran, total_query_milliseconds_in_hour) as fraction_of_total_query_time_in_hour,
         hour_start as hour
     from query_hours
-),
+)
 
-credits_billed_hourly as (
+, credits_billed_hourly as (
     select
         start_time as hour,
         warehouse_id,
         credits_used_compute,
         credits_used_cloud_services
     from snowflake.account_usage.warehouse_metering_history
-),
+)
 
-query_cost as (
+, query_cost as (
     select
         query_seconds_per_hour.*,
         credits_billed_hourly.credits_used_compute * daily_rates.effective_rate as actual_warehouse_cost,
@@ -382,9 +388,9 @@ query_cost as (
         on date(query_seconds_per_hour.start_time) = daily_rates.date
             and daily_rates.service_type = 'COMPUTE'
             and daily_rates.usage_type = 'compute'
-),
+)
 
-cost_per_query as (
+, cost_per_query as (
     select
         query_id,
         any_value(start_time) as start_time,
@@ -396,9 +402,9 @@ cost_per_query as (
         any_value(ran_on_warehouse) as ran_on_warehouse
     from query_cost
     group by 1
-),
+)
 
-credits_billed_daily as (
+, credits_billed_daily as (
     select
         date(hour) as date,
         sum(credits_used_compute) as daily_credits_used_compute,
@@ -406,9 +412,9 @@ credits_billed_daily as (
         greatest(daily_credits_used_cloud_services - daily_credits_used_compute * 0.1, 0) as daily_billable_cloud_services
     from credits_billed_hourly
     group by 1
-),
+)
 
-all_queries as (
+, all_queries as (
     select
         query_id,
         start_time,
@@ -434,9 +440,9 @@ all_queries as (
     from filtered_queries
     where
         not ran_on_warehouse
-),
+)
 
-stg__cost_per_query as (
+, stg__cost_per_query as (
     select
         all_queries.query_id,
         all_queries.start_time,
@@ -469,8 +475,11 @@ stg__cost_per_query as (
 select
     cost_per_query.query_id,
     cost_per_query.compute_cost,
-    cost_per_query.cloud_services_cost,
+    cost_per_query.compute_credits,
+    cost_per_query.cloud_services_cost,                                                                               
+    cost_per_query.cloud_services_credits,                                                                                                                                                        
     cost_per_query.query_cost,
+    cost_per_query.query_credits,
     cost_per_query.execution_start_time,
 
     -- Grab all columns from query_history (except the query time columns which we rename below)
