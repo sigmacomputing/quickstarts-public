@@ -1,0 +1,10 @@
+{
+    "name": "sigma-api-recipes",
+    "version": "1.0.0",
+    "description": "Sample API Scripts for Sigma's REST API",
+    "dependencies": {
+      "axios": "^0.24.0",
+      "dotenv": "^10.0.0"
+    }
+  }
+  
