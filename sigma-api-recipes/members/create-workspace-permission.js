@@ -1,7 +1,7 @@
 // This script provides permission to a workspace, using the memberId from .env
 
 // 1: Load environment variables from a specific .env file for configuration
-require('dotenv').config({ path: 'rest-api-recipes/.env' });
+require('dotenv').config({ path: 'sigma-api-recipes/.env' });
 
 // 2" Import the function to obtain a bearer token from the authenticate-bearer module
 const getBearerToken = require('../get-access-token');

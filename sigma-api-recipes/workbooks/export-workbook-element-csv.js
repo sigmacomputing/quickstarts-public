@@ -1,7 +1,7 @@
 // This script triggers an export to csv job with date range parameters, and downloads the export once ready.
 
 // Load environment variables from a specific .env file for configuration
-require('dotenv').config({ path: './.env' });
+require('dotenv').config({ path: 'sigma-api-recipes/.env' });
 
 // Import the function to obtain a bearer token from the authenticate-bearer module
 const getBearerToken = require('../get-access-token');

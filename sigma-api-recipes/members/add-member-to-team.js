@@ -1,6 +1,6 @@
 // This script adds a member to a team
 
-require('dotenv').config({ path: 'rest-api-recipes/.env' });
+require('dotenv').config({ path: 'sigma-api-recipes/.env' });
 
 const getBearerToken = require('../get-access-token');
 const axios = require('axios');
