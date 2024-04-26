@@ -2,7 +2,7 @@
 // Utilizes Sigma's API as documented in their Swagger documentation.
 
 // Load necessary dependencies and set up the environment
-require('dotenv').config({ path: 'rest-api-recipes/.env' }); // Load environment variables for configuration
+require('dotenv').config({ path: 'sigma-api-recipes/.env' }); // Load environment variables for configuration
 const getBearerToken = require('../get-access-token'); // Import function to obtain a bearer token for API authentication
 const axios = require('axios'); // Import Axios for making HTTP requests
 

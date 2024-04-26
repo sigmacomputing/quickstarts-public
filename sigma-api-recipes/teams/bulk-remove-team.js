@@ -30,23 +30,27 @@ async function findMemberIdByEmail(email, token) {
 }
 
 // Function to add/remove a member to a specified team by their member ID.
-async function addMemberToTeam(memberId, teamId, token) {
-    const requestUrl = `${baseURL}/teams/${teamId}/members`; // API endpoint for adding a member to a team.
-    const payload = { add: [memberId], remove: [] }; // Payload specifying the member to add (and none to remove).
-    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }; // Request headers.
+      // change logging messages to remove instead of add
+      async function addMemberToTeam(memberId, teamId, token) {
+        const requestUrl = `${baseURL}/teams/${teamId}/members`; // API endpoint for adding a member to a team.
+        
+        //Change the job to remove a member:
+        const payload = { add: [], remove: [memberId] }; // Payload specifying the member to add (and none to remove).
+        const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }; // Request headers.
+        
+        // Log the request details for debugging.
     
-    // Log the request details for debugging.
-    console.log(`Adding member to team with URL: ${requestUrl}`);
- //   console.log(`Headers:`, JSON.stringify(headers, null, 2));
-    console.log(`Payload:`, JSON.stringify(payload, null, 2));
-
-    try {
-        const response = await axios.patch(requestUrl, payload, { headers });
-        console.log(`Member ${memberId} added to team ${teamId}. Response:`, response.data);
-    } catch (error) {
-        console.error(`Error adding member ${memberId} to team ${teamId}:`, error.response ? error.response.data : error);
+        console.log(`Removed member to team with URL: ${requestUrl}`);
+     //   console.log(`Headers:`, JSON.stringify(headers, null, 2));
+        console.log(`Payload:`, JSON.stringify(payload, null, 2));
+    
+        try {
+            const response = await axios.patch(requestUrl, payload, { headers });
+            console.log(`Member ${memberId} removed from team ${teamId}. Response:`, response.data);
+        } catch (error) {
+            console.error(`Error removing member ${memberId} to team ${teamId}:`, error.response ? error.response.data : error);
+        }
     }
-}
 
 // Main function to process member emails and assign them to the specified team.
 async function processMembers(teamId, token) {

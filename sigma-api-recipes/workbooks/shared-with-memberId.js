@@ -1,7 +1,7 @@
 // This script lists all workbook names, URLs, and version numbers for the specified memberId
 
 // 1: Load environment variables from a specific .env file for configuration
-require('dotenv').config({ path: './.env' });
+require('dotenv').config({ path: 'sigma-api-recipes/.env' });
 
 // 2: Import the function to obtain a bearer token from the authenticate-bearer module
 const getBearerToken = require('../get-access-token');

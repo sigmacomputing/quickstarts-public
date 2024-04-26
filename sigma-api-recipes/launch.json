@@ -5,7 +5,7 @@
         "type": "node",
         "request": "launch",
         "name": "Debug authenticate-bearer",
-        "program": "${workspaceFolder}/rest-api-recipes/authenticate-bearer.js",
+        "program": "${workspaceFolder}/sigma-api-recipes/authenticate-bearer.js",
         "console": "integratedTerminal"
       }
     ]
