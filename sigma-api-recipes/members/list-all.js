@@ -1,4 +1,4 @@
-// This script lists all members
+// This script returns all members
 
 // 1: Load environment variables from a specific .env file for configuration
 require('dotenv').config({ path: 'sigma-api-recipes/.env' });
