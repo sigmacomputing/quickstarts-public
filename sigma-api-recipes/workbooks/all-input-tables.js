@@ -37,7 +37,7 @@ async function fetchElementsOfWorkbook(workbook, accessToken) {
                     console.log(`Workbook: "${workbook.name}", Path: "${workbook.path}/${workbook.workbookId}", Page: "${page.name}"`);
                     inputTableElements.forEach(element => {
                         // Log details for each 'input-table' element
-                        console.log(`  - Input Table: ${element.name}, Element ID: ${element.elementId}`);
+                        console.log(`  - Input Table: ${element.name}, Element ID: ${element.elementId}, Latest Version: ${workbook.latestVersion}`);
                     });
                 }
             } catch (error) {
