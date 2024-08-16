@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Sets the character encoding to UTF-8 to support a wide range of characters -->
+    <meta charset="UTF-8">
+    
+    <!-- Ensures the page is responsive and scales correctly on mobile devices -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Sets the title of the webpage as it appears in the browser tab -->
+    <title>Sigma Embed with JWT</title>
+    
+    <!-- Internal CSS to style the iframe and body -->
+    <style>
+        /* Ensures that the body and html elements take up the full height of the viewport */
+        body, html {
+            margin: 0;  /* Removes any default margin */
+            padding: 0; /* Removes any default padding */
+            height: 100%; /* Sets the height to fill the entire viewport */
+        }
+
+        /* Styles the iframe to occupy the full width and height of the page with a 1px border */
+        iframe {
+            width: 100%;              /* Makes the iframe take up the full width of the parent element */
+            height: 100%;             /* Makes the iframe take up the full height of the parent element */
+            border: 1px solid black;  /* Adds a 1px solid black border around the iframe */
+            box-sizing: border-box;   /* Ensures the border is included in the width and height calculations */
+        }
+    </style>
+</head>
+<body>
+    <!-- Main heading of the webpage, centered horizontally -->
+    <h1 style="text-align: center;">Sigma Embed with JWT</h1>
+    
+    <!-- Embeds the Sigma dashboard or visualization using an iframe -->
+    <iframe
+        src="<%= signedEmbedUrl %>"   <!-- The source URL for the iframe, dynamically populated by a template engine like EJS -->
+        frameborder="0"               <!-- Removes the default iframe border (handled by the CSS border instead) -->
+        allowfullscreen               <!-- Allows the iframe content to be displayed in fullscreen mode -->
+        title="Sigma Embed with JWT"> <!-- Provides a descriptive title for the iframe, improving accessibility -->
+    </iframe>
+</body>
+</html>
