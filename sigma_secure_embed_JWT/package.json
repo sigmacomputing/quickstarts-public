@@ -1,0 +1,17 @@
+{
+  "name": "sigma_secure_embed_jwt",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "ejs": "^3.1.10",
+    "express": "^4.17.1",
+    "jose": "^3.20.4",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^8.3.2"
+  }
+}
