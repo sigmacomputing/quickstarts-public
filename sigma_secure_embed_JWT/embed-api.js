@@ -4,16 +4,14 @@ const dotenv = require('dotenv'); // Import dotenv for loading environment varia
 
 dotenv.config(); // Load environment variables from .env file
 
-// Define constants for the base URL, embed path, and session length
-const BASE_URL = process.env.BASE_URL;
-const EMBED_PATH = process.env.EMBED_PATH;
+// Define constants for the embed URL and session length
+const EMBED_URL = process.env.EMBED_URL;
 const SESSION_LENGTH = Math.min(process.env.SESSION_LENGTH || 3600, 2592000); // Max 30 days in seconds
 
-// Log the important configuration details to ensure they are correctly set
-console.log('BASE_URL:', BASE_URL);
-console.log('EMBED_PATH:', EMBED_PATH);
+// Log important configuration details to ensure they are correctly set
+console.log('EMBED_URL:', EMBED_URL);
 console.log('SESSION_LENGTH:', SESSION_LENGTH);
-console.log('EMBED_CLIENT_ID:', process.env.EMBED_CLIENT_ID); // Add this to verify the client ID
+console.log('EMBED_CLIENT_ID:', process.env.EMBED_CLIENT_ID); // Verify the client ID
 
 // Function to generate a signed URL for embedding Sigma dashboards
 async function generateSignedUrl() {
@@ -43,7 +41,7 @@ async function generateSignedUrl() {
         console.log('Decoded JWT:', decodedToken); // Log the decoded JWT for debugging
 
         // Construct the signed embed URL by appending the JWT and embed parameters
-        const signedEmbedUrl = `${BASE_URL}${EMBED_PATH}?:jwt=${token}&:embed=true`;
+        const signedEmbedUrl = `${EMBED_URL}?:jwt=${token}&:embed=true`;
 
         // Log the constructed signed URL
         console.log('Signed Embed URL:', signedEmbedUrl);
