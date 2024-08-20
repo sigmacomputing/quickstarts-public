@@ -22,7 +22,7 @@ async function generateSignedUrl() {
         const time = Math.floor(Date.now() / 1000); // Generate the current time as a Unix timestamp
 
         // Generate JWT with claims
-        // See https://help.sigmacomputing.com/docs/example-embed-api-and-jwt-signed-url for list of available claims
+        // See https://help.sigmacomputing.com/docs/create-an-embed-api-with-json-web-tokens for list of available claims
         const token = jwt.sign({
             sub: email, // Subject (the email of the user)
             iss: process.env.EMBED_CLIENT_ID, // Issuer (client ID)
