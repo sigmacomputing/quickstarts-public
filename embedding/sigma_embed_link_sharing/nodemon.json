@@ -1,0 +1,6 @@
+{
+    "watch": [".env", ".js", "html"],
+    "ext": "js, env, html",
+    "ignore": ["node_modules"],
+    "exec": "node embed-api.js"
+  }
