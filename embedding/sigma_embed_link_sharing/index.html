@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" style="height: 100%; margin: 0; padding: 0;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sigma - Embed Link Sharing Sample</title>
+  <style>
+    body, html {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    h2 {
+      margin: 0;
+      padding: 10px;
+      text-align: center;
+      background: #f0f0f0;
+    }
+    iframe {
+      flex-grow: 1;
+      width: 100%;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>Sigma - Embed Link Sharing Sample</h2>
+  <iframe id="sigmaDashboard" frameborder="0"></iframe>
+
+  <script>
+    // Base URL for API requests
+    const API_BASE_URL = window.location.origin;
+
+    // Reference to the Sigma iframe
+    const iframe = document.getElementById("sigmaDashboard");
+
+    // Variables to store current exploreKey and bookmarkId
+    let currentExploreKey = null;
+    let currentBookmarkId = null;
+
+    // Parse query parameters from the current URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const exploreKey = urlParams.get("exploreKey");
+    const bookmarkId = urlParams.get("bookmarkId");
+
+    // Function to generate the fetch URL for the server request
+    function generateFetchUrl(exploreKey, bookmarkId) {
+      let url = `${API_BASE_URL}/api/generate-embed-url?`;  // Base API URL
+      if (exploreKey) url += `exploreKey=${exploreKey}`;
+      if (bookmarkId) url += `&bookmarkId=${bookmarkId}`;
+      console.log("Generated fetch URL:", url);  // Log the generated URL for debugging
+      return url;  // Return the constructed URL
+    }
+
+    // Function to fetch the signed embed URL from the server
+    async function fetchEmbedUrl(exploreKey, bookmarkId) {
+      try {
+        // Generate the URL with the correct parameters
+        const newUrl = generateFetchUrl(exploreKey, bookmarkId);
+        console.log("Fetching new URL:", newUrl);  // Log the URL being fetched
+        const response = await fetch(newUrl);
+        const data = await response.json();
+
+        if (response.ok) {
+          // Set the iframe src to the retrieved embed URL
+          iframe.src = data.url;
+          console.log("Updated iframe src to:", data.url);
+        } else {
+          console.error("Error fetching embed URL:", data.error);
+        }
+      } catch (error) {
+        console.error("Error fetching embed URL:", error);
+      }
+    }
+
+    // Function to update the browser URL without reloading the page
+    function updateBrowserUrl(exploreKey, bookmarkId) {
+      const params = new URLSearchParams();
+      if (exploreKey) params.append("exploreKey", exploreKey);
+      if (bookmarkId) params.append("bookmarkId", bookmarkId);
+
+      const newUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+      window.history.pushState({}, '', newUrl);
+    }
+
+    // Function to send sharing links back to Sigma
+    function sendSharingLinks() {
+      const baseUrl = window.location.origin + window.location.pathname;
+      const finalSharingLink = currentExploreKey || currentBookmarkId
+        ? `${baseUrl}?${currentExploreKey ? `exploreKey=${currentExploreKey}` : ''}${currentBookmarkId ? `&bookmarkId=${currentBookmarkId}` : ''}`
+        : baseUrl;
+
+      const sharingExplorationLink = currentExploreKey
+        ? currentBookmarkId
+          ? `${baseUrl}?exploreKey=${currentExploreKey}&bookmarkId=${currentBookmarkId}`
+          : `${baseUrl}?exploreKey=${currentExploreKey}`
+        : null;
+
+      console.log("Sending sharing links to Sigma:");
+      console.log("Final Sharing Link:", finalSharingLink);
+      console.log("Sharing Exploration Link:", sharingExplorationLink);
+
+      iframe.contentWindow.postMessage(
+        {
+          type: "workbook:sharinglink:update",
+          sharingLink: finalSharingLink,
+          sharingExplorationLink: sharingExplorationLink,
+        },
+        "https://app.sigmacomputing.com"
+      );
+    }
+
+    // Event listener for messages from the Sigma iframe
+    window.addEventListener("message", (event) => {
+      if (event.source === iframe.contentWindow && event.origin === "https://app.sigmacomputing.com") {
+        const eventData = event.data;
+
+        // Handle exploreKey changes
+        if (eventData.type === "workbook:exploreKey:onchange") {
+          currentExploreKey = eventData.exploreKey;
+          console.log("Explore Key Updated:", currentExploreKey);  // Log the exploreKey update
+          updateBrowserUrl(currentExploreKey, currentBookmarkId);  // Update the browser URL
+          sendSharingLinks();  // Send the sharing link back to Sigma
+        }
+
+        // Handle bookmarkId changes
+        if (eventData.type === "workbook:bookmark:onchange") {
+          currentBookmarkId = eventData.bookmarkId;
+          console.log("Bookmark ID Updated:", currentBookmarkId);  // Log the bookmarkId update
+          updateBrowserUrl(currentExploreKey, currentBookmarkId);  // Update the browser URL
+          sendSharingLinks();  // Send the sharing link back to Sigma
+        }
+
+        // Handle workbook loaded events
+        if (eventData.type === "workbook:loaded" || eventData.type === "workbook:dataloaded") {
+          sendSharingLinks();  // Send the sharing link back to Sigma
+        }
+      }
+    });
+
+    // Initial fetch of the embed URL and setting the iframe src
+    fetchEmbedUrl(exploreKey, bookmarkId);
+  </script>
+</body>
+</html>
