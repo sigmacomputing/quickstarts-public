@@ -82,21 +82,19 @@
         if (exploreKey) params.append("exploreKey", exploreKey);
         if (bookmarkId) params.append("bookmarkId", bookmarkId);
 
-        const newUrl = `${window.location.origin}${
-          window.location.pathname
-        }?${params.toString()}`;
+        const paramsToString = params.toString();
+        const newUrl = paramsToString
+          ? `${window.location.origin}${window.location.pathname}?${paramsToString}`
+          : `${window.location.origin}${window.location.pathname}`;
         window.history.pushState({}, "", newUrl);
       }
 
       // Function to send sharing links back to Sigma
       function sendSharingLinks() {
         const baseUrl = window.location.origin + window.location.pathname;
-        const finalSharingLink =
-          currentExploreKey || currentBookmarkId
-            ? `${baseUrl}?${
-                currentExploreKey ? `exploreKey=${currentExploreKey}` : ""
-              }${currentBookmarkId ? `&bookmarkId=${currentBookmarkId}` : ""}`
-            : baseUrl;
+        const sharingLink = currentBookmarkId
+          ? `${baseUrl}?&bookmarkId=${currentBookmarkId}`
+          : baseUrl;
 
         const sharingExplorationLink = currentExploreKey
           ? currentBookmarkId
@@ -105,13 +103,13 @@
           : null;
 
         console.log("Sending sharing links to Sigma:");
-        console.log("Final Sharing Link:", finalSharingLink);
+        console.log("Sharing Link:", baseUrl);
         console.log("Sharing Exploration Link:", sharingExplorationLink);
 
         iframe.contentWindow.postMessage(
           {
             type: "workbook:sharinglink:update",
-            sharingLink: finalSharingLink,
+            sharingLink: sharingLink,
             sharingExplorationLink: sharingExplorationLink,
           },
           "https://app.sigmacomputing.com"
