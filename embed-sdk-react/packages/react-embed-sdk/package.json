@@ -1,0 +1,36 @@
+{
+  "name": "@sigmacomputing/react-embed-sdk",
+  "version": "0.3.2",
+  "description": "React JavaScript SDK to interact with Sigma Computing's Embed API",
+  "scripts": {
+    "prepublish": "pnpm build",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint . --ext .ts,.tsx",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "sigmacomputing",
+  "license": "ISC",
+  "exports": {
+    "import": "./dist/index.mjs",
+    "require": "./dist/index.js",
+    "types": "./dist/index.d.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "react": "^16.8 || ^17 || ^18",
+    "react-dom": "^16.8 || ^17 || ^18"
+  },
+  "devDependencies": {
+    "@sigmacomputing/eslint-config": "workspace:*",
+    "@sigmacomputing/typescript-config": "workspace:*",
+    "@types/react": "^18.3.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "dependencies": {
+    "@sigmacomputing/embed-sdk": "workspace:*"
+  }
+}
