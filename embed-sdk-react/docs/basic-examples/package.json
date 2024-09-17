@@ -1,0 +1,40 @@
+{
+  "name": "@sigmacomputing/basic-examples",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@mdx-js/loader": "^3.0.1",
+    "@mdx-js/react": "^3.0.1",
+    "@next/mdx": "^14.2.5",
+    "@shikijs/rehype": "^1.12.0",
+    "@shikijs/transformers": "^1.12.0",
+    "@sigmacomputing/react-embed-sdk": "workspace:*",
+    "@types/mdx": "^2.0.13",
+    "clsx": "^2.1.1",
+    "mdx-prism": "^0.3.4",
+    "next": "14.2.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.4.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@sigmacomputing/eslint-config": "workspace:*",
+    "@sigmacomputing/typescript-config": "workspace:*",
+    "@types/node": "^20.14.13",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^9.0.8",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.4",
+    "postcss": "^8.4.40",
+    "tailwindcss": "^3.4.7",
+    "typescript": "^5.5.4"
+  }
+}

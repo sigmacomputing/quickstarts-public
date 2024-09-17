@@ -1,0 +1,28 @@
+import BasicExample from "./basic-example-wrapper";
+
+<section>
+```tsx
+import { useSigmaIframe } from "@sigmacomputing/react-embed-sdk";
+function BasicExample({ src }: { src: string }) {
+  const { iframeRef, loading, error } = useSigmaIframe(); // [!code highlight]
+  return (
+    <>
+      <p className={loading ? "show" : "hidden"}> Loading...</p> // [!code highlight]
+      <p className={error ? "show" : "hidden"}> Error loading iframe</p> // [!code highlight]
+      <iframe
+        src={src}
+        ref={iframeRef} // [!code highlight]
+        className={loading || error ? "hidden" : "show"} // [!code highlight]
+        width={"100%"}
+        height={"100%"}
+      />
+    </>
+  );
+}
+```
+</section>
+
+<section>
+
+<BasicExample src="https://staging.sigmacomputing.io/embed/1-156WHbeEOtenyfjDhfsnjY" />
+</section>
