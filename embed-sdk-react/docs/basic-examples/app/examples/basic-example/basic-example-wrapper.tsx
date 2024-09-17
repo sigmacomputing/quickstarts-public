@@ -3,7 +3,7 @@ import BasicExample from "./basic-example-embed";
 
 export default async function SignedIframe() {
   const src =
-    "https://staging.sigmacomputing.io/embed/1-156WHbeEOtenyfjDhfsnjY";
+    "process.env.EMBED_URL;";
   const signedSrc = await signEmbedUrl(src);
   return <BasicExample src={signedSrc} />;
 }
