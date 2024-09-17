@@ -1,0 +1,43 @@
+name: Changesets
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  version:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - id: create_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.EMBED_SDK_BOT_APP_ID }}
+          private-key: ${{ secrets.EMBED_SDK_BOT_TOKEN }}
+
+      - name: checkout code repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.create_token.outputs.token }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "pnpm"
+
+      - name: install dependencies
+        run: pnpm install
+
+      - name: create and publish versions
+        uses: changesets/action@v1
+        with:
+          version: pnpm ci:version
+          publish: pnpm ci:release
+          title: "chore: publish new package versions"
+        env:
+          GITHUB_TOKEN: ${{ steps.create_token.outputs.token }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --line-highlight: rgba(160, 130, 170, .14);
+}
+body {
+  color: #292929;
+  background: #F0F0F0;
+}
+
+.highlighted {
+  background-color: var(--line-highlight);
+  width: calc(100%);
+  display: inline-block;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@sigmacomputing/embed-sdk",
+  "version": "0.3.2",
+  "description": "JavaScript SDK to interact with Sigma Computing's Embed API",
+  "scripts": {
+    "prepublish": "pnpm run build",
+    "build": "tsup",
+    "lint": "eslint . --ext .ts",
+    "watch": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "sigmacomputing",
+  "license": "ISC",
+  "exports": {
+    "import": "./dist/index.mjs",
+    "require": "./dist/index.js",
+    "types": "./dist/index.d.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@sigmacomputing/eslint-config": "workspace:*",
+    "@sigmacomputing/typescript-config": "workspace:*"
+  }
+}
