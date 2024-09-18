@@ -9,9 +9,8 @@ import BasicExample from "./basic-example-embed";
 
 // Define an asynchronous component to sign the URL and render the iframe
 export default async function SignedIframe() {
-  // The base URL for the Sigma Computing dashboard or visualization to be embedded
-   const src = "YOUR_SIGMA_EMBED_PATH"; // The embed URL created in Sigma 
-   // const src = ""; // My Sigma instance
+  // Get the base URL from the environment variable
+  const src = process.env.EMBED_URL || ""; // Use the value from the .env file
 
   try {
     // Await the signed URL by passing the base URL to the signEmbedUrl function
