@@ -1799,9 +1799,6 @@ packages:
     resolution: {integrity: sha512-78/PXT1wlLLDgTzDs7sjq9hzz0vXD+zn+7wypEe4fXQxCmdmqfGsEPQxmiCSQI3ajFV91bVSsvNtrJRiW6nGng==}
     engines: {node: '>=10'}
 
-  find-yarn-workspace-root2@1.2.16:
-    resolution: {integrity: sha512-hr6hb1w8ePMpPVUK39S4RlwJzi+xPLuVuG8XlwXU3KD5Yn3qgBWVfy3AzNlDhWvE1EORCE65/Qm26rFQt3VLVA==}
-
   flat-cache@3.2.0:
     resolution: {integrity: sha512-CYcENa+FtcUKLmhhqyctpclsq7QF38pKjZHsGNiSQF5r4FtoKDWabFDl3hzaEQMvT1LHEysw5twgLvpYYb4vbw==}
     engines: {node: ^10.12.0 || >=12.0.0}
@@ -5666,11 +5663,6 @@ snapshots:
       locate-path: 6.0.0
       path-exists: 4.0.0
 
-  find-yarn-workspace-root2@1.2.16:
-    dependencies:
-      micromatch: 4.0.7
-      pkg-dir: 4.2.0
-
   flat-cache@3.2.0:
     dependencies:
       flatted: 3.3.1
@@ -6880,7 +6872,6 @@ snapshots:
   preferred-pm@3.1.4:
     dependencies:
       find-up: 5.0.0
-      find-yarn-workspace-root2: 1.2.16
       path-exists: 4.0.0
       which-pm: 2.2.0
 
