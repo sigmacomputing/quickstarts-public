@@ -1,28 +1,71 @@
-import BasicExample from "./basic-example-wrapper";
+{/* page.mdx */}
+{/*Renders the webpage and SignedIframe*/}
 
-<section>
-```tsx
-import { useSigmaIframe } from "@sigmacomputing/react-embed-sdk";
-function BasicExample({ src }: { src: string }) {
-  const { iframeRef, loading, error } = useSigmaIframe(); // [!code highlight]
+import SignedIframe from './basic-example-wrapper';
+import TooltipComponent from './TooltipComponent';
+
+export default function ExamplePage() {
   return (
-    <>
-      <p className={loading ? "show" : "hidden"}> Loading...</p> // [!code highlight]
-      <p className={error ? "show" : "hidden"}> Error loading iframe</p> // [!code highlight]
-      <iframe
-        src={src}
-        ref={iframeRef} // [!code highlight]
-        className={loading || error ? "hidden" : "show"} // [!code highlight]
-        width={"100%"}
-        height={"100%"}
-      />
-    </>
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Sigma Dashboard Example</h1>
+
+      {/* Grid Container */}
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+
+        {/* Example Embed */}
+        <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
+          <h2 className="text-xl font-bold">Example Embed</h2>
+          <p>
+            The embed shown below is provided free of charge by Sigma Computing, as an example only. The files that
+            have been customized are listed on your left.
+          </p>
+          <p>
+            While you will not be able to customize this example in terms of parameters that are
+            sent to Sigma by the Embed-SDK, you can review the files involved to see a working example of what is
+            minimally required.
+          </p>
+        </div>
+
+        {/*Files Involved*/}
+        <div className="bg-gray-50 p-6 rounded-lg shadow-md mb-8">
+          <h2 className="text-xl font-bold">Files Involved (all files in docs/basic-examples/..) </h2>
+          <ul className="list-disc pl-5 mt-2 space-y-2">
+    <li className="list-inside">
+              <TooltipComponent text="Application environment variables file. This is where we are storing the Sigma embed credentials">
+               .env
+              </TooltipComponent>
+            </li>
+    <li className="list-inside">
+              <TooltipComponent text="This file contains utility functions that facilitate the embedding of Sigma dashboards into a web application by generating signed URLs. These signed URLs ensure secure and authorized access to Sigma dashboards or visualizations.">
+                /lib/utils.ts
+              </TooltipComponent>
+            </li>
+    <li className="list-inside">
+              <TooltipComponent text="The SignedIframe component is responsible for securely embedding a Sigma Computing dashboard into a React application.">
+                app/examples/basic-example/basic-example-wrapper.tsx
+              </TooltipComponent>
+            </li>
+    <li className="list-inside">
+              <TooltipComponent text="This file is a React component designed to embed a Sigma Computing dashboard using an iframe within a React application.">
+                /app/examples/basic-example/basic-example-embed.tsx
+              </TooltipComponent>
+            </li>
+                <li className="list-inside">
+              <TooltipComponent text="This file is a React component designed to embed a Sigma Computing dashboard using an iframe within a React application.">
+                /app/examples/basic-example/basic-example-embed.tsx
+              </TooltipComponent>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      {/* BasicExample Block - Full Width */}
+      <div className="bg-white p-6 rounded-lg shadow-md h-[calc(100vh-16rem)] w-full">
+        <SignedIframe />
+      </div>
+    </div>
   );
 }
-```
-</section>
-
-<section>
-
-<BasicExample src="https://staging.sigmacomputing.io/embed/1-156WHbeEOtenyfjDhfsnjY" />
-</section>
+    
+{/* Generate Signed URL for console log display only */}
+console.log("Signed URL:", signedSrc);

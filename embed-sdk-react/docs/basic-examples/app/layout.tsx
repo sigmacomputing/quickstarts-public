@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { DM_Sans } from "next/font/google"; // Import DM Sans
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 
-const inter = Inter({ subsets: ["latin"] });
+// Configure DM Sans with specified options
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"], // Specify the weights you need
+  style: ["normal", "italic"], // Specify styles if needed
+});
 
 export const metadata: Metadata = {
-  title: "Sigma Computing Embed Docs",
-  description: "Documentation site for Sigma Computing Embed SDK",
+  title: "Sigma Computing Embed-SDK",
+  description: "Sigma Computing Embed SDK",
 };
 
 export default function RootLayout({
@@ -17,10 +22,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={dmSans.className}> {/* Apply DM Sans font class */}
         <div className="relative flex flex-col h-screen">
           <SiteHeader />
-          <div className="flex-1">{children}</div>
+          <div className="flex-1">
+            <main className="container mx-auto p-8">
+              <div className="grid grid-cols-1 gap-8">
+                {children}
+              </div>
+            </main>
+          </div>
         </div>
       </body>
     </html>
