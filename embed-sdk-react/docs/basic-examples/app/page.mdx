@@ -1,13 +1,43 @@
-<main className="container mx-auto">
-  <div className="grid grid-cols-2 gap-8 p-8">
-    <section>
-      <h1 className="text-[4.25rem] leading-[4.3rem]">Sigma Computing <br /> Embed Docs <br /> </h1>
-    </section>
-    <section>
-      <p className="text-lg leading-[64px]">
-        Get started by editing <code>pages/index.tsx</code>
-      </p>
-    </section>
+import ExampleLink from '@/components/example-link';
+import Link from 'next/link';
+
+  {/* Grid Container */}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+    {/* Placeholder Text Block */}
+    <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-0">
+      <h2 className="text-xl font-bold">General Information</h2>
+      
+      We have provide this site to help you get started with the SDK as quickly as possible. There are useful links to your right, including a link to a sample application.
+      <br></br>
+      The sample works as is, based on a Sigma provided embed. It also is a demonstration of the minimum requirements for getting Sigma embedded into your own React application.
+      </div>
+
+    {/* Additional Resources Section */}
+    <div className="bg-gray-50 p-6 rounded-lg shadow-md mb-0">
+      <h2 className="text-xl font-bold">Important Resources</h2>
+      <ul className="list-disc pl-5 mt-2 space-y-2">
+        <li>
+          <a href="http://localhost:3000/examples/basic-example" className="text-blue-600 hover:underline" rel="noopener noreferrer">Sample Application</a>
+        </li>
+        <li>
+          <a href="https://quickstarts.sigmacomputing.com/guide/embedding_15_embed_sdk/index.html?index=..%2F..index#0" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">Embed-SDK for React QuickStart</a>
+        </li>
+        <li>
+          <a href="https://quickstarts.sigmacomputing.com/?cat=embedding" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">QuickStart Embedding Series</a>
+        </li>
+        <li>
+          <a href="https://dash.readme.com/project/sigma-computing/v1.0/docs/embed-sdk-for-react" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">Documentation</a>
+        </li>
+         <li>
+          <a href="https://help.sigmacomputing.com/docs/embed-url-parameters" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">Embed Parameters Documentation</a>
+          </li>
+        <li>
+          <a href="https://www.sigmacomputing.com/" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">Sigma Website</a>
+        </li>
+      </ul>
+    </div>
   </div>
-</main>
+ 
+
 
