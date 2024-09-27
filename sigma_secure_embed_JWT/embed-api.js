@@ -1,3 +1,5 @@
+// embed-api.js
+
 const jwt = require('jsonwebtoken'); // Import jsonwebtoken library for handling JWTs
 const { v4: uuid } = require('uuid'); // Import uuid for generating unique identifiers
 const dotenv = require('dotenv'); // Import dotenv for loading environment variables
@@ -5,11 +7,11 @@ const dotenv = require('dotenv'); // Import dotenv for loading environment varia
 dotenv.config(); // Load environment variables from .env file
 
 // Define constants for the embed URL and session length
-const EMBED_URL = process.env.EMBED_URL;
+const BASE_URL = process.env.BASE_URL;
 const SESSION_LENGTH = Math.min(process.env.SESSION_LENGTH || 3600, 2592000); // Max 30 days in seconds
 
 // Log important configuration details to ensure they are correctly set
-console.log('EMBED_URL:', EMBED_URL);
+console.log('BASE_URL:', BASE_URL);
 console.log('SESSION_LENGTH:', SESSION_LENGTH);
 console.log('EMBED_CLIENT_ID:', process.env.EMBED_CLIENT_ID); // Verify the client ID
 
@@ -41,7 +43,7 @@ async function generateSignedUrl() {
         console.log('Decoded JWT:', decodedToken); // Log the decoded JWT for debugging
 
         // Construct the signed embed URL by appending the JWT and embed parameters
-        const signedEmbedUrl = `${EMBED_URL}?:jwt=${token}&:embed=true`;
+        const signedEmbedUrl = `${BASE_URL}?:jwt=${token}&:embed=true`;
 
         // Log the constructed signed URL
         console.log('Signed Embed URL:', signedEmbedUrl);
