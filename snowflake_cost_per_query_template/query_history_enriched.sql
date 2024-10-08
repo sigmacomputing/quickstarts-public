@@ -1,9 +1,9 @@
 /*************************************************************************************
 *  
 *   Name: query_history_enriched.sql
-*   Dev:  Oscar Bashaw (setup and incremental materialization), Select.dev (wrote the query_history_enriched calculation)
-*   Date: Mar 4 2024
-*   Summary: create query_history_enriched table and set up incremental materialization (inserts)
+*   Dev:  Oscar Bashaw
+*   Date: Oct 7 2024
+*   Summary: create query_history_enriched table and set up incremental materialization
 *   Desc: This series of commands will do the following:
 *           1. Set session variables
 *           2. Create the query_history_enriched table that includes all queries started on or before yesterday
@@ -59,7 +59,7 @@ use warehouse identifier($materialization_warehouse_name);
 -- 2. Create the query_history_enriched table that includes all queries ended on or before yesterday
 ---------------------------------------------------------------------------------------------------------
 create or replace table query_history_enriched 
-cluster by to_date(start_time) as (
+cluster by (to_date(start_time)) as (
     with daily_rates as (
         select date
         , max(iff(service_type = 'WAREHOUSE_METERING', effective_rate, null)) as warehouse_metering_rate
@@ -78,13 +78,13 @@ cluster by to_date(start_time) as (
         , parent_query_id
         , root_query_id
         from snowflake.account_usage.query_attribution_history
-        where to_date(start_time) < getdate()
+        where to_date(start_time) < dateadd(day, -1, getdate())
     )
 
     , query_history as (
         select *
         from snowflake.account_usage.query_history
-        where to_date(query_history.start_time) < getdate()
+        where to_date(query_history.start_time) < dateadd(day, -1, getdate())
     )
 
     , final as (
@@ -226,6 +226,7 @@ try {
                 from snowflake.account_usage.query_attribution_history query_attribution_history
                 , last_enriched_query
                 where query_attribution_history.start_time > last_enriched_query.last_enriched_query_start_time
+                and to_date(query_attribution_history.start_time) < getdate()
             )
 
             , query_history as (
@@ -233,6 +234,7 @@ try {
                 from snowflake.account_usage.query_history query_history
                 , last_enriched_query
                 where query_history.start_time > last_enriched_query.last_enriched_query_start_time
+                and to_date(query_history.start_time) < getdate()
             )
 
             , final as (
