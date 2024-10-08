@@ -111,7 +111,7 @@ cluster by (to_date(start_time)) as (
         , query_history.warehouse_type
         , query_history.cluster_number
         , regexp_like(lower(query_text), '^(show|desc)') as is_metadata_query
-        , regexp_like(lower(query_text), 'select(.|\n|\r)*from(.|\n|\r)*') and not(regexp_like(lower(query_text), 'create(.|\n|\r)*(or replace|secure|recursive)?(.|\n|\r)*view')) as is_select_query
+        , (regexp_like(lower(query_text), 'select(.|\n|\r)*from(.|\n|\r)*') or regexp_like(lower(query_text), '^with.*select.*from.*')) and not(regexp_like(lower(query_text), '^create(.|\n|\r)*(or replace|secure|recursive)?(.|\n|\r)*view')) as is_select_query
         , query_history.query_tag
         , contains(query_history.query_tag, 'Sigma Σ') as is_sigma_query
         , try_parse_json(regexp_replace(query_history.query_tag, 'Sigma Σ ', '')) as sigma_query_tag_json
@@ -261,7 +261,7 @@ try {
                 , query_history.warehouse_type
                 , query_history.cluster_number
                 , regexp_like(lower(query_text), '^(show|desc)') as is_metadata_query
-                , regexp_like(lower(query_text), 'select(.|\n|\r)*from(.|\n|\r)*') and not(regexp_like(lower(query_text), 'create(.|\n|\r)*(or replace|secure|recursive)?(.|\n|\r)*view')) as is_select_query
+                , (regexp_like(lower(query_text), 'select(.|\n|\r)*from(.|\n|\r)*') or regexp_like(lower(query_text), '^with.*select.*from.*')) and not(regexp_like(lower(query_text), '^create(.|\n|\r)*(or replace|secure|recursive)?(.|\n|\r)*view')) as is_select_query
                 , query_history.query_tag
                 , contains(query_history.query_tag, 'Sigma Σ') as is_sigma_query
                 , try_parse_json(regexp_replace(query_history.query_tag, 'Sigma Σ ', '')) as sigma_query_tag_json
