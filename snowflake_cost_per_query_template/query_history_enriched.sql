@@ -78,13 +78,13 @@ cluster by (to_date(start_time)) as (
         , parent_query_id
         , root_query_id
         from snowflake.account_usage.query_attribution_history
-        where to_date(start_time) < dateadd(day, -1, getdate())
+        where start_time < dateadd(day, -1, getdate())
     )
 
     , query_history as (
         select *
         from snowflake.account_usage.query_history
-        where to_date(query_history.start_time) < dateadd(day, -1, getdate())
+        where query_history.start_time < dateadd(day, -1, getdate())
     )
 
     , final as (
