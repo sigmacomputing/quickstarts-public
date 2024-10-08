@@ -171,8 +171,8 @@ cluster by (to_date(start_time)) as (
         , query_history.query_acceleration_upper_limit_scale_factor
         , query_attribution_history.parent_query_id
         , query_attribution_history.root_query_id
-        from query_history
-        left join query_attribution_history on query_history.query_id = query_attribution_history.query_id
+        from query_attribution_history
+        left join query_history on query_history.query_id = query_attribution_history.query_id
         left join daily_rates on to_date(query_history.start_time) = daily_rates.date
     )
 
@@ -226,7 +226,7 @@ try {
                 from snowflake.account_usage.query_attribution_history query_attribution_history
                 , last_enriched_query
                 where query_attribution_history.start_time > last_enriched_query.last_enriched_query_start_time
-                and to_date(query_attribution_history.start_time) < getdate()
+                and query_attribution_history.start_time < dateadd(hour, -12, getdate())
             )
 
             , query_history as (
@@ -234,7 +234,7 @@ try {
                 from snowflake.account_usage.query_history query_history
                 , last_enriched_query
                 where query_history.start_time > last_enriched_query.last_enriched_query_start_time
-                and to_date(query_history.start_time) < getdate()
+                and query_history.start_time < dateadd(hour, -3, getdate())
             )
 
             , final as (
@@ -321,8 +321,8 @@ try {
                 , query_history.query_acceleration_upper_limit_scale_factor
                 , query_attribution_history.parent_query_id
                 , query_attribution_history.root_query_id
-                from query_history
-                left join query_attribution_history on query_history.query_id = query_attribution_history.query_id
+                from query_attribution_history
+                left join query_history on query_history.query_id = query_attribution_history.query_id
                 left join daily_rates on to_date(query_history.start_time) = daily_rates.date
             )
 
