@@ -1,0 +1,35 @@
+/* Hide the default Streamlit hamburger menu and footer */
+#MainMenu {
+    visibility: hidden;
+}
+footer {
+    visibility: hidden;
+}
+
+/* Reduce padding around the main content area */
+.block-container {
+    padding-top: 0px;
+    padding-bottom: 0px;
+    padding-left: 0px;
+    padding-right: 0px;
+}
+
+/* Make the iframe responsive */
+iframe {
+    width: 100% !important;
+    height: calc(100vh - 50px); /* Adjust '50px' based on header/title height */
+}
+
+/* Customize the page background color */
+body {
+    background-color: #FFFFFF;
+}
+
+/* Customize the title style */
+h1 {
+    text-align: center;
+    margin-top: 10px;
+    margin-bottom: 0px;
+    font-size: 24px;
+    color: #333333;
+}
