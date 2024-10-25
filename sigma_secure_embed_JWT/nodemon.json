@@ -1,6 +1,7 @@
 {
-    "watch": ["src", "server", "views", ".env", ".js"],
-    "ext": "js,jsx,ts,tsx,json, ejs",
+   "watch": [".", "server", ".env"],
+    "ext": "js",
     "ignore": ["node_modules"],
     "exec": "node server.js"
   }
+
