@@ -1,0 +1,12 @@
+{
+  "name": "signed_URL",
+  "version": "1.0.0",
+  "main": "embed-api.js",
+  "scripts": {
+    "start": "nodemon embed-api.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

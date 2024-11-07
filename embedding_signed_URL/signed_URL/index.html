@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html style="height: 100%; margin: 0; padding: 0;">
+
+<head>
+    <title>Sigma Embedding</title>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            display: flex; /* Make the body a flex container */
+            flex-direction: column; /* Stack flex items vertically */
+        }
+        h2 {
+            /* Optional: Add style for the header if needed */
+            margin: 0; /* Remove default margin */
+            padding: 10px; /* Add some padding for aesthetics */
+            text-align: center; /* Center the header text */
+            background: #f0f0f0; /* Background color for the header */
+        }
+        iframe {
+            flex-grow: 1; /* Allow the iframe to fill the available space */
+            width: 100%; /* Full width */
+            border: none; /* Remove the iframe border */
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Sigma - Secure Embed Signed-URL QuickStart</h2>
+    <iframe id="sigmaDashboard" frameborder="0"></iframe>
+    <script>
+        const URL = "http://localhost:3000/api/generate-embed-url";
+        fetch(URL)
+        .then(data => data.json())
+        .then(res => {
+            document.getElementById("sigmaDashboard").src = res.url;
+        })
+        .catch(e => console.log(e));
+    </script>
+</body>
+
+</html>
