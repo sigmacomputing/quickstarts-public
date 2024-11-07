@@ -22,6 +22,10 @@ async function generateSignedUrl() {
             keyid: process.env.CLIENT_ID
         });
 
+        // Decode the JWT to inspect its content and log it
+        const decodedToken = jwt.decode(token, { complete: true });
+        console.log('Decoded JWT:', decodedToken); // Log the decoded JWT for debugging
+        
         const signedEmbedUrl = `${process.env.BASE_URL}?:jwt=${token}&:embed=true`;
         // Log important configuration details to ensure they are correctly set
         console.log('BASE_URL:', process.env.BASE_URL);
