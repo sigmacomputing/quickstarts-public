@@ -1,6 +1,2 @@
 plugin_hello_world/
-sigma-api-recipes/.env
-sigma-api-recipes/.env 
-sigma_secure_embed_JWT/.env
-*.env
-embedding-streamlit/.env
+
