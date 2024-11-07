@@ -11,7 +11,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;     // Set the port number from environment variables or default to 3000
 
-// Configure Express to use EJS as the templating engine
+// Configure Express to use EJS as the template engine
 app.set('view engine', 'ejs');             // Set EJS as the view engine
 app.set('views', path.join(__dirname, '/views')); // Set the directory where the view templates (EJS files) are located
 
