@@ -39,6 +39,16 @@ def local_css(file_name):
 
 local_css("styles.css")
 
+# Display the Sigma embed in the Streamlit app
+st.markdown(
+    """
+    <h1 style='text-align: center; margin-top: 10px; margin-bottom: 0px;'>
+    Securely Embed Sigma into Streamlit 🎈
+    </h1>
+    """,
+    unsafe_allow_html=True
+)
+
 # Generate the signed URL for the Sigma embed
 url_with_signature = generate_signed_url(
     embed_path=EMBED_PATH,
@@ -50,20 +60,6 @@ url_with_signature = generate_signed_url(
     session_length=SESSION_LENGTH,
     mode=MODE
 )
-
-# Display the Sigma embed in the Streamlit app
-st.markdown(
-    """
-    <h1 style='text-align: center; margin-top: 10px; margin-bottom: 0px;'>
-    Securely Embed Sigma into Streamlit 🎈
-    </h1>
-    """,
-    unsafe_allow_html=True
-)
-
-# Log the generated URL for easy verification and debugging
-st.write("Generated Signed URL for Embed:")
-st.write(url_with_signature)
 
 # Use the full page width for the iframe and specify a height
 st.components.v1.iframe(url_with_signature, height=800)
