@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from dotenv import load_dotenv
-from embed_api import generate_signed_url  # Import the function from embedding.py
+from embed_api import generate_signed_url  # Import the function from embed-api.py
 
 # Set the page configuration to use the full width of the browser window
 st.set_page_config(layout="wide")
@@ -9,13 +9,29 @@ st.set_page_config(layout="wide")
 # Load environment variables from the .env file
 load_dotenv()
 
-# Retrieve variables from environment
+# Retrieve variables from .env file
 EMBED_PATH = os.getenv('EMBED_PATH')
 CLIENT_ID = os.getenv('CLIENT_ID')
-EMBED_SECRET = os.getenv('EMBED_SECRET')
-SIGMA_TEAM = os.getenv('SIGMA_TEAM')
+EMBED_SECRET = os.getenv('SECRET')
+EMAIL = os.getenv('EMAIL')
+EXTERNAL_USER_ID = os.getenv('EXTERNAL_USER_ID')
+ACCOUNT_TYPE = os.getenv('ACCOUNT_TYPE')
+EXTERNAL_USER_TEAM = os.getenv('EXTERNAL_USER_TEAM')
+SESSION_LENGTH = os.getenv('SESSION_LENGTH', '3600')  # Set default to 3600 if not defined
+MODE = os.getenv('MODE', 'userbacked')  # Set default to 'userbacked' if not defined
 
-# Apply external CSS styles
+# Log key configuration details for debugging
+st.write("### Sigma Embed Configuration")
+st.write("EMBED_PATH:", EMBED_PATH)
+st.write("CLIENT_ID:", CLIENT_ID)
+st.write("EMAIL:", EMAIL)
+st.write("EXTERNAL_USER_ID:", EXTERNAL_USER_ID)
+st.write("ACCOUNT_TYPE:", ACCOUNT_TYPE)
+st.write("EXTERNAL_USER_TEAM:", EXTERNAL_USER_TEAM)
+st.write("SESSION_LENGTH:", SESSION_LENGTH)
+st.write("MODE:", MODE)
+
+# Apply external CSS styles if you have a "styles.css" file
 def local_css(file_name):
     """Loads a local CSS file into the Streamlit app."""
     with open(file_name) as f:
@@ -28,9 +44,11 @@ url_with_signature = generate_signed_url(
     embed_path=EMBED_PATH,
     client_id=CLIENT_ID,
     embed_secret=EMBED_SECRET,
-    sigma_team=SIGMA_TEAM,
-    user_email="user@example.com",  # Replace with dynamic user email if available
-    user_id="1"                     # Replace with dynamic user ID if available
+    sigma_team=EXTERNAL_USER_TEAM,
+    user_email=EMAIL,
+    user_id=EXTERNAL_USER_ID,
+    session_length=SESSION_LENGTH,
+    mode=MODE
 )
 
 # Display the Sigma embed in the Streamlit app
@@ -43,5 +61,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Use the full page width for the iframe
-st.components.v1.iframe(url_with_signature)
+# Log the generated URL for easy verification and debugging
+st.write("Generated Signed URL for Embed:")
+st.write(url_with_signature)
+
+# Use the full page width for the iframe and specify a height
+st.components.v1.iframe(url_with_signature, height=800)
