@@ -1,29 +1,33 @@
 // basic-example-wrapper.tsx
-// The SignedIframe component is responsible for securely embedding a Sigma Computing dashboard into a React application.
-// 	signEmbedUrl: This function is imported from the Sigma Embed SDK library and is used to generate a signed URL for secure access to a Sigma dashboard.
+"use client"; // This directive tells Next.js to treat this as a Client Component
 
-// Import the signEmbedUrl function from the utilities module
+import { useEffect, useState } from "react";
 import { signEmbedUrl } from "@/lib/utils";
-// Import the BasicExample component, which is responsible for rendering the iframe
 import BasicExample from "./basic-example-embed";
 
-// Define an asynchronous component to sign the URL and render the iframe
-export default async function SignedIframe() {
-  // Get the base URL from the environment variable
-  const src = process.env.EMBED_URL || ""; // Use the value from the .env file
+export default function SignedIframe() {
+  const [signedSrc, setSignedSrc] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const src = "https://app.sigmacomputing.com/embed/1-24vP6WRI5BK8C8dLX4kzac"; // Hardcoded URL as discussed
 
-  try {
-    // Await the signed URL by passing the base URL to the signEmbedUrl function
-    const signedSrc = await signEmbedUrl(src);
+  useEffect(() => {
+    const getSignedUrl = async () => {
+      try {
+        const signedUrl = await signEmbedUrl(src);
+        console.log("Signed URL:", signedUrl);
+        setSignedSrc(signedUrl); // Set the signed URL in state
+      } catch (err) {
+        console.error("Error signing URL:", err);
+        setError("Error loading iframe");
+      }
+    };
 
-    // Log the base and signed URLs as output in server-side terminal session
-    console.log("Signed URL:", signedSrc);
+    getSignedUrl(); // Call the async function to sign the URL
+  }, [src]); // Empty dependency array since `src` is hardcoded and won't change
 
-    // Return the BasicExample component with the signed URL as a prop
-    return <BasicExample src={signedSrc} />;
-  } catch (error) {
-    // Log any errors encountered during signing
-    console.error("Error signing URL:", error);
-    return <p>Error loading iframe</p>;
-  }
+  // Conditional rendering based on signing state
+  if (error) return <p>{error}</p>;
+  if (!signedSrc) return <p>Loading...</p>;
+
+  return <BasicExample src={signedSrc} />; // Pass signed URL to the iframe component
 }
