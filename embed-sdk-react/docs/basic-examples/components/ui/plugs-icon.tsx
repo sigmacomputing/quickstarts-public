@@ -4,7 +4,7 @@ function PlugsLogo() {
   return (
 	
 <svg xmlns="http://www.w3.org/2000/svg"
-width="165" height="100" viewBox="-110 -60 600 300" enable-background="new 0 0 488 238"
+width="165" height="100" viewBox="-110 -60 600 300" enableBackground="new 0 0 488 238"
      preserveAspectRatio="xMidYMid meet">
 		<path fill="#EFF0F0" opacity="1.000000" stroke="none" 
 

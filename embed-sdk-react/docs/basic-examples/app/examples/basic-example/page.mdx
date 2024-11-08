@@ -16,13 +16,7 @@ export default function ExamplePage() {
         <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
           <h2 className="text-xl font-bold">Example Embed</h2>
           <p>
-            The embed shown below is provided free of charge by Sigma Computing, as an example only. The files that
-            have been customized are listed on your left.
-          </p>
-          <p>
-            While you will not be able to customize this example in terms of parameters that are
-            sent to Sigma by the Embed-SDK, you can review the files involved to see a working example of what is
-            minimally required.
+            The embed will be rendered below once section 8 of the QuickStart has been configured to completion and the server restarted.
           </p>
         </div>
 
@@ -30,11 +24,6 @@ export default function ExamplePage() {
         <div className="bg-gray-50 p-6 rounded-lg shadow-md mb-8">
           <h2 className="text-xl font-bold">Files Involved (all files in docs/basic-examples/..) </h2>
           <ul className="list-disc pl-5 mt-2 space-y-2">
-    <li className="list-inside">
-              <TooltipComponent text="Application environment variables file. This is where we are storing the Sigma embed credentials">
-               .env
-              </TooltipComponent>
-            </li>
     <li className="list-inside">
               <TooltipComponent text="This file contains utility functions that facilitate the embedding of Sigma dashboards into a web application by generating signed URLs. These signed URLs ensure secure and authorized access to Sigma dashboards or visualizations.">
                 /lib/utils.ts
@@ -46,11 +35,6 @@ export default function ExamplePage() {
               </TooltipComponent>
             </li>
     <li className="list-inside">
-              <TooltipComponent text="This file is a React component designed to embed a Sigma Computing dashboard using an iframe within a React application.">
-                /app/examples/basic-example/basic-example-embed.tsx
-              </TooltipComponent>
-            </li>
-                <li className="list-inside">
               <TooltipComponent text="This file is a React component designed to embed a Sigma Computing dashboard using an iframe within a React application.">
                 /app/examples/basic-example/basic-example-embed.tsx
               </TooltipComponent>
