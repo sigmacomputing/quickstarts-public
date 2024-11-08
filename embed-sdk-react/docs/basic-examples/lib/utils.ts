@@ -8,7 +8,7 @@ const CLIENT_ID = "your_client_id";
 const SECRET = "your_secret";
 const EMAIL = "your_test_embed_user_email";
 const EXTERNAL_USER_ID = "123";
-const ACCOUNT_TYPE = “viewer";
+const ACCOUNT_TYPE = "viewer";
 const EXTERNAL_USER_TEAM = "your_team";
 const SESSION_LENGTH = "3600"; // Default session length
 
