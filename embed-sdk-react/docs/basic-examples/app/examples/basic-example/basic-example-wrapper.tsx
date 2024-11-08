@@ -8,7 +8,7 @@ import BasicExample from "./basic-example-embed";
 export default function SignedIframe() {
   const [signedSrc, setSignedSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const src = "https://app.sigmacomputing.com/embed/1-24vP6WRI5BK8C8dLX4kzac"; // Hardcoded URL as discussed
+  const src = "your_sigma_url_to_embed"; // Hardcoded URL as discussed
 
   useEffect(() => {
     const getSignedUrl = async () => {
