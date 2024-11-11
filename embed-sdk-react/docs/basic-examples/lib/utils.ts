@@ -1,14 +1,16 @@
+// utils.js
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { v4 as uuid } from "uuid";
 
-// Hardcoded Embed Configuration and User-Specific Values
-const EMBED_PATH = "your_sigma_url_to_embed";
+// Embed Configuration and User-Specific Values
+export const EMBED_PATH = "your_sigma_url_to_embed"; // Ensure this is exported
+
 const CLIENT_ID = "your_client_id";
 const SECRET = "your_secret";
 const EMAIL = "your_test_embed_user_email";
 const EXTERNAL_USER_ID = "123";
-const ACCOUNT_TYPE = "viewer";
+const ACCOUNT_TYPE = "Pro";
 const EXTERNAL_USER_TEAM = "your_team";
 const SESSION_LENGTH = "3600"; // Default session length
 
@@ -33,23 +35,24 @@ async function simpleHmac({ key, data }: { key: string; data: string }) {
 
 export async function signEmbedUrl(dashboard: string): Promise<string> {
   if (!SECRET || !CLIENT_ID) {
-    throw new Error("The Embed `SECRET` or `CLIENT_ID` is missing in the code");
+    throw new Error("The Embed SECRET or CLIENT_ID is missing in the code");
   }
 
   const searchParamsObject = {
-    ":mode": "userbacked",
+    ":client_id": CLIENT_ID,
     ":email": EMAIL,
     ":external_user_id": EXTERNAL_USER_ID,
     ":account_type": ACCOUNT_TYPE,
     ":external_user_team": EXTERNAL_USER_TEAM,
+    ":session_length": SESSION_LENGTH,
+    ":mode": "userbacked",
     ":nonce": uuid(),
     ":time": `${Math.floor(new Date().getTime() / 1000)}`,
-    ":session_length": SESSION_LENGTH,
-    ":client_id": CLIENT_ID,
   };
 
   const searchParams = new URLSearchParams(searchParamsObject);
 
+  // Use dashboard parameter correctly to create the base URL
   const urlWithSearchParams = `${dashboard}?${searchParams.toString()}`;
 
   const signature = await simpleHmac({
@@ -59,5 +62,6 @@ export async function signEmbedUrl(dashboard: string): Promise<string> {
 
   searchParams.append(":signature", signature);
 
+  // Return the fully signed URL
   return `${dashboard}?${searchParams.toString()}`;
 }
