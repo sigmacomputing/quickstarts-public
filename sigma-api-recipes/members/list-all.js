@@ -1,4 +1,5 @@
-// This script returns all members
+// Members: List All (JavaScript)
+// This script retrieves all members from the Sigma API by making GET requests with pagination until all members are fetched.
 
 // 1: Load environment variables from a specific .env file for configuration
 require('dotenv').config({ path: 'sigma-api-recipes/.env' });
