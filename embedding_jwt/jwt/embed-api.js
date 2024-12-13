@@ -9,6 +9,9 @@ async function generateSignedUrl() {
         const time = Math.floor(Date.now() / 1000); // Current Unix timestamp
         const expirationTime = time + Math.min(parseInt(process.env.SESSION_LENGTH) || 3600, 2592000);
 
+        // Convert TEAM into an array if it is a single value
+        const teamsArray = process.env.TEAM ? [process.env.TEAM] : [];
+
         const token = jwt.sign({
             sub: process.env.EMAIL,
             iss: process.env.CLIENT_ID,
@@ -16,7 +19,7 @@ async function generateSignedUrl() {
             iat: time,
             exp: expirationTime,
             account_type: process.env.ACCOUNT_TYPE,
-            team: process.env.TEAM,
+            teams: teamsArray,
         }, process.env.SECRET, {
             algorithm: 'HS256',
             keyid: process.env.CLIENT_ID
@@ -26,12 +29,12 @@ async function generateSignedUrl() {
         const decodedToken = jwt.decode(token, { complete: true });
         console.log('Decoded JWT:', decodedToken); // Log the decoded JWT for debugging
         
-        const signedEmbedUrl = `${process.env.BASE_URL}?:jwt=${token}&:embed=true`;
+        const signedEmbedUrl = `${process.env.BASE_URL}?:jwt=${encodeURIComponent(token)}&:embed=true`;
         // Log important configuration details to ensure they are correctly set
         console.log('BASE_URL:', process.env.BASE_URL);
         console.log('CLIENT_ID:', process.env.CLIENT_ID); // Verify the client ID
         console.log('SESSION_LENGTH:', process.env.SESSION_LENGTH);
-        console.log('TEAMS:', process.env.TEAM);
+        console.log('TEAMS:', teamsArray);
         console.log('ACCOUNT_TYPE:', process.env.ACCOUNT_TYPE);
         console.log('Signed Embed URL:', signedEmbedUrl);
 
