@@ -60,42 +60,452 @@ use warehouse identifier($materialization_warehouse_name);
 ---------------------------------------------------------------------------------------------------------
 create or replace table query_history_enriched 
 cluster by (to_date(start_time)) as (
-    with daily_rates as (
-        select date
-        , max(iff(service_type = 'WAREHOUSE_METERING', effective_rate, null)) as warehouse_metering_rate
-        , max(iff(service_type = 'QUERY_ACCELERATION', effective_rate, null)) as query_acceleration_rate 
-        , max(iff(service_type = 'CLOUD_SERVICES', effective_rate, null)) as cloud_services_rate 
-        from snowflake.organization_usage.rate_sheet_daily 
-        where account_locator = current_account() 
-        and service_type in ('WAREHOUSE_METERING', 'QUERY_ACCELERATION', 'CLOUD_SERVICES')
-        group by date
+    with query_history as (
+        select
+            *
+        from snowflake.account_usage.query_history 
+        where end_time < getdate()
+    )
+
+    , dates_base as (
+        select date_day as date from (    
+            with rawdata as (
+                with p as (
+                    select 0 as generated_number union all select 1
+                ), 
+                unioned as (
+                    select
+                    p0.generated_number * power(2, 0)
+                    + 
+                    p1.generated_number * power(2, 1)
+                    + 
+                    p2.generated_number * power(2, 2)
+                    + 
+                    p3.generated_number * power(2, 3)
+                    + 
+                    p4.generated_number * power(2, 4)
+                    + 
+                    p5.generated_number * power(2, 5)
+                    + 
+                    p6.generated_number * power(2, 6)
+                    + 
+                    p7.generated_number * power(2, 7)
+                    + 
+                    p8.generated_number * power(2, 8)
+                    + 
+                    p9.generated_number * power(2, 9)
+                    + 
+                    p10.generated_number * power(2, 10)
+                    + 
+                    p11.generated_number * power(2, 11)
+                    +
+                    p12.generated_number * power(2, 12)
+                    + 1
+                    as generated_number
+                    from
+                    p as p0
+                    cross join 
+                    p as p1
+                    cross join 
+                    p as p2
+                    cross join 
+                    p as p3
+                    cross join 
+                    p as p4
+                    cross join 
+                    p as p5
+                    cross join 
+                    p as p6
+                    cross join 
+                    p as p7
+                    cross join 
+                    p as p8
+                    cross join 
+                    p as p9
+                    cross join 
+                    p as p10
+                    cross join
+                    p as p11 
+                    cross join
+                    p as p12
+                )
+                select *
+                from unioned
+                where generated_number <= 10000
+                order by generated_number
+            ),
+
+            all_periods as (
+
+                select (
+                dateadd(
+                    day,
+                    row_number() over (order by 1) - 1,
+                    '2018-01-01'
+                    )
+                ) as date_day
+                from rawdata
+
+            ),
+
+            filtered as (
+                select *
+                from all_periods
+                where date_day <= dateadd(day, 1, current_date)
+            )
+
+            select * from filtered
+
+
+        )
+    )
+
+    , rate_sheet_daily_base as (
+        select
+            date,
+            usage_type,
+            currency,
+            effective_rate,
+            service_type
+        from snowflake.organization_usage.rate_sheet_daily
+        where
+            account_locator = current_account()
+    )
+
+    , remaining_balance_daily_without_contract_view as (
+        select
+            date,
+            organization_name,
+            currency,
+            free_usage_balance,
+            capacity_balance,
+            on_demand_consumption_balance,
+            rollover_balance
+        from snowflake.organization_usage.remaining_balance_daily
+
+        qualify row_number() over (partition by date order by contract_number desc) = 1
+    )
+
+    , stop_thresholds as (
+        select min(date) as start_date
+        from rate_sheet_daily_base
+
+        union all
+
+        select min(date) as start_date
+        from remaining_balance_daily_without_contract_view
+    )
+
+    , date_range as (
+        select
+            max(start_date) as start_date,
+            current_date as end_date
+        from stop_thresholds
+    )
+
+    , remaining_balance_daily as (
+        select
+            date,
+            free_usage_balance + capacity_balance + on_demand_consumption_balance + rollover_balance as remaining_balance,
+            remaining_balance < 0 as is_account_in_overage
+        from remaining_balance_daily_without_contract_view
+    )
+
+    , latest_remaining_balance_daily as (
+        select
+            date,
+            remaining_balance,
+            is_account_in_overage
+        from remaining_balance_daily
+        qualify row_number() over (order by date desc) = 1
+    )
+
+    , rate_sheet_daily as (
+        select rate_sheet_daily_base.*
+        from rate_sheet_daily_base
+        inner join date_range
+            on rate_sheet_daily_base.date between date_range.start_date and date_range.end_date
+    )
+
+    , rates_date_range_w_usage_types as (
+        select
+            date_range.start_date,
+            date_range.end_date,
+            usage_types.usage_type
+        from date_range
+        cross join (select distinct usage_type from rate_sheet_daily) as usage_types
+    )
+
+    , base as (
+        select
+            db.date,
+            dr.usage_type
+        from dates_base as db
+        inner join rates_date_range_w_usage_types as dr
+            on db.date between dr.start_date and dr.end_date
+    )
+
+    , rates_w_overage as (
+        select
+            base.date,
+            base.usage_type,
+            coalesce(
+                rate_sheet_daily.service_type,
+                lag(rate_sheet_daily.service_type) ignore nulls over (partition by base.usage_type order by base.date),
+                lead(rate_sheet_daily.service_type) ignore nulls over (partition by base.usage_type order by base.date)
+            ) as service_type,
+            coalesce(
+                rate_sheet_daily.effective_rate,
+                lag(rate_sheet_daily.effective_rate) ignore nulls over (partition by base.usage_type order by base.date),
+                lead(rate_sheet_daily.effective_rate) ignore nulls over (partition by base.usage_type order by base.date)
+            ) as effective_rate,
+            coalesce(
+                rate_sheet_daily.currency,
+                lag(rate_sheet_daily.currency) ignore nulls over (partition by base.usage_type order by base.date),
+                lead(rate_sheet_daily.currency) ignore nulls over (partition by base.usage_type order by base.date)
+            ) as currency,
+            base.usage_type like 'overage-%' as is_overage_rate,
+            replace(base.usage_type, 'overage-', '') as associated_usage_type,
+            coalesce(remaining_balance_daily.is_account_in_overage, latest_remaining_balance_daily.is_account_in_overage, false) as _is_account_in_overage,
+            case
+                when _is_account_in_overage and is_overage_rate then 1
+                when not _is_account_in_overage and not is_overage_rate then 1
+                else 0
+            end as rate_priority
+
+        from base
+        left join latest_remaining_balance_daily on latest_remaining_balance_daily.date is not null
+        left join remaining_balance_daily
+            on base.date = remaining_balance_daily.date
+        left join rate_sheet_daily
+            on base.date = rate_sheet_daily.date
+                and base.usage_type = rate_sheet_daily.usage_type
+    )
+
+    , rates as (
+        select
+            date,
+            usage_type,
+            associated_usage_type,
+            service_type,
+            effective_rate,
+            currency,
+            is_overage_rate
+        from rates_w_overage
+        qualify row_number() over (partition by date, service_type, associated_usage_type order by rate_priority desc) = 1
+    )
+
+    , daily_rates as (
+        select
+            date,
+            associated_usage_type as usage_type,
+            service_type,
+            effective_rate,
+            currency,
+            is_overage_rate,
+            row_number() over (partition by service_type, associated_usage_type order by date desc) = 1 as is_latest_rate
+        from rates
+        order by date
+    )
+
+    , stop_threshold as (
+        select max(end_time) as latest_ts
+        from snowflake.account_usage.warehouse_metering_history
+    )
+
+    , filtered_queries as (
+        select
+            query_id,
+            query_text as original_query_text,
+            credits_used_cloud_services,
+            warehouse_id,
+            warehouse_size is not null as ran_on_warehouse,
+            timeadd(
+                'millisecond',
+                queued_overload_time + compilation_time
+                + queued_provisioning_time + queued_repair_time
+                + list_external_files_time,
+                start_time
+            ) as execution_start_time,
+            start_time,
+            end_time,
+            query_acceleration_bytes_scanned
+        from snowflake.account_usage.query_history
+        where end_time <= (select latest_ts from stop_threshold)
+        and end_time < getdate()
+    )
+
+    , hours_list as (
+        select
+            dateadd(
+                'hour',
+                '-' || row_number() over (order by seq4() asc),
+                dateadd('day', '+1', current_date::timestamp_tz)
+            ) as hour_start,
+            dateadd('hour', '+1', hour_start) as hour_end
+        from table(generator(rowcount => (24 * 730)))
+    )
+
+    , query_hours as (
+        select
+            hours_list.hour_start,
+            hours_list.hour_end,
+            queries.*
+        from hours_list
+        inner join filtered_queries as queries
+            on hours_list.hour_start >= date_trunc('hour', queries.execution_start_time)
+                and hours_list.hour_start < queries.end_time
+                and queries.ran_on_warehouse
+    )
+
+    , query_seconds_per_hour as (
+        select
+            *,
+            datediff('millisecond', greatest(execution_start_time, hour_start), least(end_time, hour_end)) as num_milliseconds_query_ran,
+            sum(num_milliseconds_query_ran) over (partition by warehouse_id, hour_start) as total_query_milliseconds_in_hour,
+            div0(num_milliseconds_query_ran, total_query_milliseconds_in_hour) as fraction_of_total_query_time_in_hour,
+            sum(query_acceleration_bytes_scanned) over (partition by warehouse_id, hour_start) as total_query_acceleration_bytes_scanned_in_hour,
+            div0(query_acceleration_bytes_scanned, total_query_acceleration_bytes_scanned_in_hour) as fraction_of_total_query_acceleration_bytes_scanned_in_hour,
+            hour_start as hour
+        from query_hours
+    )
+
+    , credits_billed_hourly as (
+        select
+            start_time as hour,
+            entity_id as warehouse_id,
+            sum(iff(service_type = 'WAREHOUSE_METERING', credits_used_compute, 0)) as credits_used_compute,
+            sum(iff(service_type = 'WAREHOUSE_METERING', credits_used_cloud_services, 0)) as credits_used_cloud_services,
+            sum(iff(service_type = 'QUERY_ACCELERATION', credits_used_compute, 0)) as credits_used_query_acceleration
+        from snowflake.account_usage.metering_history
+        where true
+            and service_type in ('QUERY_ACCELERATION', 'WAREHOUSE_METERING')
+        group by 1, 2
+    )
+
+    , query_cost as (
+        select
+            query_seconds_per_hour.*,
+            credits_billed_hourly.credits_used_compute * daily_rates.effective_rate as actual_warehouse_cost,
+            credits_billed_hourly.credits_used_compute * query_seconds_per_hour.fraction_of_total_query_time_in_hour * daily_rates.effective_rate as allocated_compute_cost_in_hour,
+            credits_billed_hourly.credits_used_compute * query_seconds_per_hour.fraction_of_total_query_time_in_hour as allocated_compute_credits_in_hour,
+            credits_billed_hourly.credits_used_query_acceleration * query_seconds_per_hour.fraction_of_total_query_acceleration_bytes_scanned_in_hour as allocated_query_acceleration_credits_in_hour,
+            allocated_query_acceleration_credits_in_hour * daily_rates.effective_rate as allocated_query_acceleration_cost_in_hour
+        from query_seconds_per_hour
+        inner join credits_billed_hourly
+            on query_seconds_per_hour.warehouse_id = credits_billed_hourly.warehouse_id
+                and query_seconds_per_hour.hour = credits_billed_hourly.hour
+        inner join daily_rates
+            on date(query_seconds_per_hour.start_time) = daily_rates.date
+                and daily_rates.service_type = 'WAREHOUSE_METERING'
+                and daily_rates.usage_type = 'compute'
+    )
+
+    , cost_per_query as (
+        select
+            query_id,
+            any_value(start_time) as start_time,
+            any_value(end_time) as end_time,
+            any_value(execution_start_time) as execution_start_time,
+            sum(allocated_compute_cost_in_hour) as compute_cost,
+            sum(allocated_compute_credits_in_hour) as compute_credits,
+            sum(allocated_query_acceleration_cost_in_hour) as query_acceleration_cost,
+            sum(allocated_query_acceleration_credits_in_hour) as query_acceleration_credits,
+            any_value(credits_used_cloud_services) as credits_used_cloud_services,
+            any_value(ran_on_warehouse) as ran_on_warehouse
+        from query_cost
+        group by 1
+    )
+
+    , credits_billed_daily as (
+        select
+            date(hour) as date,
+            sum(credits_used_compute) as daily_credits_used_compute,
+            sum(credits_used_cloud_services) as daily_credits_used_cloud_services,
+            greatest(daily_credits_used_cloud_services - daily_credits_used_compute * 0.1, 0) as daily_billable_cloud_services
+        from credits_billed_hourly
+        group by 1
+    )
+
+    , all_queries as (
+        select
+            query_id,
+            start_time,
+            end_time,
+            execution_start_time,
+            compute_cost,
+            compute_credits,
+            query_acceleration_cost,
+            query_acceleration_credits,
+            credits_used_cloud_services,
+            ran_on_warehouse
+        from cost_per_query
+
+        union all
+
+        select
+            query_id,
+            start_time,
+            end_time,
+            execution_start_time,
+            0 as compute_cost,
+            0 as compute_credits,
+            0 as query_acceleration_cost,
+            0 as query_acceleration_credits,
+            credits_used_cloud_services,
+            ran_on_warehouse
+        from filtered_queries
+        where
+            not ran_on_warehouse
+    )
+
+    , stg__cost_per_query as (
+        select
+            all_queries.query_id,
+            all_queries.start_time,
+            all_queries.end_time,
+            all_queries.execution_start_time,
+            all_queries.compute_cost,
+            all_queries.compute_credits,
+            all_queries.query_acceleration_cost,
+            all_queries.query_acceleration_credits,
+            -- For the most recent day, which is not yet complete, this calculation won't be perfect.
+            -- So, we don't look at any queries from the most recent day t, just t-1 and before.
+            (div0(all_queries.credits_used_cloud_services, credits_billed_daily.daily_credits_used_cloud_services) * credits_billed_daily.daily_billable_cloud_services) * coalesce(daily_rates.effective_rate, current_rates.effective_rate) as cloud_services_cost,
+            div0(all_queries.credits_used_cloud_services, credits_billed_daily.daily_credits_used_cloud_services) * credits_billed_daily.daily_billable_cloud_services as cloud_services_credits,
+            all_queries.compute_cost + all_queries.query_acceleration_cost + cloud_services_cost as query_cost,
+            all_queries.compute_credits + all_queries.query_acceleration_credits + cloud_services_credits as query_credits,
+            all_queries.ran_on_warehouse,
+            coalesce(daily_rates.currency, current_rates.currency) as currency
+        from all_queries
+        inner join credits_billed_daily
+            on date(all_queries.start_time) = credits_billed_daily.date
+        left join daily_rates
+            on date(all_queries.start_time) = daily_rates.date
+                and daily_rates.service_type = 'CLOUD_SERVICES'
+                and daily_rates.usage_type = 'cloud services'
+        inner join daily_rates as current_rates
+            on current_rates.is_latest_rate
+                and current_rates.service_type = 'CLOUD_SERVICES'
+                and current_rates.usage_type = 'cloud services'
+        order by all_queries.start_time asc
     )
 
     , query_attribution_history as (
-        select query_id
-        , credits_attributed_compute
-        , credits_used_query_acceleration
-        , parent_query_id
-        , root_query_id
-        from snowflake.account_usage.query_attribution_history
-        where start_time < dateadd(day, -1, getdate())
-    )
-
-    , query_history as (
         select *
-        from snowflake.account_usage.query_history
-        where query_history.start_time < dateadd(day, -1, getdate())
+        from snowflake.account_usage.query_attribution_history
+        where end_time < getdate()
     )
 
     , final as (
         select query_history.query_id
-        , query_attribution_history.credits_attributed_compute
-        , query_attribution_history.credits_attributed_compute * daily_rates.warehouse_metering_rate as compute_cost
-        , query_attribution_history.credits_used_query_acceleration
-        , query_attribution_history.credits_used_query_acceleration * daily_rates.query_acceleration_rate as query_acceleration_cost
-        , query_history.credits_used_cloud_services
-        , query_history.credits_used_cloud_services * daily_rates.cloud_services_rate as cloud_services_cost
-        , (coalesce(compute_cost, 0) + coalesce(query_acceleration_cost, 0) + coalesce(cloud_services_cost, 0)) as total_cost
+        , cost_per_query.compute_credits as credits_attributed_compute
+        , cost_per_query.compute_cost as compute_cost
+        , cost_per_query.query_acceleration_credits as credits_used_query_acceleration
+        , cost_per_query.query_acceleration_cost as query_acceleration_cost
+        , cost_per_query.cloud_services_credits as credits_used_cloud_services
+        , cost_per_query.cloud_services_cost as cloud_services_cost
+        , cost_per_query.query_cost as total_cost
         , query_history.query_text
         , query_history.database_id
         , query_history.database_name
@@ -171,9 +581,9 @@ cluster by (to_date(start_time)) as (
         , query_history.query_acceleration_upper_limit_scale_factor
         , query_attribution_history.parent_query_id
         , query_attribution_history.root_query_id
-        from query_attribution_history
-        left join query_history on query_history.query_id = query_attribution_history.query_id
-        left join daily_rates on to_date(query_history.start_time) = daily_rates.date
+        from query_history 
+        left join stg__cost_per_query cost_per_query on query_history.query_id = cost_per_query.query_id
+        left join query_attribution_history on query_attribution_history.query_id = query_history.query_id
     )
 
     select *
