@@ -1,8 +1,8 @@
 /*************************************************************************************
 *  
 *   Name: query_history_enriched.sql
-*   Dev:  Oscar Bashaw
-*   Date: Oct 7 2024
+*   Dev:  Oscar Bashaw (with credit to Select.dev for their cost-per-query calculation)
+*   Date: Dec 13 2024
 *   Summary: create query_history_enriched table and set up incremental materialization
 *   Desc: This series of commands will do the following:
 *           1. Set session variables
@@ -11,12 +11,12 @@
 *           4. Create a stored procedure that enriches queries not yet in the query_history_enriched table (and 
 *              that were run on or before the most recently completed day) and insert them into query_history_enriched
 *           5. Create and start a task to call that stored procedure using the specified CRON string (Once per day Mon-Fri at 3am PT)
-*          
-*           
+*                   
 *   Prereqs: To run this script the following is required:
 *           - Ability to use the SYSADMIN role (just briefly, to give the proper privileges to another role)
 *           - The name of the role used in your Sigma connection
 *           - Verify that there is data in the views in the SNOWFLAKE.ORGANIZATION_USAGE schema
+*
 *************************************************************************************/
 
 
@@ -64,7 +64,7 @@ cluster by (to_date(start_time)) as (
         select
             *
         from snowflake.account_usage.query_history 
-        where end_time < getdate()
+        where end_time < date_trunc(day, getdate())
     )
 
     , dates_base as (
@@ -332,7 +332,7 @@ cluster by (to_date(start_time)) as (
             query_acceleration_bytes_scanned
         from snowflake.account_usage.query_history
         where end_time <= (select latest_ts from stop_threshold)
-        and end_time < getdate()
+        and end_time < date_trunc(day, getdate())
     )
 
     , hours_list as (
@@ -494,7 +494,7 @@ cluster by (to_date(start_time)) as (
     , query_attribution_history as (
         select *
         from snowflake.account_usage.query_attribution_history
-        where end_time < getdate()
+        where end_time < date_trunc(day, getdate())
     )
 
     , final as (
@@ -618,11 +618,10 @@ try {
             
             , query_history as (
                 select
-                    *
+                    query_history.*
                 from snowflake.account_usage.query_history query_history 
-                , last_enriched_query
-                where query_history.start_time > last_enriched_query.last_enriched_query_start_time
-                and query_history.start_time < dateadd(hour, -3, getdate())
+                where query_history.start_time > (select last_enriched_query_start_time from last_enriched_query)
+                and query_history.start_time < date_trunc(day, getdate())
             )
 
             , dates_base as (
@@ -889,9 +888,8 @@ try {
                     end_time,
                     query_acceleration_bytes_scanned
                 from snowflake.account_usage.query_history query_history
-                , last_enriched_query
                 where end_time <= (select latest_ts from stop_threshold)
-                and query_history.start_time > last_enriched_query.last_enriched_query_start_time
+                and query_history.start_time > (select last_enriched_query_start_time from last_enriched_query)
                 and query_history.end_time < date_trunc(day, getdate())
             )
 
@@ -1053,8 +1051,9 @@ try {
 
             , query_attribution_history as (
                 select *
-                from snowflake.account_usage.query_attribution_history
-                where end_time < getdate()
+                from snowflake.account_usage.query_attribution_history query_attribution_history
+                where end_time < date_trunc(day, getdate())
+                and query_attribution_history.start_time > (select last_enriched_query_start_time from last_enriched_query)
             )
 
             , final as (
@@ -1142,10 +1141,9 @@ try {
                 , query_attribution_history.parent_query_id
                 , query_attribution_history.root_query_id
                 from query_history 
-                , last_enriched_query
                 left join stg__cost_per_query cost_per_query on query_history.query_id = cost_per_query.query_id
                 left join query_attribution_history on query_attribution_history.query_id = query_history.query_id
-                where query_history.start_time > last_enriched_query.last_enriched_query_start_time
+                where query_history.start_time > (select last_enriched_query_start_time from last_enriched_query)
                 and query_history.end_time < date_trunc(day, getdate())
             )
 
@@ -1174,7 +1172,6 @@ as
 call usp_materialize_query_history_enriched();
 
 alter task task_call_usp_materialize_query_history_enriched resume;
-
 
 ---------------------------------------------------------------------------------------------------------
 -- END OF FILE
