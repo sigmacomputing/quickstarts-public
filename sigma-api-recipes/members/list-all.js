@@ -1,68 +1,69 @@
-// Members: List All (JavaScript)
-// This script retrieves all members from the Sigma API by making GET requests with pagination until all members are fetched.
-
-// 1: Load environment variables from a specific .env file for configuration
+// Load environment variables from a specific .env file for configuration
 require('dotenv').config({ path: 'sigma-api-recipes/.env' });
 
-// 2: Import the function to obtain a bearer token from the authenticate-bearer module
+// Import the function to obtain a bearer token from the authenticate-bearer module
 const getBearerToken = require('../get-access-token');
 
-// 3: Import Axios for making HTTP requests
+// Import Axios for making HTTP requests
 const axios = require('axios');
+const fs = require('fs'); // Import File System for saving output
 
-// 4: Load use-case specific variables from environment variables
+// Load use-case specific variables from environment variables
 const baseURL = process.env.baseURL; // Your base URL
+const limit = process.env.LIMIT || 200; // Get limit from .env, default to 200
 
 // Define an asynchronous function to list members.
 async function listMembers() {
-  // Obtain a bearer token using the previously imported function.
-  const accessToken = await getBearerToken();
-  // If unable to obtain a token, log an error message and exit the function.
-  if (!accessToken) {
-    console.log('Failed to obtain Bearer token.');
-    return;
-  }
-
-  // Initialize an empty array to store all members
-  let allMembers = [];
-
-  // Initialize pagination variables
-  let page = 1;
-  let nextPage = true;
-
-  try {
-    // Make requests until there are no more pages to fetch
-    while (nextPage) {
-      // Construct the URL for accessing the API endpoint that lists members for the current page.
-      const membersURL = `${baseURL}/members?page=${page}`;
-
-      // Make a GET request to the specified URL, including the bearer token in the request headers for authentication.
-      const response = await axios.get(membersURL, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json'
-        }
-      });
-
-      console.log(`URL sent to Sigma: ${membersURL}`); // Log the constructed URL before sending the request
-
-      // Assuming the response contains an array of members directly
-      const members = response.data;
-
-      // Concatenate the fetched members to the array of all members
-      allMembers = allMembers.concat(members);
-
-      // Update pagination variables for the next iteration
-      nextPage = response.data.nextPage;
-      page++;
+    // Obtain a bearer token using the previously imported function.
+    const accessToken = await getBearerToken();
+    if (!accessToken) {
+        console.log('Failed to obtain Bearer token.');
+        return;
     }
 
-    // Log all the fetched members to the console in a readable JSON format.
-    console.log("Members:", JSON.stringify(allMembers, null, 2));
-  } catch (error) {
-    // If the request fails, log the error details.
-    console.error('Error listing members:', error.response ? error.response.data : error);
-  }
+    let allMembers = [];  // Store all retrieved members
+    let nextPage = null;  // Initialize pagination token
+
+    try {
+        while (true) {
+            // Construct the API URL with pagination
+            let membersURL = `${baseURL}/members?limit=${limit}`;
+            if (nextPage) {
+                membersURL += `&page=${encodeURIComponent(nextPage)}`;
+            }
+
+            console.log(`Fetching members from: ${membersURL}`);
+
+            // Make API request
+            const response = await axios.get(membersURL, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
+                }
+            });
+
+            // Check if API response contains entries
+            const members = response.data.entries || [];
+            console.log(`Fetched ${members.length} members in this batch.`);
+
+            // Append fetched members to allMembers
+            allMembers = allMembers.concat(members);
+            console.log(`Total members collected so far: ${allMembers.length}`);
+
+            // Check if there's a nextPage token
+            nextPage = response.data.nextPage || null;
+            if (!nextPage) break; // Stop if there are no more pages
+        }
+
+        console.log(`Total Members Retrieved: ${allMembers.length}`);
+
+        // Save to a JSON file for verification
+        fs.writeFileSync('members_output.json', JSON.stringify(allMembers, null, 2));
+        console.log("Full member list saved to members_output.json");
+
+    } catch (error) {
+        console.error('Error listing members:', error.response ? error.response.data : error);
+    }
 }
 
 // Execute the function to list members.
