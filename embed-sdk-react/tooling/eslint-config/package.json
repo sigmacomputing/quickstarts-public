@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "files": [
-    "next.js",
+    "next": ">=14.2.25",
     "react-internal.js"
   ],
   "devDependencies": {
