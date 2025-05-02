@@ -1,0 +1,18 @@
+{
+  "name": "sigma_embedding_quickstarts",
+  "version": "1.0.0",
+  "description": "Sigma Embed QuickStarts Project",
+  "scripts": {
+    "start": "nodemon server/server.js",
+    "start:prod": "node server/server.js"
+  },
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "express": "^4.17.1",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}

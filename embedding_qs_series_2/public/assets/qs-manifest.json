@@ -1,0 +1,16 @@
+[
+  { "slug": "getting_started", "label": "01 - Getting Started" },
+  { "slug": "federated_access", "label": "02 - Federated Access" },
+  { "slug": "parameters_userattributes", "label": "03 - Parameters + Attributes" },
+  { "slug": "isolation_solutions", "label": "04 - Isolation Solutions" },
+  { "slug": "premium_service", "label": "05 - Premium Service" },
+  { "slug": "parameters_user_attributes", "label": "06 - More Parameters" },
+  { "slug": "events", "label": "07 - Events" },
+  { "slug": "version_tagging", "label": "08 - Version Tagging" },
+  { "slug": "responsive_embeds", "label": "09 - Responsive Embeds" },
+  { "slug": "multitenancy", "label": "10 - Multitenancy" },
+  { "slug": "parameterize_queries", "label": "11 - Parameterized Queries" },
+  { "slug": "link_sharing", "label": "12 - Link Sharing" },
+  { "slug": "react_sdk", "label": "13 - Embed SDK for React" },
+  { "slug": "public_access", "label": "14 - Public Access" }
+]
