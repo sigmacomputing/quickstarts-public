@@ -15,7 +15,7 @@ You need node v20 or greater installed on your machine.
 2. Run the quickstart
 
    ```bash
-   npm start
+   npm run dev
    ```
 
 3. Open the browser and navigate to `http://localhost:3000`
