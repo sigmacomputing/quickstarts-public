@@ -1,3 +1,4 @@
 /.DS_Store
 /embedding_qs_series_2/node_modules
 /embedding_jwt/jwt//node_modules
+/embedding_qs_series_2/.env

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Embedding 01: Getting Started</title>
+    <link rel="stylesheet" href="/styles/layout.css" />
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        margin: 0;
+        font-family: sans-serif;
+      }
+
+      .layout-topbar {
+        background: #f57c00;
+        color: white;
+        height: 4rem;
+        display: flex;
+        align-items: center;
+        padding: 0 1rem;
+        font-weight: bold;
+        font-size: 1.2rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        justify-content: space-between;
+      }
+
+      .menu-button {
+        background-color: white;
+        color: black;
+        border: 2px solid #f57c00;
+        font-weight: bold;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 1rem;
+      }
+
+      .menu-button:hover {
+        background-color: #ffe1c4;
+        color: #c65100;
+      }
+      ß .header-title {
+        flex: 1;
+        text-align: right;
+        color: white;
+      }
+
+      .main {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        width: 280px;
+        background: #f4f4f4;
+        padding: 1.5rem;
+        border-right: 1px solid #ddd;
+        overflow-y: auto;
+      }
+
+      .content {
+        flex: 1;
+        padding: 1.5rem;
+        background: #ffffff;
+      }
+
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: 6px;
+      }
+
+      .layout-footer {
+        height: 3rem;
+        background: #eeeeee;
+        text-align: center;
+        line-height: 3rem;
+        font-size: 0.9rem;
+        color: #666;
+      }
+
+      .left-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .sidebar.collapsed {
+        width: 0;
+        padding: 0;
+        overflow: hidden;
+        transition: width 0.3s ease;
+      }
+
+      .main.expanded .content {
+        flex: 1 1 100%;
+      }
+      .sidebar {
+        transition: width 0.3s ease, padding 0.3s ease;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="layout-topbar">
+      <div class="left-controls">
+        <button id="toggle-sidebar" class="menu-button">☰</button>
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+      </div>
+      <span class="header-title">Embedding 02: Federated Access</span>
+    </header>
+
+    <div class="main">
+      <aside class="sidebar">
+        <h2>Information:</h2>
+        <p>
+          The Plugs Sales table should render in the iframe on the right, based
+          on your .env file configuration.
+        </p>
+
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <p>Loading...</p>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is decoded below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+      </aside>
+
+      <script>
+        const toggleBtn = document.getElementById("toggle-sidebar");
+        const sidebar = document.querySelector(".sidebar");
+        const mainLayout = document.querySelector(".main");
+
+        toggleBtn.addEventListener("click", () => {
+          sidebar.classList.toggle("collapsed");
+          mainLayout.classList.toggle("expanded");
+        });
+      </script>
+
+      <main class="content">
+        <iframe id="sigma-embed" src=""></iframe>
+      </main>
+    </div>
+
+    <footer class="layout-footer">Sigma &copy; 2025</footer>
+
+    <script>
+      function decodeJwt(token) {
+        try {
+          const [header, payload, signature] = token.split(".");
+          const decode = (str) => JSON.parse(atob(str));
+          return {
+            header: decode(header),
+            payload: decode(payload),
+            signature,
+          };
+        } catch (err) {
+          return { error: "Failed to decode JWT." };
+        }
+      }
+
+      fetch("/generate-jwt/getting_started")
+        .then((res) => res.json())
+        .then((data) => {
+          const iframe = document.getElementById("sigma-embed");
+          iframe.src = data.embedUrl;
+
+          const jwt = data.jwt || "No JWT generated.";
+
+          // Display JWT
+          const jwtBlock = document.getElementById("jwt-display");
+          jwtBlock.textContent = jwt;
+
+          // Decode JWT
+          const decoded = decodeJwt(jwt);
+          const decodedBlock = document.getElementById("jwt-decoded");
+
+          // Extract base URL and workbook ID
+          const fullUrl = data.embedUrl.split("?:jwt=")[0];
+          const lastSlashIndex = fullUrl.lastIndexOf("/");
+          const baseUrlOnly = fullUrl.substring(0, lastSlashIndex);
+          const workbookId = fullUrl.substring(lastSlashIndex + 1);
+
+          if (decoded.error) {
+            decodedBlock.innerHTML = `<p style="color:red;">${decoded.error}</p>`;
+          } else {
+            decodedBlock.innerHTML = `
+              <p><strong>Base URL:</strong><br>${baseUrlOnly}</p>
+              <p><strong>Workbook ID:</strong><br>${workbookId}</p>
+              <h3>Decoded JWT Header:</h3>
+              <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
+              <h3>Decoded JWT Payload:</h3>
+              <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>
+            `;
+          }
+        })
+        .catch((err) => {
+          console.error("Error loading iframe:", err);
+          document.getElementById("sigma-embed").outerHTML =
+            '<p style="color:red;">Failed to load Sigma embed. Check console for details.</p>';
+        });
+    </script>
+  </body>
+</html>
