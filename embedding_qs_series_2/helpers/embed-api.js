@@ -43,6 +43,11 @@ async function generateSignedUrl(mode = "") {
     // Convert comma-separated teams string into array
     const teamsArray = rawTeams ? rawTeams.split(",").map((t) => t.trim()) : [];
 
+    // Gather user attributes from .env
+    const userAttributes = {
+      Store_Region: process.env.UA_STORE_REGION
+    };
+
     // Create the payload for the JWT
     const payload = {
       sub: email, // Subject = user email
@@ -52,6 +57,7 @@ async function generateSignedUrl(mode = "") {
       exp: expirationTime, // Expiration time
       account_type: accountType, // Account type (e.g., "View", "Team")
       teams: teamsArray, // Teams (array even if only 1)
+      user_attributes: userAttributes // Inject user attributes here
     };
 
     // Sign the JWT using shared secret
@@ -73,8 +79,36 @@ async function generateSignedUrl(mode = "") {
     console.log("TEAMS:", teamsArray);
     console.log("ACCOUNT_TYPE:", accountType);
     console.log("Signed Embed URL:", signedEmbedUrl);
+    console.log("User Attributes:", userAttributes);
 
-    return { signedUrl: signedEmbedUrl, jwt: token };
+    // Optional URL parameters (comment/uncomment to test)
+    const optionalParams = {
+      disable_mobile_view: process.env.disable_mobile_view,
+      hide_menu: process.env.hide_menu,
+      hide_folder_navigation: process.env.hide_folder_navigation,
+      hide_tooltip: process.env.hide_tooltip,
+      lng: process.env.lng,
+      menu_position: process.env.menu_position,
+      responsive_height: process.env.responsive_height,
+      theme: process.env.theme,
+    };
+
+    // Build query string for active optional params
+    const optionalQuery = Object.entries(optionalParams)
+      .filter(([key, value]) => value !== undefined && value !== "")
+      .map(([key, value]) => `:${key}=${encodeURIComponent(value)}`)
+      .join("&");
+
+    // Append optional params if any are active
+    const finalEmbedUrl = optionalQuery
+      ? `${signedEmbedUrl}&${optionalQuery}`
+      : signedEmbedUrl;
+
+    // Debug logs for optional params
+    console.log("Optional Parameters:", optionalParams);
+    console.log("Final Embed URL:", finalEmbedUrl);
+
+    return { signedUrl: finalEmbedUrl, jwt: token };
   } catch (error) {
     console.error("Failed to generate JWT:", error.message);
     throw new Error("JWT generation failed");
