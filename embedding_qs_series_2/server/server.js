@@ -22,6 +22,11 @@ app.get('/generate-jwt/:mode', async (req, res) => {
   }
 });
 
+// Generate public URL for embedding
+app.get('/generate-public-url', (req, res) => {
+  res.json({ baseUrl: process.env.PUBLIC_ACCESS_BASE_URL });
+});
+
 // Serve static files
 app.use(express.static(path.join(__dirname, '..', 'public')));
 

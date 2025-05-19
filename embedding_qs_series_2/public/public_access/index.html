@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Embedding 15: Public Access</title>
+    <link rel="stylesheet" href="/styles/layout.css" />
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        margin: 0;
+        font-family: sans-serif;
+      }
+
+      .layout-topbar {
+        background: #f57c00;
+        color: white;
+        height: 4rem;
+        display: flex;
+        align-items: center;
+        padding: 0 1rem;
+        font-weight: bold;
+        font-size: 1.2rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        justify-content: space-between;
+      }
+
+      .menu-button {
+        background-color: white;
+        color: black;
+        border: 2px solid #f57c00;
+        font-weight: bold;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 1rem;
+      }
+
+      .menu-button:hover {
+        background-color: #ffe1c4;
+        color: #c65100;
+      }
+      ß .header-title {
+        flex: 1;
+        text-align: right;
+        color: white;
+      }
+
+      .main {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        width: 280px;
+        background: #f4f4f4;
+        padding: 1.5rem;
+        border-right: 1px solid #ddd;
+        overflow-y: auto;
+      }
+
+      .content {
+        flex: 1;
+        padding: 1.5rem;
+        background: #ffffff;
+      }
+
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: 6px;
+      }
+
+      .layout-footer {
+        height: 3rem;
+        background: #eeeeee;
+        text-align: center;
+        line-height: 3rem;
+        font-size: 0.9rem;
+        color: #666;
+      }
+
+      .left-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .sidebar.collapsed {
+        width: 0;
+        padding: 0;
+        overflow: hidden;
+        transition: width 0.3s ease;
+      }
+
+      .main.expanded .content {
+        flex: 1 1 100%;
+      }
+      .sidebar {
+        transition: width 0.3s ease, padding 0.3s ease;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="layout-topbar">
+      <div class="left-controls">
+        <button id="toggle-sidebar" class="menu-button">☰</button>
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+      </div>
+      <span class="header-title">Embedding 15: Public Access</span>
+    </header>
+
+    <div class="main">
+    
+
+<iframe id="sigma-embed" width="100%" height="600" style="border: none;"></iframe>
+
+<script>
+  fetch("/generate-public-url")
+    .then((res) => res.json())
+    .then((data) => {
+      const iframe = document.getElementById("sigma-embed");
+      iframe.src = data.baseUrl;
+    })
+    .catch((err) => {
+      console.error("Failed to load public embed URL:", err);
+    });
+
+</script>
+
+
+  </body>
+</html>
