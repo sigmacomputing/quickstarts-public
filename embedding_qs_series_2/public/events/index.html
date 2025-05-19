@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Embedding 09: Events</title>
+    <link rel="stylesheet" href="/styles/layout.css" />
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        margin: 0;
+        font-family: sans-serif;
+      }
+
+      .layout-topbar {
+        background: #f57c00;
+        color: white;
+        height: 4rem;
+        display: flex;
+        align-items: center;
+        padding: 0 1rem;
+        font-weight: bold;
+        font-size: 1.2rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        justify-content: space-between;
+      }
+
+      .menu-button {
+        background-color: white;
+        color: black;
+        border: 2px solid #f57c00;
+        font-weight: bold;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 1rem;
+      }
+
+      .menu-button:hover {
+        background-color: #ffe1c4;
+        color: #c65100;
+      }
+      ß .header-title {
+        flex: 1;
+        text-align: right;
+        color: white;
+      }
+
+      .main {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        width: 280px;
+        background: #f4f4f4;
+        padding: 1.5rem;
+        border-right: 1px solid #ddd;
+        overflow-y: auto;
+      }
+
+      .content {
+        flex: 1;
+        padding: 1.5rem;
+        background: #ffffff;
+      }
+
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: 6px;
+      }
+
+      .layout-footer {
+        height: 3rem;
+        background: #eeeeee;
+        text-align: center;
+        line-height: 3rem;
+        font-size: 0.9rem;
+        color: #666;
+      }
+
+      .left-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .sidebar.collapsed {
+        width: 0;
+        padding: 0;
+        overflow: hidden;
+        transition: width 0.3s ease;
+      }
+
+      .main.expanded .content {
+        flex: 1 1 100%;
+      }
+      .sidebar {
+        transition: width 0.3s ease, padding 0.3s ease;
+      }
+      #region-buttons button {
+        padding: 6px 12px;
+        font-size: 14px;
+        font-weight: bold;
+        background-color: #f57c00;
+        color: black;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      #region-buttons button:hover {
+        background-color: #e96a00;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="layout-topbar">
+      <div class="left-controls">
+        <button id="toggle-sidebar" class="menu-button">☰</button>
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+      </div>
+      <span class="header-title">Embedding 09: Events</span>
+    </header>
+
+    <div class="main">
+      <aside class="sidebar">
+        <h2>Information:</h2>
+        <p>
+          The Plugs Sales table should render in the iframe on the right, based
+          on your .env file configuration.
+        </p>
+
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <p>Loading...</p>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is decoded below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+      </aside>
+
+      <script>
+        const toggleBtn = document.getElementById("toggle-sidebar");
+        const sidebar = document.querySelector(".sidebar");
+        const mainLayout = document.querySelector(".main");
+
+        toggleBtn.addEventListener("click", () => {
+          sidebar.classList.toggle("collapsed");
+          mainLayout.classList.toggle("expanded");
+        });
+      </script>
+
+      <main class="content">
+        <div
+          id="region-buttons"
+          style="
+            display: flex;
+            justify-content: left;
+            gap: 12px;
+            padding: 8px;
+            background: #fff;
+            border-bottom: 2px solid #ddd;
+          "
+        >
+          <button onclick="setStoreRegion('East')">East</button>
+          <button onclick="setStoreRegion('West')">West</button>
+          <button onclick="setStoreRegion('Midwest')">Midwest</button>
+          <button onclick="setStoreRegion('')">All</button>
+          <div class="center">
+            <p>
+              <strong
+                >These buttons send values to the Sigma control id
+                "StoreRegion"</strong
+              >
+            </p>
+          </div>
+        </div>
+
+        <div
+          id="event-log"
+          style="
+            background: #fff3cd;
+            padding: 10px;
+            border: 1px solid #ffeeba;
+            margin-bottom: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+          "
+        >
+          <strong>Events Log (most recent events first):</strong>
+          <ul
+            id="event-output"
+            style="list-style-type: none; padding-left: 0"
+          ></ul>
+        </div>
+        <iframe id="sigma-embed" src=""></iframe>
+      </main>
+    </div>
+
+    <footer class="layout-footer">Sigma &copy; 2025</footer>
+
+    <script>
+      function decodeJwt(token) {
+        try {
+          const [header, payload, signature] = token.split(".");
+          const decode = (str) => JSON.parse(atob(str));
+          return {
+            header: decode(header),
+            payload: decode(payload),
+            signature,
+          };
+        } catch (err) {
+          return { error: "Failed to decode JWT." };
+        }
+      }
+
+      fetch("/generate-jwt/events")
+        .then((res) => res.json())
+        .then((data) => {
+          const iframe = document.getElementById("sigma-embed");
+          iframe.src = data.embedUrl;
+
+          const jwt = data.jwt || "No JWT generated.";
+
+          // Display JWT
+          const jwtBlock = document.getElementById("jwt-display");
+          jwtBlock.textContent = jwt;
+
+          // Decode JWT
+          const decoded = decodeJwt(jwt);
+          const decodedBlock = document.getElementById("jwt-decoded");
+
+          // Extract base URL and workbook ID
+          const urlParts = data.embedUrl.split("?:jwt=");
+          const fullUrl = urlParts[0];
+          const paramString = urlParts[1]?.split("&:").slice(1).join("&:"); // Grab all params after the JWT
+
+          const lastSlashIndex = fullUrl.lastIndexOf("/");
+          const baseUrlOnly = fullUrl.substring(0, lastSlashIndex);
+          const workbookId = fullUrl.substring(lastSlashIndex + 1);
+
+          // Format URL parameters if they exist
+          let formattedParams = "";
+          if (paramString) {
+            formattedParams = decodeURIComponent(paramString)
+              .split("&:")
+              .map((p) => p.replace("=", ": "))
+              .join("\n");
+          }
+
+          if (decoded.error) {
+            decodedBlock.innerHTML = `<p style="color:red;">${decoded.error}</p>`;
+          } else {
+            decodedBlock.innerHTML = `
+        <p><strong>Base URL:</strong><br>${baseUrlOnly}</p>
+        <p><strong>Workbook ID:</strong><br>${workbookId}</p>
+        ${
+          formattedParams
+            ? `<h3>URL Parameters:</h3><pre>${formattedParams}</pre>`
+            : ""
+        }
+
+        <h3>Decoded JWT Header:</h3>
+        <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
+        <h3>Decoded JWT Payload:</h3>
+        <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>
+      `;
+
+            // Inject User Attributes section under URL Parameters
+            if (decoded.payload && decoded.payload.user_attributes) {
+              const urlParamsIndex = decodedBlock.innerHTML.indexOf(
+                "<h3>Decoded JWT Header:</h3>"
+              );
+              const userAttrsHTML = `
+          <h3>User Attributes:</h3>
+          <pre>${JSON.stringify(decoded.payload.user_attributes, null, 2)}</pre>
+        `;
+              decodedBlock.innerHTML =
+                decodedBlock.innerHTML.slice(0, urlParamsIndex) +
+                userAttrsHTML +
+                decodedBlock.innerHTML.slice(urlParamsIndex);
+
+              // Console log for dev visibility
+              console.log(
+                "User Attributes (JWT):",
+                decoded.payload.user_attributes
+              );
+            }
+          }
+        })
+        .catch((err) => {
+          console.error("Error loading iframe:", err);
+          document.getElementById("sigma-embed").outerHTML =
+            '<p style="color:red;">Failed to load Sigma embed. Check console for details.</p>';
+        });
+
+      // Unified handler for all messages received *inbound* to the iframe from Sigma
+      window.addEventListener("message", (event) => {
+        if (event.origin !== "https://app.sigmacomputing.com") return;
+
+        const { type, ...rest } = event.data || {};
+        console.log("Native Application to iframe (Inbound)", event.data);
+
+        if (type?.startsWith("workbook:")) {
+          console.log("⚙️ Workbook event:", type);
+        } else if (type?.startsWith("variable:")) {
+          console.log("📊 Variable update event:", type);
+        } else {
+          console.log("📩 General message:", event.data);
+        }
+
+        const logContainer = document.getElementById("event-output");
+        const logItem = document.createElement("li");
+        logItem.style.marginBottom = "8px";
+        logItem.style.color = "blue"; // Inbound = blue
+
+        logItem.innerHTML = `
+ <strong style="text-decoration: underline;">Native Application to iframe (Inbound)</strong><br/>
+    <strong>Timestamp:</strong> ${new Date().toLocaleTimeString()}<br/>
+    <strong>Event Type:</strong> ${type || "unknown"}<br/>
+    <strong>Payload:</strong> <code>${JSON.stringify(
+      event.data,
+      null,
+      2
+    )}</code>
+  `;
+        logContainer.prepend(logItem);
+      });
+
+      // Function to send the clicked StoreRegion button to Sigma
+      function setStoreRegion(region) {
+        const sigma_iframe = document.getElementById("sigma-embed");
+        const message = {
+          type: "workbook:variables:update",
+          variables: { StoreRegion: region },
+        };
+
+        if (sigma_iframe && sigma_iframe.contentWindow) {
+          sigma_iframe.contentWindow.postMessage(
+            message,
+            "https://app.sigmacomputing.com"
+          );
+          console.log("iframe to Native Application (Outbound)", message);
+
+          const logContainer = document.getElementById("event-output");
+          const logItem = document.createElement("li");
+          logItem.style.marginBottom = "8px";
+          logItem.style.color = "green"; // Outbound = green
+
+          logItem.innerHTML = `
+<strong style="text-decoration: underline;">iframe to Native Application (Outbound)</strong>
+      <strong>Timestamp:</strong> ${new Date().toLocaleTimeString()}<br/>
+      <strong>Event Type:</strong> ${message.type}<br/>
+      <strong>Payload:</strong> <code>${JSON.stringify(message, null, 2)}</code>
+    `;
+          logContainer.prepend(logItem);
+        }
+      }
+    </script>
+  </body>
+</html>
