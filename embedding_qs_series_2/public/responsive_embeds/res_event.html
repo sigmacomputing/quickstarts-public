@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Embedding 11: Responsive Embeds</title>
+    <link rel="stylesheet" href="/styles/layout.css" />
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        margin: 0;
+        font-family: sans-serif;
+      }
+
+      .layout-topbar {
+        background: #f57c00;
+        color: white;
+        height: 4rem;
+        display: flex;
+        align-items: center;
+        padding: 0 1rem;
+        font-weight: bold;
+        font-size: 1.2rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        justify-content: space-between;
+      }
+
+      .menu-button {
+        background-color: white;
+        color: black;
+        border: 2px solid #f57c00;
+        font-weight: bold;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 1rem;
+      }
+
+      .menu-button:hover {
+        background-color: #ffe1c4;
+        color: #c65100;
+      }
+
+      .header-title {
+        flex: 1;
+        text-align: right;
+        color: white;
+      }
+
+      .main {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        width: 280px;
+        background: #f4f4f4;
+        padding: 1.5rem;
+        border-right: 1px solid #ddd;
+        overflow-y: auto;
+      }
+
+      .content {
+        flex: 1;
+        padding: 1.5rem;
+        background: #ffffff;
+      }
+
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: 6px;
+      }
+
+      .layout-footer {
+        height: 3rem;
+        background: #eeeeee;
+        text-align: center;
+        line-height: 3rem;
+        font-size: 0.9rem;
+        color: #666;
+      }
+
+      .left-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .sidebar.collapsed {
+        width: 0;
+        padding: 0;
+        overflow: hidden;
+        transition: width 0.3s ease;
+      }
+
+      .main.expanded .content {
+        flex: 1 1 100%;
+      }
+      .sidebar {
+        transition: width 0.3s ease, padding 0.3s ease;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="layout-topbar">
+      <div class="left-controls">
+        <button id="toggle-sidebar" class="menu-button">☰</button>
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+      </div>
+      <span class="header-title">Embedding 11: Responsive Embeds</span>
+    </header>
+
+    <div class="main">
+      <aside class="sidebar">
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <p>Loading...</p>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is decoded below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+      </aside>
+
+      <script>
+        const toggleBtn = document.getElementById("toggle-sidebar");
+        const sidebar = document.querySelector(".sidebar");
+        const mainLayout = document.querySelector(".main");
+
+        toggleBtn.addEventListener("click", () => {
+          sidebar.classList.toggle("collapsed");
+          mainLayout.classList.toggle("expanded");
+        });
+      </script>
+
+      <main class="content">
+        <iframe id="sigma-embed" src=""></iframe>
+      </main>
+    </div>
+
+    <footer class="layout-footer">Sigma &copy; 2025</footer>
+
+    <script>
+      function decodeJwt(token) {
+        try {
+          const [header, payload, signature] = token.split(".");
+          const decode = (str) => JSON.parse(atob(str));
+          return {
+            header: decode(header),
+            payload: decode(payload),
+            signature,
+          };
+        } catch (err) {
+          return { error: "Failed to decode JWT." };
+        }
+      }
+
+      let sigmaIframe = null; // Declare at top so the event listener can access it
+
+      fetch("/generate-jwt/responsive_embeds")
+        .then((res) => res.json())
+        .then((data) => {
+          sigmaIframe = document.getElementById("sigma-embed");
+          sigmaIframe.src = data.embedUrl;
+
+          const jwt = data.jwt || "No JWT generated.";
+
+          // Display JWT
+          const jwtBlock = document.getElementById("jwt-display");
+          jwtBlock.textContent = jwt;
+
+          // Decode JWT
+          const decoded = decodeJwt(jwt);
+          const decodedBlock = document.getElementById("jwt-decoded");
+
+          // Extract base URL and workbook ID
+          const fullUrl = data.embedUrl.split("?:jwt=")[0];
+          const lastSlashIndex = fullUrl.lastIndexOf("/");
+          const baseUrlOnly = fullUrl.substring(0, lastSlashIndex);
+          const workbookId = fullUrl.substring(lastSlashIndex + 1);
+
+          if (decoded.error) {
+            decodedBlock.innerHTML = `<p style="color:red;">${decoded.error}</p>`;
+          } else {
+            decodedBlock.innerHTML = `
+        <p><strong>Base URL:</strong><br>${baseUrlOnly}</p>
+        <p><strong>Workbook ID:</strong><br>${workbookId}</p>
+        <h3>Decoded JWT Header:</h3>
+        <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
+        <h3>Decoded JWT Payload:</h3>
+        <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>
+      `;
+          }
+        })
+        .catch((err) => {
+          console.error("Error loading iframe:", err);
+          document.getElementById("sigma-embed").outerHTML =
+            '<p style="color:red;">Failed to load Sigma embed. Check console for details.</p>';
+        });
+
+      // Global message event listener to capture messages from the Sigma iframe
+      window.addEventListener("message", (event) => {
+        // Log that a message was received — useful for debugging
+        console.log("Message listener triggered");
+
+        // Log full message contents and origin for inspection
+        console.log("Message from iframe:", event.origin, event.data);
+
+        // Security check: only respond to messages coming from Sigma
+        if (event.origin !== "https://app.sigmacomputing.com") return;
+
+        // Respond to the Sigma event indicating the iframe content height has changed
+        if (event.data?.type === "workbook:pageheight:onchange") {
+          const newHeight = event.data.pageHeight;
+
+          // Ensure the height is a number and the iframe reference is valid
+          if (typeof newHeight === "number" && sigmaIframe) {
+            // Dynamically resize the iframe to fit the embedded content
+            sigmaIframe.style.height = `${newHeight}px`;
+
+            // Log the result so we can verify it worked
+            console.log(`iframe height adjusted to ${newHeight}px`);
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
