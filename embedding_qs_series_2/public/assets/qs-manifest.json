@@ -7,7 +7,7 @@
   { "slug": "federated_access", "label": "Federated Access" },
   { "slug": "link_sharing", "label": "Link Sharing" },
   { "slug": "multitenancy", "label": "Multitenancy" },
-  { "slug": "parameterize_queries", "label": "Parameterized Queries" },
+  { "slug": "parameterized_queries", "label": "Parameterized Queries" },
   { "slug": "parameters_userattributes", "label": "Parameters & User Attributes" },
   { "slug": "premium_service", "label": "Premium Service" },
   { "slug": "public_access", "label": "Public Access" },
