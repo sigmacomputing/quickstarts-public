@@ -10,11 +10,12 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Dynamic JWT generation based on mode
+// Dynamic JWT generation endpoint
+// Required for link sharing: passes query params like exploreKey/bookmarkId to the JWT signer
 app.get('/generate-jwt/:mode', async (req, res) => {
   try {
     const mode = req.params.mode;
-    const { signedUrl, jwt } = await generateSignedUrl(mode); 
+    const { signedUrl, jwt } = await generateSignedUrl(mode, req.query);
     res.json({ embedUrl: signedUrl, jwt: jwt });
   } catch (error) {
     console.error('Error generating signed URL with mode:', error);
@@ -22,20 +23,20 @@ app.get('/generate-jwt/:mode', async (req, res) => {
   }
 });
 
-// Generate public URL for embedding
+// Optional endpoint: expose the base URL for public access embedding (if needed by frontend)
 app.get('/generate-public-url', (req, res) => {
   res.json({ baseUrl: process.env.PUBLIC_ACCESS_BASE_URL });
 });
 
-// Serve static files
+// Serves HTML, CSS, JS, and assets from public folder
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// Health check
+// Basic health check endpoint
 app.get('/health', (req, res) => {
   res.send('Server is running!');
 });
 
-// Start server
+// Start the server
 app.listen(PORT, () => {
   console.log(`Server listening at http://localhost:${PORT}`);
 });
