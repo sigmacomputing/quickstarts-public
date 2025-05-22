@@ -5,7 +5,7 @@
   { "slug": "embed_sdk_for_react", "label": "Embed SDK for React" },
   { "slug": "events", "label": "Events" },
   { "slug": "federated_access", "label": "Federated Access" },
-  { "slug": "link_sharing", "label": "Link Sharing" },
+  { "slug": "link_sharing", "label": "Link & Bookmark Sharing" },
   { "slug": "multitenancy", "label": "Multitenancy" },
   { "slug": "parameterized_queries", "label": "Parameterized Queries" },
   { "slug": "parameters_userattributes", "label": "Parameters & User Attributes" },
