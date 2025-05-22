@@ -308,7 +308,7 @@
         if (event.origin !== "https://app.sigmacomputing.com") return;
 
         const { type, ...rest } = event.data || {};
-        console.log("Native Application to iframe (Inbound)", event.data);
+        console.log("Host Application to iframe (Inbound)", event.data);
 
         if (type?.startsWith("workbook:")) {
           console.log("⚙️ Workbook event:", type);
@@ -324,7 +324,7 @@
         logItem.style.color = "blue"; // Inbound = blue
 
         logItem.innerHTML = `
- <strong style="text-decoration: underline;">Native Application to iframe (Inbound)</strong><br/>
+ <strong style="text-decoration: underline;">Host Application to iframe (Inbound)</strong><br/>
     <strong>Timestamp:</strong> ${new Date().toLocaleTimeString()}<br/>
     <strong>Event Type:</strong> ${type || "unknown"}<br/>
     <strong>Payload:</strong> <code>${JSON.stringify(
@@ -349,7 +349,7 @@
             message,
             "https://app.sigmacomputing.com"
           );
-          console.log("iframe to Native Application (Outbound)", message);
+          console.log("iframe to Host Application (Outbound)", message);
 
           const logContainer = document.getElementById("event-output");
           const logItem = document.createElement("li");
@@ -357,7 +357,7 @@
           logItem.style.color = "green"; // Outbound = green
 
           logItem.innerHTML = `
-<strong style="text-decoration: underline;">iframe to Native Application (Outbound)</strong>
+<strong style="text-decoration: underline;">iframe to Host Application (Outbound)</strong>
       <strong>Timestamp:</strong> ${new Date().toLocaleTimeString()}<br/>
       <strong>Event Type:</strong> ${message.type}<br/>
       <strong>Payload:</strong> <code>${JSON.stringify(message, null, 2)}</code>
