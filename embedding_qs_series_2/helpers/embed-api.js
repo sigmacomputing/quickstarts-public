@@ -2,16 +2,16 @@ const jwt = require("jsonwebtoken");
 const { v4: uuid } = require("uuid");
 const dotenv = require("dotenv");
 
-// Load environment variables from .env
 dotenv.config();
 
 /**
  * Generate a signed Sigma embed URL based on the provided QuickStart mode.
  *
- * @param {string} [mode] - Optional QuickStart-specific mode (e.g., 'getting_started')
- * @returns {Promise<string>} - Signed URL ready to embed
+ * @param {string} [mode] - Optional QuickStart-specific mode (e.g., 'link_sharing')
+ * @param {Object} [query={}] - Express req.query object containing optional exploreKey/bookmarkId
+ * @returns {Promise<{ signedUrl: string, jwt: string }>}
  */
-async function generateSignedUrl(mode = "") {
+async function generateSignedUrl(mode = "", query = {}) {
   try {
     const now = Math.floor(Date.now() / 1000);
     const expirationTime =
@@ -19,6 +19,7 @@ async function generateSignedUrl(mode = "") {
 
     const modePrefix = mode ? `${mode.toUpperCase()}_` : "";
 
+    // Load core config from .env with support for QuickStart-specific overrides
     const baseUrl = process.env[`${modePrefix}BASE_URL`];
     if (!baseUrl) {
       throw new Error(`Mode "${mode}" not properly configured in .env file.`);
@@ -30,18 +31,17 @@ async function generateSignedUrl(mode = "") {
     const rawTeams = process.env[`${modePrefix}TEAMS`] || process.env.TEAMS;
     const teamsArray = rawTeams ? rawTeams.split(",").map((t) => t.trim()) : [];
 
-    // Collect user attributes based on ua_ prefix (case-sensitive)
-    // We use "ua_" to differentiate user attributes from other environment variables
+    // Pull user attributes from .env using "ua_" prefix
     const userAttributes = {};
     Object.entries(process.env).forEach(([key, value]) => {
       const prefix = `${modePrefix}ua_`;
       if (key.startsWith(prefix) && value) {
-        const attrName = key.slice(prefix.length); // remove ua_ prefix
+        const attrName = key.slice(prefix.length);
         userAttributes[attrName] = value.trim();
       }
     });
 
-    // Validate and enforce fallback for DRS_REGION if used
+    // Normalize DRS_REGION if defined
     const rawRegionRole = userAttributes.DRS_REGION;
     if (rawRegionRole) {
       const validRoles = [
@@ -51,17 +51,12 @@ async function generateSignedUrl(mode = "") {
         "DRS_DEFAULT",
       ];
       const cleanedRole = rawRegionRole.trim().toUpperCase();
-      if (!validRoles.includes(cleanedRole)) {
-        console.warn(
-          `Invalid DRS_REGION "${rawRegionRole}" passed. Falling back to DRS_DEFAULT.`
-        );
-        userAttributes.DRS_REGION = "DRS_DEFAULT";
-      } else {
-        userAttributes.DRS_REGION = cleanedRole; // Normalize to upper case
-      }
+      userAttributes.DRS_REGION = validRoles.includes(cleanedRole)
+        ? cleanedRole
+        : "DRS_DEFAULT";
     }
 
-    // Construct the JWT payload
+    // Define the core payload for the JWT
     const payload = {
       sub: email,
       iss: process.env.CLIENT_ID,
@@ -73,15 +68,26 @@ async function generateSignedUrl(mode = "") {
       user_attributes: userAttributes,
     };
 
+    // Create signed JWT
     const token = jwt.sign(payload, process.env.SECRET, {
       algorithm: "HS256",
       keyid: process.env.CLIENT_ID,
     });
 
-    const signedEmbedUrl = `${baseUrl}?:jwt=${encodeURIComponent(
-      token
-    )}&:embed=true`;
+    // Build embed URL using base params and signed token
+    const embedParams = [`:embed=true`, `:jwt=${encodeURIComponent(token)}`];
 
+    // These parameters support sharing filtered state
+    if (query.exploreKey) {
+      embedParams.push(`:explore=${encodeURIComponent(query.exploreKey)}`);
+    }
+    if (query.bookmarkId) {
+      embedParams.push(`:bookmark=${encodeURIComponent(query.bookmarkId)}`);
+    }
+
+    const signedEmbedUrl = `${baseUrl}?${embedParams.join("&")}`;
+
+    // Append optional UI controls from .env
     const optionalParams = {
       disable_mobile_view: process.env.disable_mobile_view,
       hide_menu: process.env.hide_menu,
@@ -102,17 +108,7 @@ async function generateSignedUrl(mode = "") {
       ? `${signedEmbedUrl}&${optionalQuery}`
       : signedEmbedUrl;
 
-    // Logging
-    console.log("Mode:", mode || "default");
-    console.log("BASE_URL:", baseUrl);
-    console.log("CLIENT_ID:", process.env.CLIENT_ID);
-    console.log("SESSION_LENGTH:", process.env.SESSION_LENGTH);
-    console.log("TEAMS:", teamsArray);
-    console.log("ACCOUNT_TYPE:", accountType);
-    console.log("User Attributes:", userAttributes);
-    console.log("Optional Parameters:", optionalParams);
-    console.log("Final Embed URL:", finalEmbedUrl);
-
+    console.log("[generateSignedUrl] Final Embed URL:", finalEmbedUrl);
     return { signedUrl: finalEmbedUrl, jwt: token };
   } catch (error) {
     console.error("Failed to generate JWT:", error.message);
