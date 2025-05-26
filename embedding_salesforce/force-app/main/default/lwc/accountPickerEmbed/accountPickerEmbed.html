@@ -1,0 +1,17 @@
+<template>
+<lightning-card title="Pick Account to Send to Sigma">
+    <div class="slds-p-around_medium">
+        <lightning-combobox
+            name="account"
+            label="SF Account Name"
+            value={selectedAccount}
+            options={accountOptions}
+            onchange={handleChange}>
+        </lightning-combobox>
+    </div>
+
+    <template if:true={iframeUrl}>
+        <iframe src={iframeUrl} width="100%" height="600px" frameborder="0"></iframe>
+    </template>
+</lightning-card>
+</template>
