@@ -1,0 +1,17 @@
+<template>
+    <lightning-card title="Sigma Dashboard Embed">
+        <div class="slds-p-around_medium">
+            <template if:true={iframeUrl}>
+                <iframe
+                    src={iframeUrl}
+                    width="100%"
+                    height="600px"
+                    frameborder="0"
+                ></iframe>
+            </template>
+            <template if:false={iframeUrl}>
+                <p>Loading Sigma dashboard...</p>
+            </template>
+        </div>
+    </lightning-card>
+</template>
