@@ -1,7 +1,7 @@
 [
   { "slug": "getting_started", "label": "Getting Started" },
   { "slug": "dynamic_role_switching", "label": "Dynamic Role Switching with Snowflake" },
-  { "slug": "ask_sigma", "label": "Embedding Ask Sigma" },
+  { "slug": "ask_sigma", "label": "Ask Sigma for Embedding" },
   { "slug": "embed_sdk_for_react", "label": "Embed SDK for React" },
   { "slug": "events", "label": "Events" },
   { "slug": "federated_access", "label": "Federated Access" },
