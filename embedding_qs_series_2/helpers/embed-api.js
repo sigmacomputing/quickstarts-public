@@ -30,6 +30,7 @@ async function generateSignedUrl(mode = "", query = {}) {
       process.env[`${modePrefix}ACCOUNT_TYPE`] || process.env.ACCOUNT_TYPE;
     const rawTeams = process.env[`${modePrefix}TEAMS`] || process.env.TEAMS;
     const teamsArray = rawTeams ? rawTeams.split(",").map((t) => t.trim()) : [];
+    const tag = process.env[`${modePrefix}tag`] || process.env.tag;
 
     // Pull user attributes from .env using "ua_" prefix
     const userAttributes = {};
@@ -66,6 +67,7 @@ async function generateSignedUrl(mode = "", query = {}) {
       account_type: accountType,
       teams: teamsArray,
       user_attributes: userAttributes,
+      tag: tag,
     };
 
     // Create signed JWT
