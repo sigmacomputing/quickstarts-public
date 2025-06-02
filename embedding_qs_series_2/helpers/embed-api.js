@@ -109,6 +109,8 @@ async function generateSignedUrl(mode = "", query = {}) {
       : signedEmbedUrl;
 
     console.log("[generateSignedUrl] Final Embed URL:", finalEmbedUrl);
+    console.log("Session Length:", process.env.SESSION_LENGTH);
+
     return { signedUrl: finalEmbedUrl, jwt: token };
   } catch (error) {
     console.error("Failed to generate JWT:", error.message);
