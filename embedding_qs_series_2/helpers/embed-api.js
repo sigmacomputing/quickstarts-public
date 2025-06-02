@@ -67,7 +67,6 @@ async function generateSignedUrl(mode = "", query = {}) {
       account_type: accountType,
       teams: teamsArray,
       user_attributes: userAttributes,
-      tag: tag,
     };
 
     // Create signed JWT
