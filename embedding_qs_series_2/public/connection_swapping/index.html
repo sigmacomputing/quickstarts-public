@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Embedding 01: Getting Started</title>
+    <title>Embedding 10: Version Tagging</title>
     <link rel="stylesheet" href="/styles/layout.css" />
     <style>
       body {
@@ -113,7 +113,9 @@
           ← Back to Landing Page
         </button>
       </div>
-      <span class="header-title">Embedding 02: Federated Access</span>
+      <span class="header-title"
+        >Embedding 14: Connection Swapping</span
+      >
     </header>
 
     <div class="main">
@@ -167,7 +169,7 @@
         }
       }
 
-      fetch("/generate-jwt/federated_access")
+      fetch("/generate-jwt/connection_swapping")
         .then((res) => res.json())
         .then((data) => {
           const iframe = document.getElementById("sigma-embed");
@@ -184,22 +186,61 @@
           const decodedBlock = document.getElementById("jwt-decoded");
 
           // Extract base URL and workbook ID
-          const fullUrl = data.embedUrl.split("?:jwt=")[0];
+          const urlParts = data.embedUrl.split("?:jwt=");
+          const fullUrl = urlParts[0];
+          const paramString = urlParts[1]?.split("&:").slice(1).join("&:"); // Grab all params after the JWT
+
           const lastSlashIndex = fullUrl.lastIndexOf("/");
           const baseUrlOnly = fullUrl.substring(0, lastSlashIndex);
           const workbookId = fullUrl.substring(lastSlashIndex + 1);
+
+          // Format URL parameters if they exist
+          let formattedParams = "";
+          if (paramString) {
+            formattedParams = decodeURIComponent(paramString)
+              .split("&:")
+              .map((p) => p.replace("=", ": "))
+              .join("\n");
+          }
 
           if (decoded.error) {
             decodedBlock.innerHTML = `<p style="color:red;">${decoded.error}</p>`;
           } else {
             decodedBlock.innerHTML = `
-              <p><strong>Base URL:</strong><br>${baseUrlOnly}</p>
-              <p><strong>Workbook ID:</strong><br>${workbookId}</p>
-              <h3>Decoded JWT Header:</h3>
-              <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
-              <h3>Decoded JWT Payload:</h3>
-              <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>
-            `;
+  <p><strong>Base URL:</strong><br>${baseUrlOnly}</p>
+  <p><strong>Workbook ID:</strong><br>${workbookId}</p>
+  ${
+    formattedParams
+      ? `<h3>URL Parameters:</h3><pre>${formattedParams}</pre>`
+      : ""
+  }
+  
+  <h3>Decoded JWT Header:</h3>
+  <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
+  <h3>Decoded JWT Payload:</h3>
+  <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>
+`;
+
+            // Inject User Attributes section under URL Parameters
+            if (decoded.payload && decoded.payload.user_attributes) {
+              const urlParamsIndex = decodedBlock.innerHTML.indexOf(
+                "<h3>Decoded JWT Header:</h3>"
+              );
+              const userAttrsHTML = `
+    <h3>User Attributes:</h3>
+    <pre>${JSON.stringify(decoded.payload.user_attributes, null, 2)}</pre>
+  `;
+              decodedBlock.innerHTML =
+                decodedBlock.innerHTML.slice(0, urlParamsIndex) +
+                userAttrsHTML +
+                decodedBlock.innerHTML.slice(urlParamsIndex);
+
+              // Console log for dev visibility
+              console.log(
+                "User Attributes (JWT):",
+                decoded.payload.user_attributes
+              );
+            }
           }
         })
         .catch((err) => {

@@ -66,6 +66,7 @@ async function generateSignedUrl(mode = "", query = {}) {
       account_type: accountType,
       teams: teamsArray,
       user_attributes: userAttributes,
+      eval_connection_id: process.env[`${modePrefix}eval_connection_id`],
     };
 
     // Create signed JWT
