@@ -84,6 +84,12 @@ async function generateSignedUrl(mode = "", query = {}) {
     if (query.bookmarkId) {
       embedParams.push(`:bookmark=${encodeURIComponent(query.bookmarkId)}`);
     }
+    const evalConnectionId = process.env[`${modePrefix}eval_connection_id`];
+    if (evalConnectionId) {
+      embedParams.push(
+        `:eval_connection_id=${encodeURIComponent(evalConnectionId)}`
+      );
+    }
 
     const signedEmbedUrl = `${baseUrl}?${embedParams.join("&")}`;
 
