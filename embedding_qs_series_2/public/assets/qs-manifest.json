@@ -1,16 +1,13 @@
 [
   { "slug": "getting_started", "label": "Getting Started" },
-  { "slug": "dynamic_role_switching", "label": "Dynamic Role Switching with Snowflake" },
   { "slug": "ask_sigma", "label": "Ask Sigma for Embedding" },
   { "slug": "connection_swapping", "label": "Connection Swapping" },
-  { "slug": "embed_sdk_for_react", "label": "Embed SDK for React" },
+  { "slug": "dynamic_role_switching", "label": "Dynamic Role Switching with Snowflake" },
   { "slug": "events", "label": "Events" },
   { "slug": "federated_access", "label": "Federated Access" },
   { "slug": "link_sharing", "label": "Link & Bookmark Sharing" },
-  { "slug": "multitenancy", "label": "Multitenancy" },
   { "slug": "parameterized_queries", "label": "Parameterized Queries" },
   { "slug": "parameters_userattributes", "label": "Parameters & User Attributes" },
-  { "slug": "premium_service", "label": "Premium Service" },
   { "slug": "public_access", "label": "Public Access" },
   { "slug": "responsive_embeds", "label": "Responsive Embeds" },
   { "slug": "version_tagging", "label": "Version Tagging" }
