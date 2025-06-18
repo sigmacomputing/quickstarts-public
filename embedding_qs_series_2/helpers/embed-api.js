@@ -109,6 +109,15 @@ async function generateSignedUrl(mode = "", query = {}) {
       ? `${signedEmbedUrl}&${optionalQuery}`
       : signedEmbedUrl;
 
+    // Debug logs (useful during development)
+    console.log("Mode:", mode || "default");
+    console.log("BASE_URL:", baseUrl); // use the looked-up baseUrl
+    console.log("CLIENT_ID:", process.env.CLIENT_ID);
+    console.log("SESSION_LENGTH:", process.env.SESSION_LENGTH);
+    console.log("TEAMS:", teamsArray);
+    console.log("ACCOUNT_TYPE:", accountType);
+    console.log("Signed Embed URL:", signedEmbedUrl);
+
     console.log("[generateSignedUrl] Final Embed URL:", finalEmbedUrl);
     return { signedUrl: finalEmbedUrl, jwt: token };
   } catch (error) {
