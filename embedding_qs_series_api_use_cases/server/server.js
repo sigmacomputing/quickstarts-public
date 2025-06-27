@@ -1,42 +1,66 @@
 // server/server.js
 
-const express = require('express');
-const dotenv = require('dotenv');
-const path = require('path');
-const { generateSignedUrl } = require('../helpers/embed-api');
-
-dotenv.config();
+const express = require("express");
+const path = require("path");
+const generateEmbedPath = require("../helpers/generateEmbedPath");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Dynamic JWT generation endpoint
-// Required for link sharing: passes query params like exploreKey/bookmarkId to the JWT signer
-app.get('/generate-jwt/:mode', async (req, res) => {
+// Serve static files from the public folder
+app.use(express.static(path.join(__dirname, "..", "public")));
+
+// Embed URL generator using impersonation
+app.get("/embed-url", async (req, res) => {
+  const memberId = req.query.memberId;
+  if (!memberId) {
+    return res.status(400).json({ error: "Missing memberId parameter" });
+  }
+
   try {
-    const mode = req.params.mode;
-    const { signedUrl, jwt } = await generateSignedUrl(mode, req.query);
-    res.json({ embedUrl: signedUrl, jwt: jwt });
-  } catch (error) {
-    console.error('Error generating signed URL with mode:', error);
-    res.status(500).json({ error: 'JWT generation failed' });
+    const path = await generateEmbedPath(memberId);
+    res.json({ path });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to generate embed path" });
   }
 });
 
-// Optional endpoint: expose the base URL for public access embedding (if needed by frontend)
-app.get('/generate-public-url', (req, res) => {
-  res.json({ baseUrl: process.env.PUBLIC_ACCESS_BASE_URL });
-});
+// Endpoint to provision users and return their memberIds
+const { lookupMemberId, provisionEmbedUser } = require("../helpers/provision");
+const config = require("../helpers/config");
 
-// Serves HTML, CSS, JS, and assets from public folder
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Endpoint to provision users for embedding
+app.get("/provision-users", async (req, res) => {
+  try {
+    const result = {};
 
-// Basic health check endpoint
-app.get('/health', (req, res) => {
-  res.send('Server is running!');
+    // Admin (must exist)
+    result.admin = {
+      email: config.email,
+      memberId: await lookupMemberId(config.email),
+    };
+
+    // Build and View (auto-provision)
+    result.build = {
+      email: "build@test.com",
+      accountType: "Build",
+      memberId: await provisionEmbedUser("build@test.com", "Build"),
+    };
+
+    result.view = {
+      email: "view@test.com",
+      accountType: "View",
+      memberId: await provisionEmbedUser("view@test.com", "View"),
+    };
+
+    res.json(result);
+  } catch (err) {
+    console.error("Provisioning error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`Server listening at http://localhost:${PORT}`);
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
