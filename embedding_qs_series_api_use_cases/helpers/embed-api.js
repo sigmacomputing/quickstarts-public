@@ -1,120 +1,91 @@
-const jwt = require("jsonwebtoken");
-const { v4: uuid } = require("uuid");
-const dotenv = require("dotenv");
+// embed-api.js
+// This module generates a signed Sigma embed URL using a shared configuration.
 
-dotenv.config();
+const jwt = require('jsonwebtoken');
+const { v4: uuid } = require('uuid');
+const {
+  baseUrl,
+  email,
+  clientId,
+  secret,
+  sessionLength,
+  accountType,
+  teams,
+  evalConnectionId,
+  embedUiOptions
+} = require('./config');
 
 /**
- * Generate a signed Sigma embed URL based on the provided QuickStart mode.
+ * Generate a signed Sigma embed URL using a shared configuration.
  *
- * @param {string} [mode] - Optional QuickStart-specific mode (e.g., 'link_sharing')
- * @param {Object} [query={}] - Express req.query object containing optional exploreKey/bookmarkId
+ * @param {Object} [query={}] - Optional exploreKey/bookmarkId
  * @returns {Promise<{ signedUrl: string, jwt: string }>}
  */
-async function generateSignedUrl(mode = "", query = {}) {
+async function generateSignedUrl(query = {}) {
   try {
-    const now = Math.floor(Date.now() / 1000);
-    const expirationTime =
-      now + Math.min(parseInt(process.env.SESSION_LENGTH) || 3600, 2592000);
-
-    const modePrefix = mode ? `${mode.toUpperCase()}_` : "";
-
-    // Load core config from .env with support for QuickStart-specific overrides
-    const baseUrl = process.env[`${modePrefix}BASE_URL`];
-    if (!baseUrl) {
-      throw new Error(`Mode "${mode}" not properly configured in .env file.`);
+    if (!baseUrl || !email || !clientId || !secret) {
+      throw new Error("Missing required configuration values in .env");
     }
 
-    const email = process.env[`${modePrefix}EMAIL`] || process.env.EMAIL;
-    const accountType =
-      process.env[`${modePrefix}ACCOUNT_TYPE`] || process.env.ACCOUNT_TYPE;
-    const rawTeams = process.env[`${modePrefix}TEAMS`] || process.env.TEAMS;
-    const teamsArray = rawTeams ? rawTeams.split(",").map((t) => t.trim()) : [];
+    const now = Math.floor(Date.now() / 1000);
+    const expirationTime = now + Math.min(sessionLength, 2592000); // Max 30 days
 
-    // Pull user attributes from .env using "ua_" prefix
     const userAttributes = {};
-    Object.entries(process.env).forEach(([key, value]) => {
-      const prefix = `${modePrefix}ua_`;
-      if (key.startsWith(prefix) && value) {
-        const attrName = key.slice(prefix.length);
+    for (const [key, value] of Object.entries(process.env)) {
+      if (key.startsWith('ua_') && value) {
+        const attrName = key.slice(3); // strip 'ua_'
         userAttributes[attrName] = value.trim();
       }
-    });
-
-    // Normalize DRS_REGION if defined
-    const rawRegionRole = userAttributes.DRS_REGION;
-    if (rawRegionRole) {
-      const validRoles = [
-        "DRS_EXECUTIVE",
-        "DRS_WEST",
-        "DRS_EAST",
-        "DRS_DEFAULT",
-      ];
-      const cleanedRole = rawRegionRole.trim().toUpperCase();
-      userAttributes.DRS_REGION = validRoles.includes(cleanedRole)
-        ? cleanedRole
-        : "DRS_DEFAULT";
     }
 
-    // Define the core payload for the JWT
+    // Optional normalization for DRS_REGION
+    const rawRegion = userAttributes.DRS_REGION?.trim().toUpperCase();
+    const validRegions = ["DRS_EXECUTIVE", "DRS_WEST", "DRS_EAST", "DRS_DEFAULT"];
+    if (rawRegion) {
+      userAttributes.DRS_REGION = validRegions.includes(rawRegion) ? rawRegion : "DRS_DEFAULT";
+    }
+
+    // Build the JWT payload
     const payload = {
       sub: email,
-      iss: process.env.CLIENT_ID,
+      iss: clientId,
       jti: uuid(),
       iat: now,
       exp: expirationTime,
       account_type: accountType,
-      teams: teamsArray,
+      teams,
       user_attributes: userAttributes,
-      eval_connection_id: process.env[`${modePrefix}eval_connection_id`],
+      ...(evalConnectionId && { eval_connection_id: evalConnectionId })
     };
 
-    // Create signed JWT
-    const token = jwt.sign(payload, process.env.SECRET, {
-      algorithm: "HS256",
-      keyid: process.env.CLIENT_ID,
+    const token = jwt.sign(payload, secret, {
+      algorithm: 'HS256',
+      keyid: clientId,
     });
 
-    // Build embed URL using base params and signed token
-    const embedParams = [`:embed=true`, `:jwt=${encodeURIComponent(token)}`];
+    // Construct the base embed URL
+    const baseEmbedUrl = `${baseUrl}?${[
+      `:embed=true`,
+      `:jwt=${encodeURIComponent(token)}`,
+      query.exploreKey ? `:explore=${encodeURIComponent(query.exploreKey)}` : '',
+      query.bookmarkId ? `:bookmark=${encodeURIComponent(query.bookmarkId)}` : ''
+    ].filter(Boolean).join('&')}`;
 
-    // These parameters support sharing filtered state
-    if (query.exploreKey) {
-      embedParams.push(`:explore=${encodeURIComponent(query.exploreKey)}`);
-    }
-    if (query.bookmarkId) {
-      embedParams.push(`:bookmark=${encodeURIComponent(query.bookmarkId)}`);
-    }
-
-    const signedEmbedUrl = `${baseUrl}?${embedParams.join("&")}`;
-
-    // Append optional UI controls from .env
-    const optionalParams = {
-      disable_mobile_view: process.env.disable_mobile_view,
-      hide_menu: process.env.hide_menu,
-      hide_folder_navigation: process.env.hide_folder_navigation,
-      hide_tooltip: process.env.hide_tooltip,
-      lng: process.env.lng,
-      menu_position: process.env.menu_position,
-      responsive_height: process.env.responsive_height,
-      theme: process.env.theme,
-    };
-
-    const optionalQuery = Object.entries(optionalParams)
-      .filter(([_, value]) => value !== undefined && value !== "")
+    // Append optional UI flags
+    const optionalQuery = Object.entries(embedUiOptions)
+      .filter(([_, value]) => value !== undefined && value !== '')
       .map(([key, value]) => `:${key}=${encodeURIComponent(value)}`)
-      .join("&");
+      .join('&');
 
-    const finalEmbedUrl = optionalQuery
-      ? `${signedEmbedUrl}&${optionalQuery}`
-      : signedEmbedUrl;
+    const finalUrl = optionalQuery ? `${baseEmbedUrl}&${optionalQuery}` : baseEmbedUrl;
 
-    console.log("[generateSignedUrl] Final Embed URL:", finalEmbedUrl);
-    return { signedUrl: finalEmbedUrl, jwt: token };
-  } catch (error) {
-    console.error("Failed to generate JWT:", error.message);
-    throw new Error("JWT generation failed");
+    console.log('[generateSignedUrl] Final Embed URL:', finalUrl);
+    return { signedUrl: finalUrl, jwt: token };
+  } catch (err) {
+    console.error('JWT generation failed:', err.message);
+    throw err;
   }
 }
 
+// Export the function for use in other modules
 module.exports = { generateSignedUrl };

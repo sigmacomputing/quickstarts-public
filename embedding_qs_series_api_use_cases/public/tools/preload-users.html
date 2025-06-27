@@ -1,0 +1,48 @@
+// This HTML file is used to preload Sigma users for embedding purposes.
+// It provides a button to trigger the provisioning process and displays the results.
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Preload Sigma Users</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; }
+    code { background: #eee; padding: 0.2rem 0.4rem; border-radius: 4px; }
+    pre { background: #f9f9f9; padding: 1rem; border: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+  <h1>🔧 Preload Embed Users into Sigma</h1>
+  <p>This page will auto-create the <strong>build</strong> and <strong>view</strong> users by calling Sigma's embed API, and return their member IDs.</p>
+  <button onclick="provision()">Start Provisioning</button>
+  <div id="results" style="margin-top: 2rem;"></div>
+
+  <script>
+    async function provision() {
+      const container = document.getElementById("results");
+      container.innerHTML = "<p>⏳ Running setup...</p>";
+
+      try {
+        const res = await fetch('/provision-users');
+        const data = await res.json();
+
+        container.innerHTML = `
+          <h3>✅ Provisioning Complete</h3>
+          <ul>
+            <li><strong>Admin</strong> (${data.admin.email}):<br><code>${data.admin.memberId}</code></li>
+            <li><strong>Build</strong> (${data.build.email}):<br><code>${data.build.memberId}</code></li>
+            <li><strong>View</strong> (${data.view.email}):<br><code>${data.view.memberId}</code></li>
+          </ul>
+          <p>✂️ Copy into your <code>.env</code>:</p>
+<pre>
+ADMIN_MEMBER_ID=${data.admin.memberId}
+BUILD_MEMBER_ID=${data.build.memberId}
+VIEW_MEMBER_ID=${data.view.memberId}
+</pre>
+        `;
+      } catch (err) {
+        container.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>
