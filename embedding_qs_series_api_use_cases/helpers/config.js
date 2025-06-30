@@ -13,6 +13,9 @@ function parseBoolean(value) {
 module.exports = {
   baseUrl: process.env.BASE_URL || "",
 
+  //  Auth URL for Sigma API
+  apiBaseUrl: process.env.API_BASE_URL || "https://api.sigmacomputing.com/v2",
+
   // Auth-related
   email: process.env.EMAIL,
   clientId: process.env.CLIENT_ID,
@@ -21,6 +24,10 @@ module.exports = {
   accountType: process.env.ACCOUNT_TYPE,
   teams: process.env.TEAMS?.split(",").map((t) => t.trim()) || [],
   evalConnectionId: process.env.eval_connection_id || null,
+
+  // Email addresses for different roles
+  buildEmail: process.env.BUILD_EMAIL,
+  viewEmail: process.env.VIEW_EMAIL,
 
   // Member IDs for different roles
   memberIds: {
@@ -51,3 +58,10 @@ module.exports = {
     view_id: process.env.view_id || "",
   },
 };
+
+if (process.env.DEBUG === "true") {
+  console.log("Loaded config:");
+  console.log("...API Base:", process.env.API_BASE_URL);
+  console.log("...Client ID:", process.env.CLIENT_ID?.slice(0, 6), "...");
+  console.log("...Email:", process.env.EMAIL);
+}

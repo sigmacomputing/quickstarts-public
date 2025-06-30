@@ -1,54 +1,143 @@
-// helpers/provision.js
+const axios = require("axios");
+const getBearerToken = require("./get-access-token");
+const config = require("../helpers/config");
 
-const axios = require('axios');
-const getBearerToken = require('./get-access-token');
-const config = require('../helpers/config');
-
-const SIGMA_API_BASE = 'https://api.sigmacomputing.com/v2';
+const SIGMA_API_BASE = config.apiBaseUrl;
+const teamIdCache = {}; // In-memory cache for team IDs
 
 /**
- * Returns the memberId for a user with the given email (must already exist).
+ * Look up a team ID by name, using cache if available.
  */
-async function lookupMemberId(email) {
+async function getTeamIdByName(teamName) {
+  if (teamIdCache[teamName]) {
+    console.log(`Returning cached team ID for "${teamName}"`);
+    return teamIdCache[teamName];
+  }
+
   const token = await getBearerToken();
-  const url = `${SIGMA_API_BASE}/users?email=${encodeURIComponent(email)}`;
+  const url = `${SIGMA_API_BASE}/teams?name=${encodeURIComponent(teamName)}`;
 
-  const response = await axios.get(url, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  try {
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-  const user = response.data?.data?.[0];
-  if (!user || !user.id) throw new Error(`User not found: ${email}`);
-  return user.id;
+    const team = response.data?.entries?.[0];
+    if (!team || !team.teamId) throw new Error(`Team not found: ${teamName}`);
+    console.log(`Found team "${teamName}" → ${team.teamId}`);
+    teamIdCache[teamName] = team.teamId;
+    return team.teamId;
+
+    return team.id;
+  } catch (err) {
+    console.error(`getTeamIdByName failed for ${teamName}`);
+    if (err.response) {
+      console.error("Status:", err.response.status);
+      console.error("Message:", err.response.data?.message);
+      console.error("Request ID:", err.response.data?.requestId);
+    } else {
+      console.error("Unknown error:", err.message);
+    }
+    throw err;
+  }
 }
 
 /**
- * Triggers auto-provisioning for an embed user and returns their memberId.
+ * Look up an existing member by email.
  */
-async function provisionEmbedUser(email, accountType) {
+async function lookupMemberId(email) {
   const token = await getBearerToken();
-  
+  const url = `${SIGMA_API_BASE}/members?search=${encodeURIComponent(email)}`;
+
+  try {
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const member = response.data?.entries?.[0];
+    if (!member || !member.memberId)
+      throw new Error(`Member not found: ${email}`);
+
+    console.log(`Found member ${email} → ${member.memberId}`);
+    return member.memberId;
+  } catch (err) {
+    console.error(`lookupMemberId failed for ${email}`);
+    if (err.response) {
+      console.error("Status:", err.response.status);
+      console.error("Message:", err.response.data?.message);
+      console.error("Request ID:", err.response.data?.requestId);
+    } else {
+      console.error("Unknown error:", err.message);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Provision a new embed user and assign to Embed_Users team.
+ */
+async function provisionEmbedUser(email, firstName, lastName, memberType) {
+  const token = await getBearerToken();
+  const teamId = await getTeamIdByName("Embed_Users");
+
   const payload = {
+    userKind: "embed",
+    memberType,
     email,
-    accountType,            // required for role (e.g., "Build" or "View")
-    teams: ['Embed_Users'], // assign team membership
-    embedPath: '/embed/blank',
-    useExisting: true
+    firstName,
+    lastName,
+    addToTeams: [{ teamId, isTeamAdmin: false }],
+    isGuest: false,
   };
 
-  const response = await axios.post(`${SIGMA_API_BASE}/embed/paths`, payload, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  });
+  try {
+    const response = await axios.post(
+      `${SIGMA_API_BASE}/members?sendInvite=false`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-  const memberId = response.data?.memberId;
-  if (!memberId) throw new Error(`Failed to provision user: ${email}`);
-  return memberId;
+    console.log(
+      "Full response from /members:",
+      JSON.stringify(response.data, null, 2)
+    );
+
+    const memberId = response.data?.id;
+    if (!memberId)
+      throw new Error(`Provisioning failed: no member ID returned`);
+
+    console.log(`Provisioned ${email} → memberId: ${memberId}`);
+    return memberId;
+  } catch (err) {
+    if (err.response?.status === 409) {
+      const msg = err.response.data?.message || "";
+      const match = msg.match(/member-id=([\w-]+)/);
+      const existingId = match?.[1];
+      if (existingId) {
+        console.warn(`Member already exists: ${email} → ${existingId}`);
+        return existingId;
+      }
+    }
+
+    console.error(`provisionEmbedUser failed for ${email}`);
+    if (err.response) {
+      console.error("Status:", err.response.status);
+      console.error("Message:", err.response.data?.message);
+      console.error("Request ID:", err.response.data?.requestId);
+    } else {
+      console.error("Unknown error:", err.message);
+    }
+    throw err;
+  }
 }
 
 module.exports = {
   lookupMemberId,
-  provisionEmbedUser
+  provisionEmbedUser,
+  getTeamIdByName, 
 };

@@ -102,7 +102,6 @@
       }
     </style>
   </head>
-
   <body>
     <header class="layout-topbar">
       <div class="left-controls">
@@ -122,9 +121,8 @@
         </p>
         <label for="userSelect"><strong>User:</strong></label>
         <select id="userSelect">
-          <option value="admin">Sigma Administrator</option>
-          <option value="build">Build</option>
-          <option value="view">View</option>
+          <option value="View">View</option>
+          <option value="Build">Build</option>
         </select>
 
         <button onclick="loadEmbed()">Load Embed</button>
@@ -148,6 +146,35 @@
       });
     </script>
 
-    <script src="/assets/impersonate.js"></script>
+    <script>
+      async function loadEmbed() {
+        const role = document.getElementById("userSelect").value;
+
+        console.log("Load Embed called with role:", role);
+
+        try {
+          const res = await fetch("/embed-url", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user: role }),
+          });
+
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`Server returned error: ${res.status} – ${text}`);
+          }
+
+          const data = await res.json();
+          if (data.embedUrl) {
+            document.getElementById("sigma-embed").src = data.embedUrl;
+          } else {
+            alert("Embed URL not returned.");
+          }
+        } catch (err) {
+          console.error("Fetch failed:", err);
+          alert("An error occurred loading the embed: " + err.message);
+        }
+      }
+    </script>
   </body>
 </html>

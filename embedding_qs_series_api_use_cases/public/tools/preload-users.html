@@ -1,48 +1,135 @@
-// This HTML file is used to preload Sigma users for embedding purposes.
-// It provides a button to trigger the provisioning process and displays the results.
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Preload Sigma Users</title>
-  <style>
-    body { font-family: sans-serif; padding: 2rem; }
-    code { background: #eee; padding: 0.2rem 0.4rem; border-radius: 4px; }
-    pre { background: #f9f9f9; padding: 1rem; border: 1px solid #ddd; }
-  </style>
-</head>
-<body>
-  <h1>🔧 Preload Embed Users into Sigma</h1>
-  <p>This page will auto-create the <strong>build</strong> and <strong>view</strong> users by calling Sigma's embed API, and return their member IDs.</p>
-  <button onclick="provision()">Start Provisioning</button>
-  <div id="results" style="margin-top: 2rem;"></div>
+  <head>
+    <title>Preload Sigma Users</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #fafafa;
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
 
-  <script>
-    async function provision() {
-      const container = document.getElementById("results");
-      container.innerHTML = "<p>⏳ Running setup...</p>";
+      .layout-topbar {
+        background: #f57c00;
+        color: white;
+        height: 4rem;
+        display: flex;
+        align-items: center;
+        padding: 0 1.5rem;
+        font-weight: bold;
+        font-size: 1.2rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        justify-content: space-between;
+      }
 
-      try {
-        const res = await fetch('/provision-users');
-        const data = await res.json();
+      .container {
+        max-width: 700px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
 
-        container.innerHTML = `
-          <h3>✅ Provisioning Complete</h3>
-          <ul>
-            <li><strong>Admin</strong> (${data.admin.email}):<br><code>${data.admin.memberId}</code></li>
-            <li><strong>Build</strong> (${data.build.email}):<br><code>${data.build.memberId}</code></li>
-            <li><strong>View</strong> (${data.view.email}):<br><code>${data.view.memberId}</code></li>
-          </ul>
-          <p>✂️ Copy into your <code>.env</code>:</p>
-<pre>
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      p {
+        font-size: 1rem;
+        line-height: 1.6;
+        margin-top: 0;
+      }
+
+      .menu-button {
+        background-color: white;
+        color: #f57c00;
+        border: 2px solid #f57c00;
+        font-weight: bold;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 1rem;
+        margin-top: 1rem;
+        transition: all 0.2s ease;
+      }
+
+      .menu-button:hover {
+        background-color: #ffe1c4;
+        color: #c65100;
+      }
+
+      h3 {
+        margin-top: 2rem;
+      }
+
+      pre {
+        background: #f4f4f4;
+        padding: 1rem;
+        border-radius: 4px;
+        font-size: 0.95rem;
+        overflow-x: auto;
+      }
+
+      code {
+        background: #eee;
+        padding: 0 4px;
+        border-radius: 3px;
+        font-size: 0.95rem;
+      }
+
+      ul {
+        padding-left: 1.2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout-topbar">
+      Sigma Embed QuickStart – Provision Users
+    </div>
+
+    <div class="container">
+      <h1>Preload Two Test Embed Users</h1>
+      <p>
+        This utility will create the <strong>build</strong> and <strong>view</strong> users by calling Sigma's Embed API and return their member IDs, along with your admin user ID.
+      </p>
+
+      <button id="provision" class="menu-button">Start Provisioning</button>
+
+      <div id="results"></div>
+    </div>
+
+    <script>
+      document.getElementById("provision").addEventListener("click", provision);
+
+      async function provision() {
+        const container = document.getElementById("results");
+        container.innerHTML = "<p>⏳ Running setup...</p>";
+
+        try {
+          const res = await fetch("/provision-users");
+          const data = await res.json();
+
+          container.innerHTML = `
+            <h3>Provisioning Complete</h3>
+            <ul>
+              <li><strong>Admin</strong> (${data.admin.email}):<br><code>${data.admin.memberId}</code></li>
+              <li><strong>Build</strong> (${data.build.email}):<br><code>${data.build.memberId}</code></li>
+              <li><strong>View</strong> (${data.view.email}):<br><code>${data.view.memberId}</code></li>
+            </ul>
+            <p>Copy the following into your <code>.env</code> file:</p>
+            <pre>
 ADMIN_MEMBER_ID=${data.admin.memberId}
 BUILD_MEMBER_ID=${data.build.memberId}
 VIEW_MEMBER_ID=${data.view.memberId}
-</pre>
-        `;
-      } catch (err) {
-        container.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+            </pre>
+          `;
+        } catch (err) {
+          container.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+        }
       }
-    }
-  </script>
-</body>
+    </script>
+  </body>
 </html>
