@@ -129,7 +129,7 @@
       </aside>
 
       <main class="content">
-        <iframe id="sigma-embed" src=""></iframe>
+        <iframe id="sigma-embed" title="Sigma Embed Area" src=""></iframe>
       </main>
     </div>
 
@@ -149,8 +149,14 @@
     <script>
       async function loadEmbed() {
         const role = document.getElementById("userSelect").value;
+        const iframe = document.getElementById("sigma-embed");
+        const button = document.querySelector("button[onclick='loadEmbed()']");
 
         console.log("Load Embed called with role:", role);
+
+        // Disable button to prevent multiple clicks
+        button.disabled = true;
+        button.textContent = "Loading...";
 
         try {
           const res = await fetch("/embed-url", {
@@ -166,13 +172,18 @@
 
           const data = await res.json();
           if (data.embedUrl) {
-            document.getElementById("sigma-embed").src = data.embedUrl;
+            iframe.src = data.embedUrl;
           } else {
+            iframe.src = "";
             alert("Embed URL not returned.");
           }
         } catch (err) {
           console.error("Fetch failed:", err);
+          iframe.src = ""; // clear any stale content
           alert("An error occurred loading the embed: " + err.message);
+        } finally {
+          button.disabled = false;
+          button.textContent = "Load Embed";
         }
       }
     </script>

@@ -4,6 +4,7 @@ require("dotenv").config();
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const path = require("path");
+const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 const config = require("../helpers/config");
@@ -31,13 +32,13 @@ if (
 
 const PORT = process.env.PORT || 3000;
 
-// 3: Serve static files from public/
+// 3: Serve frontend
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-// 4: Health check endpoint
+// 4: Health check
 app.get("/health", (req, res) => res.send("OK"));
 
-// 5: POST /embed-url — Return a signed embed URL for a given role
+// 5: POST /embed-url — Generate signed embed URL based on role or memberId
 app.post("/embed-url", async (req, res) => {
   const { memberId, user } = req.body;
   console.log("📥 /embed-url body:", { memberId, user });
@@ -46,6 +47,10 @@ app.post("/embed-url", async (req, res) => {
 
   if (!resolvedId && user) {
     const role = user.toLowerCase();
+
+    console.log("🔍 Checking config.memberIds for role:", role);
+    console.log("🔍 Available roles in config:", config.memberIds);
+
     if (config.memberIds[role]) {
       resolvedId = config.memberIds[role];
     } else {
@@ -59,16 +64,21 @@ app.post("/embed-url", async (req, res) => {
 
   try {
     const embedPath = new URL(config.defaultWorkbookId).pathname;
+    const now = Math.floor(Date.now() / 1000);
 
     const payload = {
       sub: resolvedId,
       path: embedPath,
-      exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour
+      exp: now + config.sessionLength,
+      iat: now,
+      iss: config.clientId,
+      jti: uuidv4(),
+      teams: config.teams,
     };
 
     const token = jwt.sign(payload, config.secret, {
       algorithm: "HS256",
-      issuer: config.clientId,
+      keyid: config.clientId,
     });
 
     const fullUrl = `${config.defaultWorkbookId}?auth_token=${token}`;
@@ -84,7 +94,7 @@ app.post("/embed-url", async (req, res) => {
   }
 });
 
-// 6: GET /env — Return environment vars (for debugging only)
+// 6: GET /env — Return config values (for debugging only)
 app.get("/env", (req, res) => {
   res.json({
     ADMIN_MEMBER_ID: config.memberIds.admin,
@@ -94,19 +104,29 @@ app.get("/env", (req, res) => {
   });
 });
 
-// 7: GET /provision-users — Create embed users if needed
+// 7: GET /provision-users — Create View/Build users if needed
 app.get("/provision-users", async (req, res) => {
   try {
     const result = {
       build: {
         email: config.buildEmail,
         accountType: "Build",
-        memberId: await provisionEmbedUser(config.buildEmail, "Build", "QuickStarts", "Build"),
+        memberId: await provisionEmbedUser(
+          config.buildEmail,
+          "Build",
+          "QuickStarts",
+          "Build"
+        ),
       },
       view: {
         email: config.viewEmail,
         accountType: "View",
-        memberId: await provisionEmbedUser(config.viewEmail, "View", "QuickStarts", "View"),
+        memberId: await provisionEmbedUser(
+          config.viewEmail,
+          "View",
+          "QuickStarts",
+          "View"
+        ),
       },
       admin: {
         email: config.email,
@@ -116,11 +136,12 @@ app.get("/provision-users", async (req, res) => {
 
     res.json(result);
   } catch (err) {
+    console.error("❌ Provisioning error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
 // 8: Start server
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
