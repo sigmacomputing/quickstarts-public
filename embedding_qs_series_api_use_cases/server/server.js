@@ -1,66 +1,126 @@
 // server/server.js
 
+require("dotenv").config();
 const express = require("express");
+const jwt = require("jsonwebtoken");
 const path = require("path");
-const generateEmbedPath = require("../helpers/generateEmbedPath");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const config = require("../helpers/config");
+const { lookupMemberId, provisionEmbedUser } = require("../helpers/provision");
 
-// Serve static files from the public folder
-app.use(express.static(path.join(__dirname, "..", "public")));
+app.use(express.json());
 
-// Embed URL generator using impersonation
-app.get("/embed-url", async (req, res) => {
-  const memberId = req.query.memberId;
-  if (!memberId) {
-    return res.status(400).json({ error: "Missing memberId parameter" });
-  }
-
-  try {
-    const path = await generateEmbedPath(memberId);
-    res.json({ path });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to generate embed path" });
-  }
+// 1: Log all incoming requests
+app.use((req, res, next) => {
+  console.log(`📡 Incoming: ${req.method} ${req.url}`);
+  next();
 });
 
-// Endpoint to provision users and return their memberIds
-const { lookupMemberId, provisionEmbedUser } = require("../helpers/provision");
-const config = require("../helpers/config");
+// 2: Validate required config
+if (
+  !config.email ||
+  !config.clientId ||
+  !config.secret ||
+  !config.defaultWorkbookId ||
+  !config.memberIds.view ||
+  !config.memberIds.build
+) {
+  throw new Error("Missing one or more required values in .env or config.js");
+}
 
-// Endpoint to provision users for embedding
-app.get("/provision-users", async (req, res) => {
+const PORT = process.env.PORT || 3000;
+
+// 3: Serve static files from public/
+app.use(express.static(path.join(__dirname, "..", "public")));
+
+// 4: Health check endpoint
+app.get("/health", (req, res) => res.send("OK"));
+
+// 5: POST /embed-url — Return a signed embed URL for a given role
+app.post("/embed-url", async (req, res) => {
+  const { memberId, user } = req.body;
+  console.log("📥 /embed-url body:", { memberId, user });
+
+  let resolvedId = memberId;
+
+  if (!resolvedId && user) {
+    const role = user.toLowerCase();
+    if (config.memberIds[role]) {
+      resolvedId = config.memberIds[role];
+    } else {
+      return res.status(400).json({ error: "Invalid role passed." });
+    }
+  }
+
+  if (!resolvedId) {
+    return res.status(400).json({ error: "Missing or unresolvable memberId." });
+  }
+
   try {
-    const result = {};
+    const embedPath = new URL(config.defaultWorkbookId).pathname;
 
-    // Admin (must exist)
-    result.admin = {
-      email: config.email,
-      memberId: await lookupMemberId(config.email),
+    const payload = {
+      sub: resolvedId,
+      path: embedPath,
+      exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour
     };
 
-    // Build and View (auto-provision)
-    result.build = {
-      email: "build@test.com",
-      accountType: "Build",
-      memberId: await provisionEmbedUser("build@test.com", "Build"),
-    };
+    const token = jwt.sign(payload, config.secret, {
+      algorithm: "HS256",
+      issuer: config.clientId,
+    });
 
-    result.view = {
-      email: "view@test.com",
-      accountType: "View",
-      memberId: await provisionEmbedUser("view@test.com", "View"),
-    };
+    const fullUrl = `${config.defaultWorkbookId}?auth_token=${token}`;
 
-    res.json(result);
+    console.log("🔗 Full Embed URL:", fullUrl);
+    console.log("📦 Decoded JWT Payload:", payload);
+    console.log("🔑 Signed Token:", token);
+
+    res.json({ embedUrl: fullUrl });
   } catch (err) {
-    console.error("Provisioning error:", err.message);
+    console.error("❌ Error generating embed URL:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Start the server
+// 6: GET /env — Return environment vars (for debugging only)
+app.get("/env", (req, res) => {
+  res.json({
+    ADMIN_MEMBER_ID: config.memberIds.admin,
+    BUILD_MEMBER_ID: config.memberIds.build,
+    VIEW_MEMBER_ID: config.memberIds.view,
+    EMBED_PATH: config.defaultWorkbookId,
+  });
+});
+
+// 7: GET /provision-users — Create embed users if needed
+app.get("/provision-users", async (req, res) => {
+  try {
+    const result = {
+      build: {
+        email: config.buildEmail,
+        accountType: "Build",
+        memberId: await provisionEmbedUser(config.buildEmail, "Build", "QuickStarts", "Build"),
+      },
+      view: {
+        email: config.viewEmail,
+        accountType: "View",
+        memberId: await provisionEmbedUser(config.viewEmail, "View", "QuickStarts", "View"),
+      },
+      admin: {
+        email: config.email,
+        memberId: await lookupMemberId(config.email),
+      },
+    };
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 8: Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });

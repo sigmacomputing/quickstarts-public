@@ -1,28 +1,40 @@
-// generateEmbedPath.js
-// This module generates a secure embed path for a Sigma workbook by impersonating a user.
-
+// helpers/generateEmbedPath.js
 const axios = require('axios');
 const getValidToken = require('./auth');
 require('dotenv').config();
 
-// Ensure required environment variables are set.
 const SIGMA_API = 'https://api.sigmacomputing.com';
-const WORKBOOK_ID = process.env.WORKBOOK_ID; // Add this to your .env
+const WORKBOOK_ID = process.env.WORKBOOK_ID;
+const VIEW_MEMBER_ID = process.env.VIEW_MEMBER_ID;
+const BUILD_MEMBER_ID = process.env.BUILD_MEMBER_ID;
+
+// Log environment variables for debugging only
+console.log("ENV: VIEW_MEMBER_ID =", VIEW_MEMBER_ID);
+console.log("ENV: BUILD_MEMBER_ID =", BUILD_MEMBER_ID);
 
 /**
  * Generate a secure embed path by impersonating a Sigma user
- * @param {string} memberId - Sigma member ID of the user to impersonate
+ * @param {string} accountTypeOrId - 'view', 'build', or a literal memberId
  * @returns {Promise<string|null>} - Secure embed path or null on failure
  */
-// @throws {Error} If WORKBOOK_ID is not set in .env
-async function generateEmbedPath(memberId) {
+async function generateEmbedPath(accountTypeOrId) {
   if (!WORKBOOK_ID) {
-    throw new Error('WORKBOOK_ID is not set in .env');
+    throw new Error("WORKBOOK_ID is not set in .env");
   }
-// Validate memberId
+
+  const memberId = {
+    view: VIEW_MEMBER_ID,
+    build: BUILD_MEMBER_ID,
+  }[accountTypeOrId?.toLowerCase()] || accountTypeOrId;
+
+  console.log("Resolved memberId for", accountTypeOrId, "→", memberId);
+
+  if (!memberId) {
+    throw new Error(`Invalid or missing memberId for selected role: ${accountTypeOrId}`);
+  }
+
   try {
     const token = await getValidToken();
-// Check if token is valid
     const response = await axios.post(
       `${SIGMA_API}/v2/embed/paths`,
       {
@@ -39,14 +51,13 @@ async function generateEmbedPath(memberId) {
       }
     );
 
-    // Check if the response contains the expected path
-    const path = response.data.path;
-    console.log(`Embed path for member ${memberId}: ${path}`);
+    const path = response.data?.path;
+    console.log(`Embed path for ${accountTypeOrId} (${memberId}): ${path}`);
     return path;
   } catch (err) {
     console.error('Failed to generate embed path:', err.response?.data || err.message);
     return null;
   }
 }
-// This function generates a secure embed path for a Sigma workbook by impersonating a user.
+
 module.exports = generateEmbedPath;
