@@ -16,7 +16,7 @@
 
   <!-- Content box -->
   <div class="container">
-    <h1>Sigma Embedding QuickStarts</h1>
+    <h1>Sigma Embedding API QuickStarts</h1>
 
     <select id="qsSelector">
       <option value="" disabled>Select a QuickStart</option>
@@ -24,7 +24,8 @@
 
     <br/>
     <button onclick="goToQS()">Go</button>
-  </div>
+    <input type="button" onclick="location.href='http://localhost:3000/tools/preload-users.html';" value="Provision Users" />
+    </div>
 
   <script>
     async function loadQuickStarts() {

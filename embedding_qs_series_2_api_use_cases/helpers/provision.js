@@ -1,8 +1,7 @@
 const axios = require("axios");
 const getBearerToken = require("./get-access-token");
-const config = require("../helpers/config");
 
-const SIGMA_API_BASE = config.apiBaseUrl;
+const SIGMA_API_BASE = process.env.BASE_URL;
 const teamIdCache = {}; // In-memory cache for team IDs
 
 /**
