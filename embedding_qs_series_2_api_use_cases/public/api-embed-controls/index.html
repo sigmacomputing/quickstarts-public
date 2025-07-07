@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Embed Controls QuickStart</title>
+    <link rel="stylesheet" href="/styles/layout.css" />
+    <link rel="icon" href="data:," />
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        margin: 0;
+        font-family: sans-serif;
+      }
+
+      .layout-topbar {
+        background: #f57c00;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        padding: 0.5rem 1rem;
+        gap: 0.5rem;
+      }
+
+      .menu-button:hover {
+        background-color: #ffe1c4;
+        color: #c65100;
+      }
+
+      .header-title {
+        font-size: 1rem;
+        margin-left: auto;
+        white-space: nowrap;
+      }
+      .main {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        width: 280px;
+        background: #f4f4f4;
+        padding: 1.5rem;
+        border-right: 1px solid #ddd;
+        overflow-y: auto;
+        transition: width 0.3s ease, padding 0.3s ease;
+      }
+
+      .sidebar.collapsed {
+        width: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      #collapse-info {
+        display: flex;
+        flex-direction: column;
+        width: fit-content;
+      }
+
+      .content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto; /* This makes the right panel scrollable */
+        padding: 1.5rem;
+        background: #ffffff;
+      }
+
+      iframe {
+        flex: 1 0 auto;
+        min-height: 500px;
+        border: none;
+        border-radius: 6px;
+      }
+
+      .layout-footer {
+        background: lightgray;
+        text-align: center;
+        line-height: 35px;
+        height: 34px;
+      }
+
+      select {
+        font-size: 1rem;
+        padding: 6px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+      }
+
+      .control-panel {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 10px;
+        font-size: 14px;
+      }
+
+      .control-group {
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .control-group label {
+        font-weight: bold;
+        font-size: 13px;
+      }
+
+      .control-group select {
+        font-size: 13px;
+        padding: 4px 6px;
+      }
+
+      .control-group label {
+        display: block;
+        margin-bottom: 4px;
+        font-weight: bold;
+      }
+
+      .left-controls {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="layout-topbar">
+      <div style="display: flex; align-items: center; gap: 0.5rem">
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+        <span class="header-title">API Embed Controls QuickStart</span>
+      </div>
+
+      <div class="control-panel">
+        <div class="control-group">
+          <label for="roleSelect">Current User:</label>
+          <select id="roleSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a user
+            </option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="workbookSelect">Workbook:</label>
+          <select id="workbookSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a workbook
+            </option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="embedType">Embed Type:</label>
+          <select id="embedType" autocomplete="off">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select an embed type
+            </option>
+            <option value="workbook">Workbook</option>
+            <option value="page">Page</option>
+            <option value="element">Element</option>
+          </select>
+        </div>
+
+        <div class="control-group" id="page-id-group" style="display: none">
+          <label for="pageId">Page:</label>
+          <select id="pageId">
+            <option selected disabled>Select a page</option>
+          </select>
+        </div>
+
+        <div class="control-group" id="element-id-group" style="display: none">
+          <label for="ElementId">Element:</label>
+          <select id="ElementId">
+            <option selected disabled>Select an element</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="collapse-info">Toggle Info Panel</button>
+    </header>
+
+    <div class="main">
+      <aside class="sidebar">
+        <h2>Information:</h2>
+        <p>
+          The embedded content should render in the iframe on the right, based
+          on your .env file configuration.
+        </p>
+
+        <code id="debug-embed-url">N/A</code>
+
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <p>Loading...</p>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+      </aside>
+
+      <main class="content">
+        <iframe id="sigma-embed" src=""></iframe>
+      </main>
+    </div>
+
+    <footer class="layout-footer">Sigma &copy; 2025</footer>
+
+    <script>
+      const sidebar = document.querySelector(".sidebar");
+
+      function decodeJwt(token) {
+        try {
+          const [header, payload, signature] = token.split(".");
+          const decode = (str) => JSON.parse(atob(str));
+          return {
+            header: decode(header),
+            payload: decode(payload),
+            signature,
+          };
+        } catch {
+          return { error: "Failed to decode JWT." };
+        }
+      }
+
+      async function loadEmbed(mode = "api-embed-controls") {
+        const embedType = document.getElementById("embedType").value;
+        const workbookUrlId = window.selectedworkbookUrlId;
+        const selectedUser = document.getElementById("roleSelect").value;
+
+        const pageId = document.getElementById("pageId")?.value;
+        const elementId = document.getElementById("ElementId")?.value;
+        const embedFrame = document.getElementById("sigma-embed");
+
+        if (!selectedUser || !workbookUrlId || !embedType) {
+          console.warn("Embed not loaded — missing required fields.");
+          embedFrame.style.display = "none";
+          return;
+        }
+
+        let targetId = "";
+        if (embedType === "page") {
+          if (!pageId) {
+            embedFrame.style.display = "none";
+            return;
+          }
+          targetId = pageId.trim();
+        } else if (embedType === "element") {
+          if (!pageId || !elementId) {
+            embedFrame.style.display = "none";
+            return;
+          }
+          targetId = `${pageId.trim()}:${elementId.trim()}`;
+        }
+
+        let url = `/generate-jwt/${mode}?embedType=${embedType}&workbookUrlId=${encodeURIComponent(
+          workbookUrlId
+        )}`;
+        if (targetId) {
+          url += `&targetId=${encodeURIComponent(targetId)}`;
+        }
+
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sub: selectedUser }),
+          });
+
+          if (!res.ok) {
+            const errText = await res.text();
+            console.error("Failed to fetch embed:", res.status, errText);
+            throw new Error("Embed request failed");
+          }
+
+          const data = await res.json();
+          const jwt = data.jwt;
+          const embedUrl = data.embedUrl;
+
+          embedFrame.src = embedUrl;
+          embedFrame.style.display = "block";
+
+          document.getElementById("debug-embed-url").textContent =
+            embedUrl || "N/A";
+
+          if (jwt) {
+            const decoded = decodeJwt(jwt);
+            const decodedBlock = document.getElementById("jwt-decoded");
+            document.getElementById("jwt-display").textContent = jwt;
+            const fullUrl = embedUrl.split("?:jwt=")[0];
+            const lastSlashIndex = fullUrl.lastIndexOf("/");
+            const baseUrlOnly = fullUrl.substring(0, lastSlashIndex);
+            const parsedWorkbookUrlId = fullUrl.substring(lastSlashIndex + 1);
+
+            decodedBlock.innerHTML = decoded.error
+              ? `<p style="color:red;">${decoded.error}</p>`
+              : `<h3>Decoded JWT Header:</h3>
+              <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
+      
+           <h3>Decoded JWT Payload:</h3>
+           <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>`;
+          }
+        } catch (err) {
+          console.error("loadEmbed() failed:", err);
+          embedFrame.style.display = "none";
+          document.getElementById("debug-embed-url").textContent =
+            "Error loading embed.";
+          document.getElementById("debug-jwt").textContent = "JWT unavailable.";
+        }
+      }
+
+      async function loadUserOptions() {
+        const select = document.getElementById("roleSelect");
+        const res = await fetch("/env");
+        const env = await res.json();
+
+        select.innerHTML = `
+      <option value="" disabled selected style="color:gray;font-style:italic">Select a user</option>
+      <option value="view">${env.VIEW_EMAIL || "View User"}</option>
+      <option value="build">${env.BUILD_EMAIL || "Build User"}</option>
+    `;
+      }
+
+      async function loadWorkbooks() {
+        const select = document.getElementById("workbookSelect");
+
+        try {
+          const res = await fetch("/api/get-workbooks");
+          const { workbooks } = await res.json();
+
+          select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select a workbook</option>`;
+
+          workbooks.forEach((wb) => {
+            const match = wb.url.match(/workbook\/([a-zA-Z0-9]+)/);
+            const workbookUrlId = match ? match[1] : null;
+            if (!workbookUrlId) return;
+            const opt = document.createElement("option");
+            opt.value = workbookUrlId;
+            opt.textContent = wb.name;
+            select.appendChild(opt);
+          });
+
+          select.addEventListener("change", () => {
+            window.selectedworkbookUrlId = select.value;
+            const embedType = document.getElementById("embedType").value;
+
+            document.getElementById("sigma-embed").style.display = "none";
+
+            if (embedType === "page") {
+              document.getElementById("page-id-group").style.display = "block";
+              document.getElementById("element-id-group").style.display =
+                "none";
+              loadTargetIdOptions("page");
+            } else if (embedType === "element") {
+              document.getElementById("page-id-group").style.display = "block";
+              document.getElementById("element-id-group").style.display =
+                "block";
+              loadTargetIdOptions("element");
+            } else {
+              loadEmbed(document.getElementById("roleSelect").value);
+            }
+          });
+        } catch (err) {
+          console.error("Failed to load workbooks:", err);
+          select.innerHTML = `<option value="">Error loading workbooks</option>`;
+        }
+      }
+
+      async function loadTargetIdOptions(embedType) {
+        const workbookUrlId = window.selectedworkbookUrlId;
+        if (!workbookUrlId) return;
+
+        const pageSelect = document.getElementById("pageId");
+        const elementSelect = document.getElementById("ElementId");
+
+        pageSelect.innerHTML = `<option value="" disabled selected>Select a page</option>`;
+        elementSelect.innerHTML = `<option value="" disabled selected>Select an element</option>`;
+
+        try {
+          const res = await fetch(
+            `/api/get-pages?workbookUrlId=${workbookUrlId}`
+          );
+          const { entries: pages } = await res.json();
+
+          if (!Array.isArray(pages)) {
+            console.warn("No pages returned.");
+            return;
+          }
+
+          pages.forEach((p) => {
+            const opt = document.createElement("option");
+            opt.value = p.pageId;
+            opt.textContent = p.name;
+            pageSelect.appendChild(opt);
+          });
+
+          if (embedType === "page") {
+            pageSelect.onchange = () => {
+              loadEmbed(document.getElementById("roleSelect").value);
+            };
+          } else if (embedType === "element") {
+            pageSelect.onchange = async () => {
+              const selectedPageId = pageSelect.value;
+              if (!selectedPageId) return;
+
+              try {
+                const resElements = await fetch(
+                  `/api/get-elements?workbookUrlId=${workbookUrlId}&pageId=${selectedPageId}`
+                );
+
+                const elementsResponse = await resElements.json();
+                console.log("📦 Full elements response:", elementsResponse);
+
+                // Defensive parse: Handle raw array or { entries: [...] }
+                const elements = Array.isArray(elementsResponse.entries)
+                  ? elementsResponse.entries
+                  : Array.isArray(elementsResponse)
+                  ? elementsResponse
+                  : [];
+
+                console.log("📦 Elements to populate:", elements);
+
+                // Sanity check: ensure the select exists
+                const elementSelect = document.getElementById("ElementId");
+                if (!elementSelect) {
+                  console.error("elementSelect is null. Check ID casing.");
+                  return;
+                }
+
+                // Reset dropdown
+                elementSelect.innerHTML = `<option value="" disabled selected>Select an element</option>`;
+
+                // Append all elements (with fallback for unnamed ones)
+                elements
+                  .filter((el) => ["visualization", "table"].includes(el.type))
+                  .forEach((el) => {
+                    const opt = document.createElement("option");
+                    opt.value = el.elementId;
+                    opt.textContent = el.name || `[${el.type}]`;
+                    elementSelect.appendChild(opt);
+                  });
+
+                // Ensure the group is visible
+                document.getElementById("element-id-group").style.display =
+                  "block";
+
+                // Hook to trigger re-embed when element selected
+                elementSelect.onchange = () => {
+                  loadEmbed(document.getElementById("roleSelect").value);
+                };
+              } catch (err) {
+                console.error("Failed to fetch or populate elements:", err);
+              }
+            };
+          }
+        } catch (err) {
+          console.error("Failed to load pages/elements:", err);
+        }
+      }
+
+      document.getElementById("collapse-info").addEventListener("click", () => {
+        sidebar.classList.toggle("collapsed");
+      });
+
+      document.getElementById("roleSelect").addEventListener("change", () => {
+        loadEmbed(document.getElementById("roleSelect").value);
+      });
+
+      document.getElementById("embedType").addEventListener("change", () => {
+        const embedType = document.getElementById("embedType").value;
+
+        document.getElementById("page-id-group").style.display = "none";
+        document.getElementById("element-id-group").style.display = "none";
+
+        if (embedType === "page") {
+          document.getElementById("page-id-group").style.display = "block";
+          loadTargetIdOptions("page");
+        } else if (embedType === "element") {
+          document.getElementById("page-id-group").style.display = "block";
+          document.getElementById("element-id-group").style.display = "block";
+          loadTargetIdOptions("element");
+        } else {
+          loadEmbed(document.getElementById("roleSelect").value);
+        }
+
+        document.getElementById("sigma-embed").style.display = "none";
+      });
+
+      (async () => {
+        await loadUserOptions();
+        await loadWorkbooks();
+        document.getElementById("page-id-group").style.display = "none";
+        document.getElementById("element-id-group").style.display = "none";
+      })();
+    </script>
+  </body>
+</html>

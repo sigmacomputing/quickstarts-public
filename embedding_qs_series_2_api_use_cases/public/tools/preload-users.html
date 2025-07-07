@@ -87,14 +87,19 @@
     </style>
   </head>
   <body>
-    <div class="layout-topbar">Sigma Embed QuickStart – Provision Users</div>
+    <div class="layout-topbar">Sigma Embed QuickStart – Provision Users
+
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+    </div>
 
     <div class="container">
       <h1>Preload Two Test Embed Users</h1>
       <p>
-        This utility will create the <strong>build</strong> and
-        <strong>view</strong> users by calling Sigma's Embed API and return
-        their member IDs, along with your admin user ID.
+        This utility will create the <strong>"build:</strong> and
+        <strong>"view"</strong> users by calling Sigma's Embed API and return
+        their emails and member IDs for reference only.
       </p>
 
       <button id="provision" class="menu-button">Start Provisioning</button>
@@ -120,16 +125,11 @@
           container.innerHTML = `
       <h3>Provisioning Complete</h3>
       <ul>
-        <li><strong>Admin</strong> (${data.admin.email}):<br><code>${data.admin.memberId}</code></li>
-        <li><strong>Build</strong> (${data.build.email}):<br><code>${data.build.memberId}</code></li>
-        <li><strong>View</strong> (${data.view.email}):<br><code>${data.view.memberId}</code></li>
+        <li><strong>Build User:</strong> (${data.build.email}):<br><code>${data.build.memberId}</code></li>
       </ul>
-      <p>Copy the following into your <code>.env</code> file:</p>
-      <pre>
-ADMIN_MEMBER_ID=${data.admin.memberId}
-BUILD_MEMBER_ID=${data.build.memberId}
-VIEW_MEMBER_ID=${data.view.memberId}
-      </pre>
+      <ul>
+        <li><strong>View User:</strong> (${data.view.email}):<br><code>${data.view.memberId}</code></li>
+      </ul>
     `;
         } catch (err) {
           container.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
