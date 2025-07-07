@@ -1,7 +1,7 @@
 {
   "name": "sigma_embedding_quickstarts",
   "version": "1.0.0",
-  "description": "Sigma Embed QuickStarts Project",
+  "description": "Sigma Embed API QuickStarts Project",
   "scripts": {
     "start": "nodemon server/server.js",
     "start:prod": "node server/server.js"
