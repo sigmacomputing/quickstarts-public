@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Preload Sigma Users</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        background-color: #fafafa;
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      .layout-topbar {
+        background: #f57c00;
+        color: white;
+        height: 4rem;
+        display: flex;
+        align-items: center;
+        padding: 0 1.5rem;
+        font-weight: bold;
+        font-size: 1.2rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        justify-content: space-between;
+      }
+
+      .container {
+        max-width: 700px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      p {
+        font-size: 1rem;
+        line-height: 1.6;
+        margin-top: 0;
+      }
+
+      .menu-button {
+        background-color: white;
+        color: #f57c00;
+        border: 2px solid #f57c00;
+        font-weight: bold;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 1rem;
+        margin-top: 1rem;
+        transition: all 0.2s ease;
+      }
+
+      .menu-button:hover {
+        background-color: #ffe1c4;
+        color: #c65100;
+      }
+
+      h3 {
+        margin-top: 2rem;
+      }
+
+      pre {
+        background: #f4f4f4;
+        padding: 1rem;
+        border-radius: 4px;
+        font-size: 0.95rem;
+        overflow-x: auto;
+      }
+
+      code {
+        background: #eee;
+        padding: 0 4px;
+        border-radius: 3px;
+        font-size: 0.95rem;
+      }
+
+      ul {
+        padding-left: 1.2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout-topbar">Sigma Embed QuickStart – Provision Users
+
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+    </div>
+
+    <div class="container">
+      <h1>Preload Two Test Embed Users</h1>
+      <p>
+        This utility will create the <strong>"build:</strong> and
+        <strong>"view"</strong> users by calling Sigma's Embed API and return
+        their emails and member IDs for reference only.
+      </p>
+
+      <button id="provision" class="menu-button">Start Provisioning</button>
+
+      <div id="results"></div>
+    </div>
+
+    <script>
+      document.getElementById("provision").addEventListener("click", provision);
+
+      async function provision() {
+        const container = document.getElementById("results");
+        container.innerHTML = "<p>⏳ Running setup...</p>";
+
+        try {
+          const res = await fetch("/provision-users");
+          const text = await res.text();
+
+          console.log("🔍 Raw response text:", text);
+
+          const data = JSON.parse(text);
+
+          container.innerHTML = `
+      <h3>Provisioning Complete</h3>
+      <ul>
+        <li><strong>Build User:</strong> (${data.build.email}):<br><code>${data.build.memberId}</code></li>
+      </ul>
+      <ul>
+        <li><strong>View User:</strong> (${data.view.email}):<br><code>${data.view.memberId}</code></li>
+      </ul>
+    `;
+        } catch (err) {
+          container.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+        }
+      }
+    </script>
+  </body>
+</html>

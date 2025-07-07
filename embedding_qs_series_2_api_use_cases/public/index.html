@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sigma Embed QuickStarts</title>
+  <link rel="stylesheet" href="/styles/layout.css" />
+</head>
+<body>
+
+  <!-- Animated SVG overlay -->
+  <object type="image/svg+xml" data="/assets/embed-login-bg.svg" class="svg-bg"></object>
+
+  <!-- Logo -->
+  <img src="/assets/quickstarts-logo.png" alt="QuickStarts Logo" class="logo" />
+
+  <!-- Content box -->
+  <div class="container">
+    <h1>Sigma Embedding API QuickStarts</h1>
+
+    <select id="qsSelector">
+      <option value="" disabled>Select a QuickStart</option>
+    </select>
+
+    <br/>
+    <button onclick="goToQS()">Go</button>
+    <input type="button" onclick="location.href='http://localhost:3000/tools/preload-users.html';" value="Provision Users" />
+    </div>
+
+  <script>
+    async function loadQuickStarts() {
+      try {
+        const response = await fetch('/assets/qs-manifest.json');
+        const quickStarts = await response.json();
+        const selector = document.getElementById('qsSelector');
+
+        quickStarts.forEach(qs => {
+          const option = document.createElement('option');
+          option.value = qs.slug;
+          option.textContent = qs.label;
+          selector.appendChild(option);
+        });
+
+        selector.value = "getting_started";
+      } catch (error) {
+        console.error('Failed to load QuickStart manifest:', error);
+      }
+    }
+
+    function goToQS() {
+      const selected = document.getElementById('qsSelector').value;
+      if (!selected) return alert("Please select a QuickStart.");
+      window.location.href = `/${selected}/?mode=${selected}`;
+    }
+
+    loadQuickStarts();
+  </script>
+</body>
+</html>
