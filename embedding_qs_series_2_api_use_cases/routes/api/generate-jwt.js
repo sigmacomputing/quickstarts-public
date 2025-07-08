@@ -85,7 +85,10 @@ router.post("/:mode", async (req, res) => {
     // Optional: log final result for visibility
     console.log("Embed generated:", embedUrl);
 
-    res.json({ embedUrl: `${embedUrl}?:jwt=${jwt}`, jwt });
+    // res.json({ embedUrl: `${embedUrl}?:jwt=${jwt}`, jwt });
+    const separator = embedUrl.includes("?") ? "&" : "?";
+res.json({ embedUrl: `${embedUrl}${separator}:jwt=${jwt}`, jwt });
+
   } catch (err) {
     console.error("Failed to generate JWT:", err);
     res.status(500).json({ error: "Internal error" });
