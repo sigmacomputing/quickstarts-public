@@ -551,7 +551,7 @@ cluster by (to_date(start_time)) as (
         , cost_per_query.cloud_services_credits as credits_used_cloud_services
         , cost_per_query.cloud_services_cost as cloud_services_cost
         , cost_per_query.cortex_functions_cost as cortex_functions_cost
-        , cost_per_query.cortex_functions_credits as cortex_functions_credits
+        , cost_per_query.cortex_functions_credits as credits_used_cortex_functions
         , cost_per_query.query_cost as total_cost
         , query_history.query_text
         , query_history.database_id
@@ -1164,7 +1164,7 @@ try {
                     , cost_per_query.cloud_services_credits as credits_used_cloud_services
                     , cost_per_query.cloud_services_cost as cloud_services_cost
                     , cost_per_query.cortex_functions_cost as cortex_functions_cost
-                    , cost_per_query.cortex_functions_credits as cortex_functions_credits
+                    , cost_per_query.cortex_functions_credits as credits_used_cortex_functions
                     , cost_per_query.query_cost as total_cost
                     , query_history.query_text
                     , query_history.database_id
