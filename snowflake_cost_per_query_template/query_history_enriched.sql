@@ -459,6 +459,39 @@ cluster by (to_date(start_time)) as (
             not ran_on_warehouse
     )
 
+    , cortex_consumption_by_function as (
+        select query_id
+        , function_name
+        , sum(token_credits) as credits
+        from snowflake.account_usage.cortex_functions_query_usage_history
+        group by query_id, function_name
+    )
+
+    , cortex_function_usage_details as (
+        select query_id
+        , sum(token_credits) as credits
+        , array_agg(object_construct('model_name', model_name, 'function_name', function_name, 'tokens', tokens, 'token_credits', token_credits)) as details
+        from snowflake.account_usage.cortex_functions_query_usage_history
+        group by query_id
+    )
+
+    , cortex_function_usage_by_query as (
+        select query_id
+        , object_agg(function_name, credits) as function_credits
+        from cortex_consumption_by_function
+        group by query_id
+    )
+
+    , cortex_function_cost_and_usage_by_query as (
+        select cortex_function_usage_details.query_id
+        , cortex_function_usage_details.credits as cortex_credits
+        , cortex_function_usage_by_query.function_credits as cortex_credits_by_function
+        , cortex_function_usage_details.details as cortex_usage_details
+        from cortex_function_usage_details
+        left join cortex_function_usage_by_query 
+            on cortex_function_usage_by_query.query_id = cortex_function_usage_details.query_id
+    )
+
     , stg__cost_per_query as (
         select
             all_queries.query_id,
@@ -473,8 +506,10 @@ cluster by (to_date(start_time)) as (
             -- So, we don't look at any queries from the most recent day t, just t-1 and before.
             (div0(all_queries.credits_used_cloud_services, credits_billed_daily.daily_credits_used_cloud_services) * credits_billed_daily.daily_billable_cloud_services) * coalesce(daily_rates.effective_rate, current_rates.effective_rate) as cloud_services_cost,
             div0(all_queries.credits_used_cloud_services, credits_billed_daily.daily_credits_used_cloud_services) * credits_billed_daily.daily_billable_cloud_services as cloud_services_credits,
-            all_queries.compute_cost + all_queries.query_acceleration_cost + cloud_services_cost as query_cost,
-            all_queries.compute_credits + all_queries.query_acceleration_credits + cloud_services_credits as query_credits,
+            zeroifnull(cortex_function_cost_and_usage_by_query.cortex_credits * coalesce(ai_services_daily_rates.effective_rate, ai_services_current_rates.effective_rate)) as cortex_functions_cost,
+            zeroifnull(cortex_function_cost_and_usage_by_query.cortex_credits) as cortex_functions_credits,
+            all_queries.compute_cost + all_queries.query_acceleration_cost + cloud_services_cost + cortex_functions_cost as query_cost,
+            all_queries.compute_credits + all_queries.query_acceleration_credits + cloud_services_credits + cortex_functions_credits as query_credits,
             all_queries.ran_on_warehouse,
             coalesce(daily_rates.currency, current_rates.currency) as currency
         from all_queries
@@ -488,6 +523,16 @@ cluster by (to_date(start_time)) as (
             on current_rates.is_latest_rate
                 and current_rates.service_type = 'CLOUD_SERVICES'
                 and current_rates.usage_type = 'cloud services'
+        left join daily_rates as ai_services_daily_rates
+            on date(all_queries.start_time) = ai_services_daily_rates.date
+                and ai_services_daily_rates.service_type = 'AI_SERVICES'
+                and ai_services_daily_rates.usage_type = 'ai services'
+        inner join daily_rates as ai_services_current_rates
+            on ai_services_current_rates.is_latest_rate
+                and ai_services_current_rates.service_type = 'AI_SERVICES'
+                and ai_services_current_rates.usage_type = 'ai services'
+        left join cortex_function_cost_and_usage_by_query 
+            on all_queries.query_id = cortex_function_cost_and_usage_by_query.query_id
         order by all_queries.start_time asc
     )
 
@@ -505,6 +550,8 @@ cluster by (to_date(start_time)) as (
         , cost_per_query.query_acceleration_cost as query_acceleration_cost
         , cost_per_query.cloud_services_credits as credits_used_cloud_services
         , cost_per_query.cloud_services_cost as cloud_services_cost
+        , cost_per_query.cortex_functions_cost as cortex_functions_cost
+        , cost_per_query.cortex_functions_credits as credits_used_cortex_functions
         , cost_per_query.query_cost as total_cost
         , query_history.query_text
         , query_history.database_id
@@ -581,9 +628,15 @@ cluster by (to_date(start_time)) as (
         , query_history.query_acceleration_upper_limit_scale_factor
         , query_attribution_history.parent_query_id
         , query_attribution_history.root_query_id
+        , cortex_function_cost_and_usage_by_query.cortex_credits_by_function
+        , cortex_function_cost_and_usage_by_query.cortex_usage_details
         from query_history 
-        left join stg__cost_per_query cost_per_query on query_history.query_id = cost_per_query.query_id
-        left join query_attribution_history on query_attribution_history.query_id = query_history.query_id
+        left join stg__cost_per_query cost_per_query 
+            on query_history.query_id = cost_per_query.query_id
+        left join query_attribution_history 
+            on query_attribution_history.query_id = query_history.query_id
+        left join cortex_function_cost_and_usage_by_query 
+            on cortex_function_cost_and_usage_by_query.query_id = query_history.query_id
     )
 
     select *
@@ -1017,6 +1070,39 @@ try {
                     not ran_on_warehouse
             )
 
+            , cortex_consumption_by_function as (
+                select query_id
+                , function_name
+                , sum(token_credits) as credits
+                from snowflake.account_usage.cortex_functions_query_usage_history
+                group by query_id, function_name
+            )
+
+            , cortex_function_usage_details as (
+                select query_id
+                , sum(token_credits) as credits
+                , array_agg(object_construct('model_name', model_name, 'function_name', function_name, 'tokens', tokens, 'token_credits', token_credits)) as details
+                from snowflake.account_usage.cortex_functions_query_usage_history
+                group by query_id
+            )
+
+            , cortex_function_usage_by_query as (
+                select query_id
+                , object_agg(function_name, credits) as function_credits
+                from cortex_consumption_by_function
+                group by query_id
+            )
+
+            , cortex_function_cost_and_usage_by_query as (
+                select cortex_function_usage_details.query_id
+                , cortex_function_usage_details.credits as cortex_credits
+                , cortex_function_usage_by_query.function_credits as cortex_credits_by_function
+                , cortex_function_usage_details.details as cortex_usage_details
+                from cortex_function_usage_details
+                left join cortex_function_usage_by_query 
+                    on cortex_function_usage_by_query.query_id = cortex_function_usage_details.query_id
+            )
+
             , stg__cost_per_query as (
                 select
                     all_queries.query_id,
@@ -1031,8 +1117,10 @@ try {
                     -- So, we don't look at any queries from the most recent day t, just t-1 and before.
                     (div0(all_queries.credits_used_cloud_services, credits_billed_daily.daily_credits_used_cloud_services) * credits_billed_daily.daily_billable_cloud_services) * coalesce(daily_rates.effective_rate, current_rates.effective_rate) as cloud_services_cost,
                     div0(all_queries.credits_used_cloud_services, credits_billed_daily.daily_credits_used_cloud_services) * credits_billed_daily.daily_billable_cloud_services as cloud_services_credits,
-                    all_queries.compute_cost + all_queries.query_acceleration_cost + cloud_services_cost as query_cost,
-                    all_queries.compute_credits + all_queries.query_acceleration_credits + cloud_services_credits as query_credits,
+                    zeroifnull(cortex_function_cost_and_usage_by_query.cortex_credits * coalesce(ai_services_daily_rates.effective_rate, ai_services_current_rates.effective_rate)) as cortex_functions_cost,
+                    zeroifnull(cortex_function_cost_and_usage_by_query.cortex_credits) as cortex_functions_credits,
+                    all_queries.compute_cost + all_queries.query_acceleration_cost + cloud_services_cost + cortex_functions_cost as query_cost,
+                    all_queries.compute_credits + all_queries.query_acceleration_credits + cloud_services_credits + cortex_functions_credits as query_credits,
                     all_queries.ran_on_warehouse,
                     coalesce(daily_rates.currency, current_rates.currency) as currency
                 from all_queries
@@ -1046,6 +1134,16 @@ try {
                     on current_rates.is_latest_rate
                         and current_rates.service_type = 'CLOUD_SERVICES'
                         and current_rates.usage_type = 'cloud services'
+                left join daily_rates as ai_services_daily_rates
+                    on date(all_queries.start_time) = ai_services_daily_rates.date
+                        and ai_services_daily_rates.service_type = 'AI_SERVICES'
+                        and ai_services_daily_rates.usage_type = 'ai services'
+                inner join daily_rates as ai_services_current_rates
+                    on ai_services_current_rates.is_latest_rate
+                        and ai_services_current_rates.service_type = 'AI_SERVICES'
+                        and ai_services_current_rates.usage_type = 'ai services'
+                left join cortex_function_cost_and_usage_by_query 
+                    on all_queries.query_id = cortex_function_cost_and_usage_by_query.query_id
                 order by all_queries.start_time asc
             )
 
@@ -1057,94 +1155,103 @@ try {
             )
 
             , final as (
-                select query_history.query_id
-                , cost_per_query.compute_credits as credits_attributed_compute
-                , cost_per_query.compute_cost as compute_cost
-                , cost_per_query.query_acceleration_credits as credits_used_query_acceleration
-                , cost_per_query.query_acceleration_cost as query_acceleration_cost
-                , cost_per_query.cloud_services_credits as credits_used_cloud_services
-                , cost_per_query.cloud_services_cost as cloud_services_cost
-                , cost_per_query.query_cost as total_cost
-                , query_history.query_text
-                , query_history.database_id
-                , query_history.database_name
-                , query_history.schema_id
-                , query_history.schema_name
-                , query_history.query_type
-                , query_history.session_id
-                , query_history.user_name
-                , query_history.role_name
-                , query_history.warehouse_id
-                , query_history.warehouse_name
-                , query_history.warehouse_size
-                , query_history.warehouse_type
-                , query_history.cluster_number
-                , regexp_like(lower(query_text), '^(show|desc)') as is_metadata_query
-                , (regexp_like(lower(query_text), 'select(.|\n|\r)*from(.|\n|\r)*') or regexp_like(lower(query_text), '^with.*select.*from.*')) and not(regexp_like(lower(query_text), '^create(.|\n|\r)*(or replace|secure|recursive)?(.|\n|\r)*view')) as is_select_query
-                , query_history.query_tag
-                , contains(query_history.query_tag, 'Sigma Σ') as is_sigma_query
-                , try_parse_json(regexp_replace(query_history.query_tag, 'Sigma Σ ', '')) as sigma_query_tag_json
-                , sigma_query_tag_json:kind::text as sigma_query_kind
-                , sigma_query_tag_json:sourceUrl::text as sigma_source_url
-                , sigma_query_tag_json:"request-id"::text as sigma_request_id
-                , sigma_query_tag_json:email::text as sigma_user_email
-                , split_part(split_part(sigma_user_email, '@', 2), '.', 1) as sigma_user_email_domain
-                , split_part(sigma_source_url, '?', 1) as sigma_document_url
-                , trim(regexp_replace(regexp_replace(split_part(split_part(sigma_source_url, '/', 6), '?:', 1), right(split_part(split_part(sigma_source_url, '/', 6), '?:', 1), 22), ''), '-', ' ')) as sigma_document_name
-                , query_history.execution_status
-                , query_history.error_code
-                , query_history.error_message
-                , query_history.start_time
-                , query_history.end_time
-                , query_history.warehouse_size is not null as ran_on_warehouse
-                , query_history.total_elapsed_time as total_elapsed_time_ms
-                , query_history.compilation_time as compilation_time_ms
-                , query_history.queued_provisioning_time as queued_provisioning_time_ms
-                , query_history.queued_repair_time as queued_repair_time_ms
-                , query_history.queued_overload_time as queued_overload_time_ms
-                , query_history.transaction_blocked_time as transaction_blocked_time_ms
-                , query_history.list_external_files_time as list_external_files_time_ms
-                , query_history.execution_time as execution_time_ms
-                , query_history.bytes_scanned
-                , query_history.percentage_scanned_from_cache
-                , query_history.bytes_written
-                , query_history.bytes_written_to_result
-                , query_history.bytes_read_from_result
-                , query_history.rows_produced
-                , query_history.rows_inserted
-                , query_history.rows_updated
-                , query_history.rows_deleted
-                , query_history.rows_unloaded
-                , query_history.bytes_deleted
-                , query_history.partitions_scanned
-                , query_history.partitions_total
-                , query_history.bytes_spilled_to_local_storage
-                , query_history.bytes_spilled_to_remote_storage
-                , query_history.bytes_sent_over_the_network
-                , query_history.outbound_data_transfer_cloud
-                , query_history.outbound_data_transfer_region
-                , query_history.outbound_data_transfer_bytes
-                , query_history.inbound_data_transfer_cloud
-                , query_history.inbound_data_transfer_region
-                , query_history.inbound_data_transfer_bytes
-                , query_history.release_version
-                , query_history.external_function_total_invocations
-                , query_history.external_function_total_sent_rows
-                , query_history.external_function_total_received_rows
-                , query_history.external_function_total_sent_bytes
-                , query_history.external_function_total_received_bytes
-                , query_history.query_load_percent
-                , query_history.is_client_generated_statement
-                , query_history.query_acceleration_bytes_scanned
-                , query_history.query_acceleration_partitions_scanned
-                , query_history.query_acceleration_upper_limit_scale_factor
-                , query_attribution_history.parent_query_id
-                , query_attribution_history.root_query_id
+                select 
+                    query_history.query_id
+                    , cost_per_query.compute_credits as credits_attributed_compute
+                    , cost_per_query.compute_cost as compute_cost
+                    , cost_per_query.query_acceleration_credits as credits_used_query_acceleration
+                    , cost_per_query.query_acceleration_cost as query_acceleration_cost
+                    , cost_per_query.cloud_services_credits as credits_used_cloud_services
+                    , cost_per_query.cloud_services_cost as cloud_services_cost
+                    , cost_per_query.cortex_functions_cost as cortex_functions_cost
+                    , cost_per_query.cortex_functions_credits as credits_used_cortex_functions
+                    , cost_per_query.query_cost as total_cost
+                    , query_history.query_text
+                    , query_history.database_id
+                    , query_history.database_name
+                    , query_history.schema_id
+                    , query_history.schema_name
+                    , query_history.query_type
+                    , query_history.session_id
+                    , query_history.user_name
+                    , query_history.role_name
+                    , query_history.warehouse_id
+                    , query_history.warehouse_name
+                    , query_history.warehouse_size
+                    , query_history.warehouse_type
+                    , query_history.cluster_number
+                    , regexp_like(lower(query_text), '^(show|desc)') as is_metadata_query
+                    , (regexp_like(lower(query_text), 'select(.|\n|\r)*from(.|\n|\r)*') or regexp_like(lower(query_text), '^with.*select.*from.*')) and not(regexp_like(lower(query_text), '^create(.|\n|\r)*(or replace|secure|recursive)?(.|\n|\r)*view')) as is_select_query
+                    , query_history.query_tag
+                    , contains(query_history.query_tag, 'Sigma Σ') as is_sigma_query
+                    , try_parse_json(regexp_replace(query_history.query_tag, 'Sigma Σ ', '')) as sigma_query_tag_json
+                    , sigma_query_tag_json:kind::text as sigma_query_kind
+                    , sigma_query_tag_json:sourceUrl::text as sigma_source_url
+                    , sigma_query_tag_json:"request-id"::text as sigma_request_id
+                    , sigma_query_tag_json:email::text as sigma_user_email
+                    , split_part(split_part(sigma_user_email, '@', 2), '.', 1) as sigma_user_email_domain
+                    , split_part(sigma_source_url, '?', 1) as sigma_document_url
+                    , trim(regexp_replace(regexp_replace(split_part(split_part(sigma_source_url, '/', 6), '?:', 1), right(split_part(split_part(sigma_source_url, '/', 6), '?:', 1), 22), ''), '-', ' ')) as sigma_document_name
+                    , query_history.execution_status
+                    , query_history.error_code
+                    , query_history.error_message
+                    , query_history.start_time
+                    , query_history.end_time
+                    , query_history.warehouse_size is not null as ran_on_warehouse
+                    , query_history.total_elapsed_time as total_elapsed_time_ms
+                    , query_history.compilation_time as compilation_time_ms
+                    , query_history.queued_provisioning_time as queued_provisioning_time_ms
+                    , query_history.queued_repair_time as queued_repair_time_ms
+                    , query_history.queued_overload_time as queued_overload_time_ms
+                    , query_history.transaction_blocked_time as transaction_blocked_time_ms
+                    , query_history.list_external_files_time as list_external_files_time_ms
+                    , query_history.execution_time as execution_time_ms
+                    , query_history.bytes_scanned
+                    , query_history.percentage_scanned_from_cache
+                    , query_history.bytes_written
+                    , query_history.bytes_written_to_result
+                    , query_history.bytes_read_from_result
+                    , query_history.rows_produced
+                    , query_history.rows_inserted
+                    , query_history.rows_updated
+                    , query_history.rows_deleted
+                    , query_history.rows_unloaded
+                    , query_history.bytes_deleted
+                    , query_history.partitions_scanned
+                    , query_history.partitions_total
+                    , query_history.bytes_spilled_to_local_storage
+                    , query_history.bytes_spilled_to_remote_storage
+                    , query_history.bytes_sent_over_the_network
+                    , query_history.outbound_data_transfer_cloud
+                    , query_history.outbound_data_transfer_region
+                    , query_history.outbound_data_transfer_bytes
+                    , query_history.inbound_data_transfer_cloud
+                    , query_history.inbound_data_transfer_region
+                    , query_history.inbound_data_transfer_bytes
+                    , query_history.release_version
+                    , query_history.external_function_total_invocations
+                    , query_history.external_function_total_sent_rows
+                    , query_history.external_function_total_received_rows
+                    , query_history.external_function_total_sent_bytes
+                    , query_history.external_function_total_received_bytes
+                    , query_history.query_load_percent
+                    , query_history.is_client_generated_statement
+                    , query_history.query_acceleration_bytes_scanned
+                    , query_history.query_acceleration_partitions_scanned
+                    , query_history.query_acceleration_upper_limit_scale_factor
+                    , query_attribution_history.parent_query_id
+                    , query_attribution_history.root_query_id
+                    , cortex_function_cost_and_usage_by_query.cortex_credits_by_function
+                    , cortex_function_cost_and_usage_by_query.cortex_usage_details
                 from query_history 
-                left join stg__cost_per_query cost_per_query on query_history.query_id = cost_per_query.query_id
-                left join query_attribution_history on query_attribution_history.query_id = query_history.query_id
+                left join stg__cost_per_query cost_per_query 
+                    on query_history.query_id = cost_per_query.query_id
+                left join query_attribution_history 
+                    on query_attribution_history.query_id = query_history.query_id
+                left join cortex_function_cost_and_usage_by_query 
+                    on cortex_function_cost_and_usage_by_query.query_id = query_history.query_id            
                 where query_history.start_time > (select last_enriched_query_start_time from last_enriched_query)
-                and query_history.end_time < date_trunc(day, getdate())
+                    and query_history.end_time < date_trunc(day, getdate())
             )
 
             select *
