@@ -34,10 +34,13 @@ async function getWorkbooksByTeam(teamName = process.env.WORKSPACE_NAME) {
 
   // Return only relevant metadata for downstream use
   return filtered.map((w) => ({
-    id: w.workbookId,
+    id: w.workbookId, // full UUID for API calls
+    urlId: w.workbookUrlId, // short ID used for matching
     name: w.name,
     url: w.url,
+    version: w.latestVersion,
     path: w.path,
+    latestVersion: w.latestVersion,
   }));
 }
 

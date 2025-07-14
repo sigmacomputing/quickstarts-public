@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Page metadata and layout styles -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Bookmarks QuickStart</title>
+    <link rel="stylesheet" href="/styles/layout.css" />
+    <link rel="icon" href="data:," />
+
+    <style>
+            body {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        margin: 0;
+        font-family: sans-serif;
+      .layout-topbar {
+        background: #f57c00;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        padding: 0.5rem 1rem;
+      }
+
+      .header-title {
+        font-size: 1rem;
+        margin-left: auto;
+        white-space: nowrap;
+      }
+
+      .control-panel {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 10px;
+        font-size: 14px;
+      }
+
+      .control-group label {
+        font-weight: bold;
+        font-size: 13px;
+      }
+
+      .control-group select {
+        font-size: 13px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+      }
+
+      #collapse-info {
+        width: fit-content;
+        margin-top: 4px;
+        margin-left: 0;
+        font-size: 14px;
+        cursor: pointer;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+      }
+
+      .main {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        width: 280px;
+        background: #f4f4f4;
+        padding: 1.5rem;
+        border-right: 1px solid #ddd;
+        overflow-y: auto;
+        transition: width 0.3s ease, padding 0.3s ease;
+      }
+
+      .sidebar.collapsed {
+        width: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        padding: 1.5rem;
+        background: #ffffff;
+      }
+
+      iframe {
+        flex: 1 0 auto;
+        min-height: 500px;
+        border: none;
+        border-radius: 6px;
+      }
+
+      .layout-footer {
+        background: lightgray;
+        text-align: center;
+        line-height: 35px;
+        height: 34px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- === Top bar === -->
+    <header class="layout-topbar" style="background-color: #f57c00">
+      <!-- Navigation and title -->
+      <div style="display: flex; align-items: center; gap: 0.5rem">
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+        <span class="header-title" style="font-weight: bold"
+          >API Bookmarks QuickStart</span
+        >
+      </div>
+
+      <!-- Combined Control Panel -->
+      <div
+        class="control-panel"
+        style="display: flex; flex-wrap: wrap; gap: 24px; margin-top: 10px"
+      >
+        <!-- User Select -->
+        <div class="control-group">
+          <label for="roleSelect">Current User:</label>
+          <select id="roleSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a user
+            </option>
+          </select>
+        </div>
+
+        <!-- Workbook Select -->
+        <div class="control-group">
+          <label for="workbookSelect">Workbook:</label>
+          <select id="workbookSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a workbook
+            </option>
+          </select>
+        </div>
+
+        <!-- Bookmark Dropdown (Always Visible) -->
+        <div class="control-group">
+          <label for="bookmarkSelect"><strong>Saved Bookmark:</strong></label>
+          <select id="bookmarkSelect" style="min-width: 180px" disabled>
+            <option value="" selected style="color: gray; font-style: italic">
+              Original Workbook
+            </option>
+          </select>
+        </div>
+
+        <!-- Bookmark Name + Create Button (Initially Hidden) -->
+        <div id="bookmarkControls" class="control-group" style="display: none">
+          <label for="bookmarkName"><strong>Bookmark Name:</strong></label>
+          <input id="bookmarkName" type="text" placeholder="Enter name…" />
+          <button id="create-bookmark-btn">Create Bookmark</button>
+        </div>
+      </div>
+
+      <!-- Toggle info panel (own row, aligned left) -->
+      <button id="collapse-info">Toggle Info Panel</button>
+    </header>
+
+    <!-- === Main Layout === -->
+    <div class="main">
+      <!-- === Sidebar Info Panel === -->
+      <aside class="sidebar">
+        <h2>Information:</h2>
+        <p>
+          The embedded content should render in the iframe on the right, based
+          on your .env file configuration.
+        </p>
+        <code id="debug-embed-url">N/A</code>
+
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <p>Loading...</p>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+      </aside>
+
+      <!-- === iFrame === -->
+      <main class="content">
+        <iframe id="sigma-embed" src=""></iframe>
+      </main>
+    </div>
+
+    <!-- === Footer === -->
+    <footer class="layout-footer">Sigma &copy; 2025</footer>
+  </body>
+  <script>
+    let DEBUG = false;
+    let env = {};
+    let latestExploreKey = null;
+    let currentMode = "view";
+    let pendingBookmarkKey = null;
+
+    async function loadEnv() {
+      try {
+        const res = await fetch("/env");
+        env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode enabled via /env");
+      } catch (err) {
+        console.warn("Failed to load /env:", err);
+      }
+    }
+
+    function decodeJwt(token) {
+      try {
+        const [headerB64, payloadB64] = token.split(".");
+        const decodePart = (str) => {
+          const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+          const padded = base64 + "===".slice((base64.length + 3) % 4);
+          return JSON.parse(atob(padded));
+        };
+        return {
+          header: decodePart(headerB64),
+          payload: decodePart(payloadB64),
+        };
+      } catch (err) {
+        console.warn("JWT decode error:", err);
+        return { error: "Failed to decode JWT (invalid base64 or JSON)." };
+      }
+    }
+
+    function toggleBookmarkControls(show) {
+      const controls = document.getElementById("bookmarkControls");
+      const createBtn = document.getElementById("create-bookmark-btn");
+      const bookmarkNameInput = document.getElementById("bookmarkName");
+
+      if (DEBUG) console.log("Toggling bookmark controls:", show);
+
+      if (controls && createBtn && bookmarkNameInput) {
+        controls.style.display = show ? "inline-block" : "none";
+        createBtn.disabled = !show;
+        if (!show) bookmarkNameInput.value = "";
+      }
+    }
+
+    async function loadUserOptions() {
+      const select = document.getElementById("roleSelect");
+      if (!select) {
+        console.warn("Missing roleSelect element!");
+        return;
+      }
+
+      select.innerHTML = `
+      <option value="" disabled selected style="color:gray;font-style:italic">Select a user</option>
+      <option value="${env.VIEW_EMAIL}" data-mode="view">${env.VIEW_EMAIL}</option>
+      <option value="${env.BUILD_EMAIL}" data-mode="build">${env.BUILD_EMAIL}</option>
+    `;
+
+      select.disabled = false;
+
+      select.addEventListener("change", (e) => {
+        const selected = e.target.selectedOptions[0];
+        currentMode = selected.dataset.mode || "view";
+        console.log("🔍 currentMode set to:", currentMode);
+
+        const workbookSelect = document.getElementById("workbookSelect");
+        const selectedWorkbook = workbookSelect?.value;
+        if (selectedWorkbook) {
+          window.selectedworkbookUrlId = selectedWorkbook;
+          loadEmbed();
+        }
+
+        toggleBookmarkControls(false);
+      });
+    }
+
+    async function loadWorkbooks() {
+      const select = document.getElementById("workbookSelect");
+      try {
+        const res = await fetch("/api/workbooks");
+        const data = await res.json();
+        const workbooks = data.workbooks || [];
+
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select a workbook</option>`;
+
+        workbooks.forEach((wb) => {
+          const opt = document.createElement("option");
+          opt.value = wb.url.split("/").pop();
+          opt.textContent = wb.name;
+          opt.dataset.workbookid = wb.id;
+          select.appendChild(opt);
+        });
+
+        select.addEventListener("change", (e) => {
+          window.selectedworkbookUrlId = e.target.value;
+          loadEmbed();
+        });
+      } catch (err) {
+        console.error("Failed to load workbooks:", err);
+      }
+    }
+
+    async function loadBookmarks(selectedBookmarkId = "") {
+      const select = document.getElementById("bookmarkSelect");
+      if (!select) return;
+
+      try {
+        const res = await fetch(
+          `/api/bookmarks/list?workbookUrlId=${encodeURIComponent(
+            window.selectedworkbookUrlId
+          )}`
+        );
+        const { entries: bookmarks = [] } = await res.json();
+
+        select.innerHTML = `
+        <option value="" disabled selected style="color:gray;font-style:italic">Original Workbook</option>
+      `;
+
+        bookmarks.forEach((bookmark) => {
+          const option = document.createElement("option");
+          option.value = bookmark.bookmarkId;
+          option.textContent = bookmark.name;
+          option.dataset.bookmarkId = bookmark.bookmarkId;
+          if (bookmark.bookmarkId === selectedBookmarkId) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+
+        // Enable the dropdown
+        select.disabled = false;
+
+        if (DEBUG) console.log("Bookmarks loaded:", bookmarks);
+      } catch (err) {
+        console.error("Failed to load bookmarks:", err);
+      }
+    }
+
+    async function loadEmbed(selectedBookmarkId = "") {
+      const selectedUser = document.getElementById("roleSelect").value;
+      const workbookUrlId = window.selectedworkbookUrlId;
+      const embedType = "workbook";
+
+      if (!selectedUser || !workbookUrlId) {
+        console.warn("Embed not loaded — missing required fields.");
+        return;
+      }
+
+      const hideFolderNav =
+        currentMode === "build"
+          ? "false"
+          : env.hide_folder_navigation || "true";
+      const hideMenu =
+        currentMode === "build" ? "false" : env.hide_menu || "true";
+      const menuPosition =
+        currentMode === "build" ? "top" : env.menu_position || "none";
+
+      if (DEBUG) {
+        console.log("Current mode:", currentMode);
+        console.log("Embed options:", {
+          currentMode,
+          hideFolderNav,
+          hideMenu,
+          menu_position: menuPosition,
+        });
+      }
+
+      try {
+        const res = await fetch(
+          `/api/jwt/api-embed-bookmarks?workbookUrlId=${encodeURIComponent(
+            workbookUrlId
+          )}&embedType=${encodeURIComponent(embedType)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sub: selectedUser,
+              bookmarkId: selectedBookmarkId || undefined,
+              hide_folder_navigation: hideFolderNav,
+              hide_menu: hideMenu,
+              menu_position: menuPosition,
+            }),
+          }
+        );
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error("Failed to fetch embed:", res.status, errText);
+          return;
+        }
+
+        const { jwt, embedUrl } = await res.json();
+        if (DEBUG) console.log("Embed URL returned from server:", embedUrl);
+
+        document.getElementById("sigma-embed").src = embedUrl;
+
+        await loadBookmarks(selectedBookmarkId);
+
+        document.getElementById("debug-embed-url").textContent =
+          embedUrl || "N/A";
+        document.getElementById("jwt-display").textContent = jwt;
+
+        const decoded = decodeJwt(jwt);
+        const decodedBlock = document.getElementById("jwt-decoded");
+        decodedBlock.innerHTML = decoded.error
+          ? `<p style="color:red;">${decoded.error}</p>`
+          : `<h3>Decoded JWT Header:</h3>
+           <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
+           <h3>Decoded JWT Payload:</h3>
+           <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>`;
+      } catch (err) {
+        console.error("loadEmbed() failed:", err);
+      }
+    }
+
+    // === Event Listeners ===
+
+    document
+      .getElementById("bookmarkSelect")
+      .addEventListener("change", (e) => {
+        const selectedBookmarkId =
+          e.target.selectedOptions[0]?.dataset.bookmarkId || "";
+        loadEmbed(selectedBookmarkId);
+        toggleBookmarkControls(false);
+      });
+
+    document.getElementById("collapse-info").addEventListener("click", () => {
+      document.querySelector(".sidebar").classList.toggle("collapsed");
+    });
+
+    document
+      .getElementById("create-bookmark-btn")
+      .addEventListener("click", async () => {
+        const workbookUrlId = window.selectedworkbookUrlId;
+        const exploreKey = latestExploreKey;
+        const bookmarkName = document
+          .getElementById("bookmarkName")
+          .value.trim();
+
+        if (!workbookUrlId || !exploreKey) {
+          alert(
+            "Missing workbook or explore key. Please interact with the embed first."
+          );
+          return;
+        }
+
+        if (!bookmarkName) {
+          alert("Please enter a name for your bookmark.");
+          return;
+        }
+
+        try {
+          const res = await fetch("/api/bookmarks/create-bookmark", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userEmail: document.getElementById("roleSelect").value,
+              workbookUrlId,
+              exploreKey,
+              name: bookmarkName,
+            }),
+          });
+
+          const result = await res.json();
+          if (DEBUG) console.log("Bookmark creation response:", result);
+
+          alert("Bookmark created successfully!");
+          document.getElementById("bookmarkName").value = "";
+          await loadBookmarks();
+        } catch (err) {
+          console.error("Failed to create bookmark:", err);
+          alert("Bookmark creation failed.");
+        }
+      });
+
+    // === Startup Logic ===
+
+    (async () => {
+      await loadEnv();
+      if (DEBUG) console.log("DEBUG now enabled — startup complete.");
+
+      window.addEventListener("message", (event) => {
+        const data = event.data;
+        const iframe = document.getElementById("sigma-embed");
+
+        if (DEBUG) console.log("Message received from iframe:", data);
+
+        if (data.type === "workbook:dataloaded") {
+          if (pendingBookmarkKey && iframe?.contentWindow) {
+            iframe.contentWindow.postMessage(
+              {
+                type: "workbook:exploreKey:apply",
+                exploreKey: pendingBookmarkKey,
+              },
+              "*"
+            );
+            if (DEBUG)
+              console.log("Applied pending exploreKey:", pendingBookmarkKey);
+            pendingBookmarkKey = null;
+          }
+        }
+
+        if (
+          data.type === "exploreCreated" ||
+          data.type === "workbook:exploreKey:onchange"
+        ) {
+          if (data.exploreKey) {
+            latestExploreKey = data.exploreKey;
+            if (DEBUG) {
+              console.log("Captured exploreKey:", latestExploreKey);
+              console.log("Current mode at exploreKey event:", currentMode);
+            }
+            toggleBookmarkControls(currentMode === "build");
+          }
+        }
+      });
+
+      await loadUserOptions();
+      await loadWorkbooks();
+    })();
+  </script>
+</html>
