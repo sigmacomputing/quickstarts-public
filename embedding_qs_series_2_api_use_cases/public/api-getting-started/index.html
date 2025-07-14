@@ -169,7 +169,7 @@
 
         <div id="jwt-decoded" style="margin-bottom: 1rem">
           <h3>Decoded JWT:</h3>
-          <p>Loading...</p>
+          <div id="jwt-decode-content"><p>Loading...</p></div>
         </div>
 
         <h3>JWT:</h3>
@@ -185,130 +185,191 @@
 
     <!-- === Footer === -->
     <footer class="layout-footer">Sigma &copy; 2025</footer>
+  </body>
+  <script>
+    let DEBUG = false;
+    let env = {};
+    let currentMode = "view";
 
-    <!-- === Scripts === -->
-    <script>
-      // Collapse sidebar panel
-      const sidebar = document.querySelector(".sidebar");
-      document.getElementById("collapse-info").addEventListener("click", () => {
-        sidebar.classList.toggle("collapsed");
-      });
+    async function loadEnv() {
+      try {
+        const res = await fetch("/env");
+        env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode enabled via /env");
+      } catch (err) {
+        console.warn("Failed to load /env config");
+      }
+    }
 
-      // Decode JWT string into header and payload
-      function decodeJwt(token) {
-        try {
-          const [header, payload] = token.split(".");
-          const decode = (str) => JSON.parse(atob(str));
-          return {
-            header: decode(header),
-            payload: decode(payload),
-          };
-        } catch {
-          return { error: "Failed to decode JWT." };
-        }
+    const sidebar = document.querySelector(".sidebar");
+    document.getElementById("collapse-info").addEventListener("click", () => {
+      sidebar.classList.toggle("collapsed");
+    });
+
+    function base64UrlDecode(str) {
+      str = str.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = str.length % 4;
+      if (pad) str += "=".repeat(4 - pad);
+      return atob(str);
+    }
+
+    async function loadEmbed() {
+      const selectedUser = document.getElementById("roleSelect").value;
+      const workbookUrlId = window.selectedworkbookUrlId;
+      const embedType = "workbook";
+
+      const decodeBlock = document.getElementById("jwt-decode-content");
+
+      decodeBlock.innerHTML = "<p>Loading JWT...</p>";
+      document.getElementById("jwt-display").textContent = "Loading JWT...";
+      document.getElementById("debug-embed-url").textContent = "N/A";
+
+      if (!selectedUser || !workbookUrlId) {
+        console.warn("Embed not loaded — missing required fields.");
+        return;
       }
 
-      // === Embed Logic (fixed to workbook embed) ===
-      async function loadEmbed() {
-        const selectedUser = document.getElementById("roleSelect").value;
-        const workbookUrlId = window.selectedworkbookUrlId;
-        const embedType = "workbook"; // Always 'workbook' for this page
+      const hideFolderNav =
+        currentMode === "build"
+          ? "false"
+          : env.hide_folder_navigation || "true";
+      const hideMenu =
+        currentMode === "build" ? "false" : env.hide_menu || "true";
+      const menuPosition =
+        currentMode === "build" ? "top" : env.menu_position || "none";
 
-        if (!selectedUser || !workbookUrlId) {
-          console.warn("Embed not loaded — missing required fields.");
-          return;
-        }
+      if (DEBUG) {
+        console.log("Embed config:", {
+          currentMode,
+          hideFolderNav,
+          hideMenu,
+          menuPosition,
+        });
+      }
 
-        const url = `/generate-jwt/api-getting-started?embedType=${embedType}&workbookUrlId=${encodeURIComponent(
-          workbookUrlId
-        )}`;
-
-        try {
-          const res = await fetch(url, {
+      try {
+        const res = await fetch(
+          `/api/jwt/${embedType}?embedType=${embedType}&workbookUrlId=${encodeURIComponent(
+            workbookUrlId
+          )}`,
+          {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sub: selectedUser }),
-          });
-
-          if (!res.ok) {
-            const errText = await res.text();
-            console.error("Failed to fetch embed:", res.status, errText);
-            return;
+            body: JSON.stringify({
+              sub: selectedUser,
+              hide_folder_navigation: hideFolderNav,
+              hide_menu: hideMenu,
+              menu_position: menuPosition,
+            }),
           }
+        );
 
-          const { jwt, embedUrl } = await res.json();
-
-          // Load iframe and display decoded JWT
-          document.getElementById("sigma-embed").src = embedUrl;
-          document.getElementById("debug-embed-url").textContent =
-            embedUrl || "N/A";
-          document.getElementById("jwt-display").textContent = jwt;
-
-          if (jwt) {
-            const decoded = decodeJwt(jwt);
-            const decodedBlock = document.getElementById("jwt-decoded");
-            decodedBlock.innerHTML = decoded.error
-              ? `<p style="color:red;">${decoded.error}</p>`
-              : `<h3>Decoded JWT Header:</h3>
-                 <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
-                 <h3>Decoded JWT Payload:</h3>
-                 <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>`;
-          }
-        } catch (err) {
-          console.error("loadEmbed() failed:", err);
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (parseErr) {
+          throw new Error(`Invalid JSON response: ${text.slice(0, 100)}...`);
         }
-      }
 
-      // === Load Available Users from .env ===
-      async function loadUserOptions() {
-        const select = document.getElementById("roleSelect");
+        if (!res.ok) {
+          throw new Error(
+            json.error || res.statusText || "Failed to fetch embed"
+          );
+        }
+
+        const { jwt, embedUrl } = json;
+        if (DEBUG) console.log("Embed response:", { jwt, embedUrl });
+
+        document.getElementById("sigma-embed").src = embedUrl;
+        document.getElementById("debug-embed-url").textContent =
+          embedUrl || "N/A";
+        document.getElementById("jwt-display").textContent = jwt;
+
+        if (jwt && jwt.split(".").length === 3) {
+          try {
+            const [headerStr, payloadStr] = jwt.split(".").slice(0, 2);
+            const header = JSON.parse(base64UrlDecode(headerStr));
+            const payload = JSON.parse(base64UrlDecode(payloadStr));
+            decodeBlock.innerHTML = `
+            <h3>Decoded JWT Header:</h3>
+            <pre>${JSON.stringify(header, null, 2)}</pre>
+            <h3>Decoded JWT Payload:</h3>
+            <pre>${JSON.stringify(payload, null, 2)}</pre>`;
+          } catch (decodeErr) {
+            decodeBlock.innerHTML = `<p style="color:red;">JWT decoding failed.</p>`;
+          }
+        } else {
+          decodeBlock.innerHTML = `<p style="color:red;">Missing or invalid JWT format.</p>`;
+        }
+      } catch (err) {
+        console.error("loadEmbed() failed:", err.message);
+        decodeBlock.innerHTML = `<p style="color:red;">${err.message}</p>`;
+      }
+    }
+
+    async function loadUserOptions() {
+      const select = document.getElementById("roleSelect");
+      try {
         const res = await fetch("/env");
         const env = await res.json();
 
         select.innerHTML = `
-          <option value="" disabled selected style="color:gray;font-style:italic">Select a user</option>
-          <option value="view">${env.VIEW_EMAIL || "View User"}</option>
-          <option value="build">${env.BUILD_EMAIL || "Build User"}</option>
-        `;
+        <option value="" disabled selected style="color:gray;font-style:italic">Select a user</option>
+        <option value="${env.VIEW_EMAIL}" data-mode="view">${env.VIEW_EMAIL}</option>
+        <option value="${env.BUILD_EMAIL}" data-mode="build">${env.BUILD_EMAIL}</option>`;
 
-        select.addEventListener("change", loadEmbed);
-      }
+        select.addEventListener("change", (e) => {
+          const selected = e.target.selectedOptions[0];
+          currentMode = selected.dataset.mode || "view";
+          if (DEBUG) console.log("Selected mode:", currentMode);
 
-      // === Load Workbooks via API and handle selection ===
-      async function loadWorkbooks() {
-        const select = document.getElementById("workbookSelect");
-
-        try {
-          const res = await fetch("/api/get-workbooks");
-          const { workbooks } = await res.json();
-
-          select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select a workbook</option>`;
-
-          workbooks.forEach((wb) => {
-            const match = wb.url.match(/workbook\/([a-zA-Z0-9]+)/);
-            const workbookUrlId = match ? match[1] : null;
-            if (!workbookUrlId) return;
-            const opt = document.createElement("option");
-            opt.value = workbookUrlId;
-            opt.textContent = wb.name;
-            select.appendChild(opt);
-          });
-
-          select.addEventListener("change", () => {
-            window.selectedworkbookUrlId = select.value;
+          const workbookSelect = document.getElementById("workbookSelect");
+          const selectedWorkbook = workbookSelect?.value;
+          if (selectedWorkbook) {
+            window.selectedworkbookUrlId = selectedWorkbook;
             loadEmbed();
-          });
-        } catch (err) {
-          console.error("Failed to load workbooks:", err);
-          select.innerHTML = `<option value="">Error loading workbooks</option>`;
-        }
+          }
+        });
+      } catch (err) {
+        console.error("Failed to load user options:", err);
       }
+    }
 
-      // === Initialize ===
-      (async () => {
-        await loadUserOptions();
-        await loadWorkbooks();
-      })();
-    </script>
-  </body>
+    async function loadWorkbooks() {
+      const select = document.getElementById("workbookSelect");
+
+      try {
+        const res = await fetch("/api/workbooks");
+        const { workbooks } = await res.json();
+
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select a workbook</option>`;
+
+        workbooks.forEach((wb) => {
+          const match = wb.url.match(/workbook\/([a-zA-Z0-9]+)/);
+          const workbookUrlId = match ? match[1] : null;
+          if (!workbookUrlId) return;
+          const opt = document.createElement("option");
+          opt.value = workbookUrlId;
+          opt.textContent = wb.name;
+          select.appendChild(opt);
+        });
+
+        select.addEventListener("change", () => {
+          window.selectedworkbookUrlId = select.value;
+          loadEmbed();
+        });
+      } catch (err) {
+        console.error("Failed to load workbooks:", err);
+        select.innerHTML = `<option value="">Error loading workbooks</option>`;
+      }
+    }
+
+    (async () => {
+      await loadEnv();
+      await loadUserOptions();
+      await loadWorkbooks();
+    })();
+  </script>
 </html>
