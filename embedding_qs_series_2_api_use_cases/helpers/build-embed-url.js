@@ -2,11 +2,11 @@
 const dotenv = require("dotenv");
 dotenv.config();
 
-const BASE_URL = "https://app.sigmacomputing.com";
+const EMBED_URL_BASE = process.env.EMBED_URL_BASE;
 
 /**
  * Builds a Sigma embed URL using workbookName and workbookUrlId,
- * and appends optional embed interface parameters from .env
+ * and appends optional embed interface parameters from .env or request
  */
 module.exports = function buildEmbedUrl({
   orgSlug,
@@ -15,6 +15,12 @@ module.exports = function buildEmbedUrl({
   embedType = "workbook",
   pageId = "",
   elementId = "",
+  bookmarkId = "",
+
+  // Allow override via request
+  hide_folder_navigation,
+  hide_menu,
+  menu_position,
 }) {
   if (!orgSlug || !workbookUrlId) {
     throw new Error("Missing orgSlug or workbookUrlId");
@@ -41,7 +47,7 @@ module.exports = function buildEmbedUrl({
     throw new Error(`Unsupported embedType: ${embedType}`);
   }
 
-  // Build query string manually to preserve colons (Sigma requires :param)
+  // Start with .env-based values
   const optionalParams = {
     disable_auto_refresh: process.env.disable_auto_refresh,
     disable_mobile_view: process.env.disable_mobile_view,
@@ -59,7 +65,24 @@ module.exports = function buildEmbedUrl({
     view_id: process.env.view_id,
   };
 
-  const params = [":embed=true"];
+  // Override specific ones if values were passed in
+  if (typeof hide_folder_navigation !== "undefined")
+    optionalParams.hide_folder_navigation = hide_folder_navigation;
+
+  if (typeof hide_menu !== "undefined")
+    optionalParams.hide_menu = hide_menu;
+
+  if (typeof menu_position !== "undefined")
+    optionalParams.menu_position = menu_position;
+
+  const params = [];
+
+  // Add bookmark if present
+  if (bookmarkId) {
+    params.push(`:bookmark=${bookmarkId}`);
+  }
+
+  params.push(":embed=true");
 
   for (const [key, val] of Object.entries(optionalParams)) {
     if (val && val !== "") {
@@ -68,5 +91,5 @@ module.exports = function buildEmbedUrl({
   }
 
   const queryString = params.join("&");
-  return `${BASE_URL}/${orgSlug}${path}?${queryString}`;
+  return `${EMBED_URL_BASE}/${orgSlug}${path}?${queryString}`;
 };

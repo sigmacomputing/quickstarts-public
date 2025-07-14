@@ -1,3 +1,5 @@
+// File: embedding_qs_series_2_api_use_cases/routes/api/jwt.js
+
 const express = require("express");
 const router = express.Router();
 
@@ -5,22 +7,20 @@ const buildEmbedUrl = require("../../helpers/build-embed-url");
 const getWorkbookMetadata = require("../../helpers/get-workbook-metadata");
 const generateJwt = require("../../helpers/create-jwt");
 
-/**
- * Sigma API: GET /v2/workbooks/{workbookId}
- * This endpoint is used to fetch workbook metadata including:
- * - orgSlug
- * - workbookName
- * - validated workbookUrlId
- *
- * This route generates a JWT + Sigma embed URL based on the user's selection.
- * The JWT is signed server-side and returned to the frontend along with the full embed URL.
- */
-
+// POST /api/jwt/:mode
 router.post("/:mode", async (req, res) => {
   try {
     const { embedType = "workbook", workbookUrlId, targetId } = req.query;
     const mode = req.params.mode;
     const selectedUser = req.body?.sub || req.query?.sub;
+
+    // Add this to destructure from the request body
+    const {
+      bookmarkId,
+      hide_folder_navigation,
+      hide_menu,
+      menu_position,
+    } = req.body;
 
     let pageId = "";
     let elementId = "";
@@ -38,14 +38,12 @@ router.post("/:mode", async (req, res) => {
       return res.status(400).json({ error: "Missing workbookUrlId" });
     }
 
-    // Map selected role (view/build) to email from .env
     const userMap = {
       view: process.env.VIEW_EMAIL,
       build: process.env.BUILD_EMAIL,
     };
     const sub = userMap[selectedUser] || selectedUser;
 
-    // 🔹 Get workbook metadata from Sigma API (via helper)
     const metadata = await getWorkbookMetadata(workbookUrlId);
     if (!metadata) {
       return res.status(404).json({ error: "Workbook not found" });
@@ -57,19 +55,18 @@ router.post("/:mode", async (req, res) => {
       workbookUrlId: parsedWorkbookUrlId,
     } = metadata;
 
-    // Defensive validation
     if (embedType === "page" && (!workbookName || !targetId)) {
       return res
         .status(400)
         .json({ error: "Missing workbookName or pageId for page embed" });
     }
+
     if (embedType === "element" && (!workbookName || !targetId)) {
       return res
         .status(400)
         .json({ error: "Missing workbookName or elementId for element embed" });
     }
 
-    // 🔹 Construct embed URL from metadata
     const embedUrl = buildEmbedUrl({
       orgSlug,
       workbookName,
@@ -77,21 +74,28 @@ router.post("/:mode", async (req, res) => {
       embedType,
       pageId: embedType === "page" ? targetId : pageId,
       elementId: embedType === "element" ? elementId : "",
+      bookmarkId,
+      hide_folder_navigation,
+      hide_menu,
+      menu_position,
     });
 
-    // 🔹 Generate signed JWT
     const jwt = generateJwt({ embedUrl, mode, sub });
 
-    // Optional: log final result for visibility
-    console.log("Embed generated:", embedUrl);
+    if (process.env.DEBUG === "true") {
+      console.log("Embed URL:", embedUrl);
+      if (bookmarkId) {
+        console.log("With bookmarkId:", bookmarkId);
+      }
+    }
 
-    // res.json({ embedUrl: `${embedUrl}?:jwt=${jwt}`, jwt });
     const separator = embedUrl.includes("?") ? "&" : "?";
-res.json({ embedUrl: `${embedUrl}${separator}:jwt=${jwt}`, jwt });
-
+    res
+      .status(200)
+      .json({ embedUrl: `${embedUrl}${separator}:jwt=${jwt}`, jwt });
   } catch (err) {
-    console.error("Failed to generate JWT:", err);
-    res.status(500).json({ error: "Internal error" });
+    console.error("JWT generation error:", err.message);
+    res.status(500).json({ error: "Failed to generate JWT" });
   }
 });
 

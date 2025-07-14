@@ -1,4 +1,4 @@
-// helpers/get-access-token.js
+// File: embedding_qs_series_2_api_use_cases/helpers/get-access-token.js
 
 require("dotenv").config();
 const axios = require("axios");
@@ -11,20 +11,18 @@ let cachedToken = null;
 let tokenExpiry = 0; // Epoch time in seconds
 
 /**
- * getBearerToken - Uses OAuth2 client credentials flow to fetch a token from Sigma.
+ * Uses OAuth2 client credentials flow to fetch a token from Sigma.
+ * Caches token until expiration with a 60s buffer.
  *
- * Sigma API: POST /oauth/token
- * Content-Type: application/x-www-form-urlencoded
- *
- * Caches token in memory until expiry (with 60s buffer).
- *
- * @returns {Promise<string|null>} The bearer token, or null if request fails.
+ * @returns {Promise<string|null>} The bearer token or null if request fails.
  */
 async function getBearerToken() {
   const now = Math.floor(Date.now() / 1000);
 
   if (cachedToken && now < tokenExpiry - 60) {
-    console.log("Reusing cached bearer token");
+    if (process.env.DEBUG === "true") {
+      console.log("Reusing cached bearer token");
+    }
     return cachedToken;
   }
 
@@ -43,10 +41,21 @@ async function getBearerToken() {
     const expiresIn = response.data.expires_in || 3600;
     tokenExpiry = now + expiresIn;
 
-    console.log("Bearer token obtained successfully");
+    if (process.env.DEBUG === "true") {
+      console.log("Bearer token obtained successfully");
+    }
+
     return cachedToken;
   } catch (error) {
-    console.error("Error obtaining Bearer token:", error.response?.data || error.message);
+    const errorMsg =
+      error.response?.data?.error_description ||
+      error.response?.data?.error ||
+      error.message;
+
+    if (process.env.DEBUG === "true") {
+      console.error("Error obtaining Bearer token:", errorMsg);
+    }
+
     return null;
   }
 }
@@ -54,8 +63,14 @@ async function getBearerToken() {
 // Optional: run standalone for testing
 if (require.main === module) {
   getBearerToken()
-    .then((token) => console.log("Token acquired:", token))
-    .catch((err) => console.error("Failed to acquire token:", err));
+    .then((token) => {
+      if (process.env.DEBUG === "true") {
+        console.log("Token acquired:", token);
+      }
+    })
+    .catch((err) => {
+      console.error("Failed to acquire token:", err.message);
+    });
 }
 
 module.exports = getBearerToken;
