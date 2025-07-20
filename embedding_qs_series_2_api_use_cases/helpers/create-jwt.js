@@ -4,36 +4,32 @@ const { v4: uuidv4 } = require("uuid");
 /**
  * generateJwt - Generates a signed Sigma JWT for embedding.
  *
- * This JWT grants access to a specific embed URL for a specified user (`sub`),
- * scoped to either "view" or "build" permissions.
- *
- * The JWT must be signed using your Sigma-issued shared secret and include
- * your client ID as the issuer (`iss`).
- *
- * Sigma Docs: https://help.sigmacomputing.com/docs/authenticate-embed-users
- *
  * @param {Object} options
  * @param {string} options.embedUrl - The fully qualified Sigma embed URL.
- * @param {string} options.mode - Either "view" or "build".
+ * @param {string} options.mode - "view" or "build" (fallback if permissions not given)
  * @param {string} options.sub - Email or memberId of the user.
+ * @param {string[]} [options.permissions] - Optional explicit permissions array (e.g., ["build"])
  * @returns {string} A signed JWT token.
  */
-function generateJwt({ embedUrl, mode, sub }) {
+function generateJwt({ embedUrl, mode, sub, permissions }) {
   if (!sub) {
     throw new Error("Missing 'sub' (user identifier) — must be passed explicitly.");
   }
 
+  const finalPermissions =
+    permissions || (mode === "build" ? ["build", "view"] : ["view"]);
+
   const payload = {
-    iss: process.env.CLIENT_ID, // Sigma embed client ID
+    iss: process.env.CLIENT_ID,
     sub,
     aud: "https://sigmacomputing.com/iam",
     iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 60 * 5, // 5-minute TTL
-    jti: uuidv4(), // unique token ID
+    exp: Math.floor(Date.now() / 1000) + 60 * 5,
+    jti: uuidv4(),
     scope: "embed",
     embed: {
       url: embedUrl,
-      permissions: mode === "build" ? ["build", "view"] : ["view"],
+      permissions: finalPermissions,
     },
   };
 
@@ -42,6 +38,12 @@ function generateJwt({ embedUrl, mode, sub }) {
 
   if (!secret || !kid) {
     throw new Error("Missing SECRET or KEY_ID environment variables");
+  }
+
+  if (process.env.DEBUG === "true") {
+    console.log("🔐 JWT payload:", payload);
+    console.log("🔐 JWT for:", payload.sub);
+    console.log("🔐 JWT embed.url:", payload.embed.url);
   }
 
   return jwt.sign(payload, secret, {

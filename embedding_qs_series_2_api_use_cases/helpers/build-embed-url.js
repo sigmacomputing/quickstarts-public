@@ -16,8 +16,9 @@ module.exports = function buildEmbedUrl({
   pageId = "",
   elementId = "",
   bookmarkId = "",
+  exploreKey = "",
 
-  // Allow override via request
+  // Optional UI parameter overrides
   hide_folder_navigation,
   hide_menu,
   menu_position,
@@ -27,27 +28,20 @@ module.exports = function buildEmbedUrl({
   }
 
   let path;
-
   if (embedType === "workbook") {
-    if (!workbookName) {
-      throw new Error("Missing workbookName for workbook embed");
-    }
+    if (!workbookName) throw new Error("Missing workbookName for workbook embed");
     path = `/workbook/${workbookName}-${workbookUrlId}`;
   } else if (embedType === "page") {
-    if (!workbookName || !pageId) {
-      throw new Error("Missing workbookName or pageId for page embed");
-    }
+    if (!workbookName || !pageId) throw new Error("Missing workbookName or pageId for page embed");
     path = `/workbook/${workbookName}-${workbookUrlId}/page/${pageId}`;
   } else if (embedType === "element") {
-    if (!workbookName || !pageId || !elementId) {
+    if (!workbookName || !pageId || !elementId)
       throw new Error("Missing required info for element embed");
-    }
     path = `/workbook/${workbookName}-${workbookUrlId}/element/${elementId}`;
   } else {
     throw new Error(`Unsupported embedType: ${embedType}`);
   }
 
-  // Start with .env-based values
   const optionalParams = {
     disable_auto_refresh: process.env.disable_auto_refresh,
     disable_mobile_view: process.env.disable_mobile_view,
@@ -65,7 +59,7 @@ module.exports = function buildEmbedUrl({
     view_id: process.env.view_id,
   };
 
-  // Override specific ones if values were passed in
+  // Allow request-time overrides
   if (typeof hide_folder_navigation !== "undefined")
     optionalParams.hide_folder_navigation = hide_folder_navigation;
 
@@ -77,13 +71,16 @@ module.exports = function buildEmbedUrl({
 
   const params = [];
 
-  // Add bookmark if present
+  // ⚠️ IMPORTANT: Only one of these should be used — bookmark takes precedence
   if (bookmarkId) {
-    params.push(`:bookmark=${bookmarkId}`);
+    params.push(`:bookmark=${encodeURIComponent(bookmarkId)}`);
+  } else if (exploreKey) {
+    params.push(`:explore=${encodeURIComponent(exploreKey)}`);
   }
 
   params.push(":embed=true");
 
+  // Add optional embed UI parameters
   for (const [key, val] of Object.entries(optionalParams)) {
     if (val && val !== "") {
       params.push(`:${key}=${encodeURIComponent(val)}`);

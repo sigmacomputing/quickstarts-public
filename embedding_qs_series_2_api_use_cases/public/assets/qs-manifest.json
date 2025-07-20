@@ -1,5 +1,6 @@
 [
-  { "slug": "api-getting-started", "label": "API Getting Started" },
-  { "slug": "api-embed-controls", "label": "API Embed Controls" },
-  { "slug": "api-embed-bookmarks", "label": "API Embed Bookmarks" }
+  { "slug": "api-getting-started", "label": "Getting Started" },
+  { "slug": "api-embed-controls", "label": "Embed Controls" },
+  { "slug": "api-embed-bookmarks", "label": "Embed Bookmarks" },
+  { "slug": "api-embed-bookmarks_db", "label": "Bookmark Sharing with Local DB" }
 ]
