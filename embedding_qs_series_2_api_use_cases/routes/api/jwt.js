@@ -14,9 +14,9 @@ router.post("/:mode", async (req, res) => {
     const mode = req.params.mode;
     const selectedUser = req.body?.sub || req.query?.sub;
 
-    // Add this to destructure from the request body
     const {
       bookmarkId,
+      exploreKey,
       hide_folder_navigation,
       hide_menu,
       menu_position,
@@ -38,11 +38,18 @@ router.post("/:mode", async (req, res) => {
       return res.status(400).json({ error: "Missing workbookUrlId" });
     }
 
+    // 🔄 Map shorthand identifiers like "build" → actual email
     const userMap = {
       view: process.env.VIEW_EMAIL,
       build: process.env.BUILD_EMAIL,
     };
     const sub = userMap[selectedUser] || selectedUser;
+
+    // ✅ Determine permissions based on actual user email
+    let permissions = ["view"];
+    if (sub === process.env.BUILD_EMAIL) {
+      permissions = ["build"];
+    }
 
     const metadata = await getWorkbookMetadata(workbookUrlId);
     if (!metadata) {
@@ -67,6 +74,15 @@ router.post("/:mode", async (req, res) => {
         .json({ error: "Missing workbookName or elementId for element embed" });
     }
 
+    if (process.env.DEBUG === "true") {
+      console.log("📨 JWT request body:", req.body);
+      console.log("📘 embedType:", embedType);
+      console.log("📗 workbookUrlId:", workbookUrlId);
+      console.log("👤 selectedUser (sub):", sub);
+      console.log("🔖 bookmarkId:", bookmarkId);
+      console.log("🔑 exploreKey:", exploreKey);
+    }
+
     const embedUrl = buildEmbedUrl({
       orgSlug,
       workbookName,
@@ -75,18 +91,17 @@ router.post("/:mode", async (req, res) => {
       pageId: embedType === "page" ? targetId : pageId,
       elementId: embedType === "element" ? elementId : "",
       bookmarkId,
+      exploreKey,
       hide_folder_navigation,
       hide_menu,
       menu_position,
     });
 
-    const jwt = generateJwt({ embedUrl, mode, sub });
+    // ✅ Now pass permissions explicitly
+    const jwt = generateJwt({ embedUrl, mode, sub, permissions });
 
     if (process.env.DEBUG === "true") {
-      console.log("Embed URL:", embedUrl);
-      if (bookmarkId) {
-        console.log("With bookmarkId:", bookmarkId);
-      }
+      console.log("JWT:", jwt);
     }
 
     const separator = embedUrl.includes("?") ? "&" : "?";
@@ -94,7 +109,7 @@ router.post("/:mode", async (req, res) => {
       .status(200)
       .json({ embedUrl: `${embedUrl}${separator}:jwt=${jwt}`, jwt });
   } catch (err) {
-    console.error("JWT generation error:", err.message);
+    console.error("❌ JWT generation error:", err.message);
     res.status(500).json({ error: "Failed to generate JWT" });
   }
 });
