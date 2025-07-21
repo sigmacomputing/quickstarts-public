@@ -22,7 +22,7 @@ function generateJwt({ embedUrl, mode, sub, permissions }) {
   const payload = {
     iss: process.env.CLIENT_ID,
     sub,
-    aud: "https://sigmacomputing.com/iam",
+    aud: process.env.JWT_AUDIENCE || "https://sigmacomputing.com/iam",
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 60 * 5,
     jti: uuidv4(),
@@ -43,7 +43,6 @@ function generateJwt({ embedUrl, mode, sub, permissions }) {
   if (process.env.DEBUG === "true") {
     console.log("🔐 JWT payload:", payload);
     console.log("🔐 JWT for:", payload.sub);
-    console.log("🔐 JWT embed.url:", payload.embed.url);
   }
 
   return jwt.sign(payload, secret, {
