@@ -78,10 +78,11 @@
         </div>
       </div>
 
-      <!-- Toggle info panel and README link (own row, aligned left) -->
+      <!-- Toggle info panel, README link, and Clear All button (own row, aligned left) -->
       <div style="white-space: nowrap;">
         <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
         <button onclick="window.open('/api-embed-bookmarks/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+        <button id="clearAllBookmarks" style="display: none; margin-left: 8px; background-color: #b00020; color: white;">Clear All Bookmarks</button>
       </div>
     </header>
 
@@ -216,6 +217,18 @@
         const selected = e.target.selectedOptions[0];
         currentMode = selected.dataset.mode || "view";
         if (DEBUG) console.log("🔍 currentMode set to:", currentMode);
+
+        // Show/hide Clear All button based on user permissions
+        const clearAllBtn = document.getElementById("clearAllBookmarks");
+        if (clearAllBtn) {
+          if (currentMode === "build") {
+            clearAllBtn.style.display = "inline-block";
+            if (DEBUG) console.log("🔓 Showing Clear All button for Build User");
+          } else {
+            clearAllBtn.style.display = "none";
+            if (DEBUG) console.log("🔒 Hiding Clear All button for View User");
+          }
+        }
 
         const workbookSelect = document.getElementById("workbookSelect");
         const selectedWorkbook = workbookSelect?.value;
@@ -453,6 +466,59 @@
         } catch (err) {
           if (DEBUG) console.error("Failed to create bookmark:", err);
           alert("Bookmark creation failed.");
+        }
+      });
+
+    // Clear All Bookmarks event listener
+    document
+      .getElementById("clearAllBookmarks")
+      .addEventListener("click", async () => {
+        const workbookUrlId = window.selectedworkbookUrlId;
+        const userEmail = document.getElementById("roleSelect").value;
+
+        if (!workbookUrlId) {
+          alert("Please select a workbook first.");
+          return;
+        }
+        
+        if (!userEmail) {
+          alert("Please select a user first.");
+          return;
+        }
+        
+        // Show warning dialog
+        const confirmMessage = `Are you sure you want to delete ALL bookmarks for this workbook?\n\nThis action cannot be undone.`;
+        if (!confirm(confirmMessage)) {
+          return;
+        }
+
+        try {
+          const res = await fetch("/api/bookmarks/clear-all", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              workbookUrlId,
+              userEmail
+            }),
+          });
+          
+          if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`HTTP ${res.status}: ${errorText}`);
+          }
+          
+          const result = await res.json();
+          if (DEBUG) console.log("Clear all bookmarks response:", result);
+          
+          alert(`Successfully deleted ${result.deletedCount} bookmarks.`);
+          
+          // Reload bookmarks to show updated list and reset to Original Workbook
+          await loadBookmarks();
+          loadEmbed(""); // Load original workbook without bookmark
+          
+        } catch (err) {
+          if (DEBUG) console.error("Failed to clear all bookmarks:", err);
+          alert(`Failed to clear all bookmarks: ${err.message}`);
         }
       });
 
