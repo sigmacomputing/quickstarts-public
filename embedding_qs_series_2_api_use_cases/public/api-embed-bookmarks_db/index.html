@@ -276,7 +276,7 @@
             ><input
               type="radio"
               name="sharedWith"
-              value="view.embed@example.com"
+              value="view.embed.qs@example.com"
             />
             View User</label
           >
@@ -519,7 +519,23 @@
       const hasName = nameInput.value.trim().length > 0;
       const hasExploreKey = latestExploreKey !== null;
 
-      // Enable/disable toggle button
+      // Hide management buttons completely for View Users (they can't create/manage bookmarks)
+      if (currentUserEmail === env.VIEW_EMAIL) {
+        bookmarkToggle.style.display = "none";
+        const clearAllBtn = document.getElementById("clearAllBookmarks");
+        if (clearAllBtn) {
+          clearAllBtn.style.display = "none";
+        }
+        if (DEBUG) console.log("🔒 Hiding Manage Bookmarks and Clear All buttons for View User");
+        return; // Exit early, no need to update other bookmark controls
+      }
+      
+      // Show management buttons for Build Users
+      bookmarkToggle.style.display = "block";
+      const clearAllBtn = document.getElementById("clearAllBookmarks");
+      if (clearAllBtn) {
+        clearAllBtn.style.display = "block";
+      }
       if (hasExploreKey) {
         bookmarkToggle.disabled = false;
         bookmarkToggle.style.opacity = "1";
@@ -617,15 +633,28 @@
 
       select.disabled = false;
 
-      select.addEventListener("change", (e) => {
+      select.addEventListener("change", async (e) => {
         const selected = e.target.selectedOptions[0];
+        const previousUser = currentUserEmail;
         currentMode = selected.dataset.mode || "view";
-        currentUserEmail = selected.value; // <-- Store selected email globally
+        currentUserEmail = selected.value;
+        
+        if (DEBUG) {
+          console.log(`User changed from ${previousUser} to ${currentUserEmail} (mode: ${currentMode})`);
+        }
 
-        const selectedWorkbook =
-          document.getElementById("workbookSelect")?.value;
+        // Update button visibility based on user permissions
+        updateBookmarkButtonState();
+
+        // If we have a workbook selected, reload bookmarks with new user filtering
+        const selectedWorkbook = document.getElementById("workbookSelect")?.value;
         if (selectedWorkbook) {
           window.selectedworkbookUrlId = selectedWorkbook;
+          
+          // Reload bookmarks to apply new user filtering
+          await loadBookmarks();
+          
+          // Load embed without bookmark to show original workbook
           loadEmbed();
         }
       });
@@ -653,10 +682,19 @@
         select.addEventListener("change", async (e) => {
           const selectedOption = e.target.selectedOptions[0];
           window.selectedworkbookUrlId = e.target.value;
-          window.selectedworkbookId =
-            selectedOption?.dataset.workbookid || null;
-          await loadBookmarks(); // Load bookmarks for the selected workbook
-          loadEmbed();
+          window.selectedworkbookId = selectedOption?.dataset.workbookid || null;
+          
+          if (DEBUG) {
+            console.log(`Workbook changed to: ${window.selectedworkbookUrlId} (ID: ${window.selectedworkbookId})`);
+          }
+          
+          // Only load bookmarks if we have a user selected
+          if (currentUserEmail) {
+            await loadBookmarks(); // Load bookmarks for the selected workbook
+            loadEmbed(); // Load embed for original workbook (no bookmark)
+          } else {
+            if (DEBUG) console.warn("No user selected - cannot load bookmarks");
+          }
         });
       } catch (err) {
         console.error("Failed to load workbooks:", err);
@@ -673,17 +711,32 @@
         
         if (DEBUG) {
           console.log("loadBookmarks() called with workbookUrlId:", workbookUrlId);
+          console.log("Current user email:", currentUserEmail);
+          console.log("View email from env:", env.VIEW_EMAIL);
           console.log("API URL will be:", `/api/bookmarks_db?workbookUrlId=${encodeURIComponent(workbookUrlId || '')}`);
         }
         
         if (!workbookUrlId) {
-          if (DEBUG) console.warn("No workbook selected");
+          if (DEBUG) console.warn("No workbook selected - resetting bookmark dropdown");
+          select.innerHTML = `<option value="" selected style="color:gray;font-style:italic">Select a workbook first</option>`;
+          select.disabled = true;
+          return;
+        }
+        
+        if (!currentUserEmail) {
+          if (DEBUG) console.warn("No user selected - cannot filter bookmarks");
+          select.innerHTML = `<option value="" selected style="color:gray;font-style:italic">Select a user first</option>`;
+          select.disabled = true;
           return;
         }
 
         const res = await fetch(
           `/api/bookmarks_db?workbookUrlId=${encodeURIComponent(workbookUrlId)}`
         );
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
 
         const data = await res.json();
         const bookmarks = data.bookmarks || [];
@@ -692,7 +745,7 @@
         if (DEBUG) {
           console.log("API response data:", data);
           console.log(`Found ${bookmarks.length} bookmarks for workbook:`, workbookUrlId);
-          bookmarks.forEach(bm => console.log(`  - Bookmark: ${bm.name} (ID: ${bm.id})`));
+          bookmarks.forEach(bm => console.log(`  - Bookmark: ${bm.name} (ID: ${bm.id}), sharedWith:`, bm.sharedWith));
         }
 
         // Reset dropdown
@@ -705,50 +758,61 @@
         if (!selectedBookmarkId) defaultOpt.selected = true;
         select.appendChild(defaultOpt);
         
+        // Enable dropdown even if no bookmarks (for Original Workbook option)
+        select.disabled = false;
+        
         // Handle empty bookmarks - but still show Original Workbook
         if (bookmarks.length === 0) {
           if (DEBUG) console.log("No bookmarks returned for selected workbook - showing only Original Workbook");
-          select.disabled = false; // Enable so user can select Original Workbook
           toggleBookmarkControls(false);
           return;
         }
 
-        // Populate bookmarks dropdown
-        if (DEBUG) console.log(`Loaded ${bookmarks.length} bookmarks`);
-
-        select.disabled = false;
-
         // Filter bookmarks based on current user permissions FIRST
         const filteredBookmarks = bookmarks.filter((bm) => {
-          // Build user can see all bookmarks (but we removed Build User from UI)
-          // View user can only see bookmarks shared with them or Embed_Users team
+          // Ensure bookmark has required fields
+          if (!bm.sharedWith) {
+            if (DEBUG) console.warn(`Bookmark ${bm.name} missing sharedWith field`);
+            return false;
+          }
+          
+          // View user filtering logic
           if (currentUserEmail === env.VIEW_EMAIL) {
             // View user: only show bookmarks that are:
             // 1. Shared with View User specifically, or
             // 2. Shared with Embed_Users team
             // Note: Empty sharedWith array means NOT shared (private to creator)
-            const canView = bm.sharedWith && 
-                           bm.sharedWith.length > 0 && 
-                           (bm.sharedWith.includes(env.VIEW_EMAIL) || 
-                            bm.sharedWith.includes("team:Embed_Users"));
+            const isSharedWithUser = Array.isArray(bm.sharedWith) && 
+                                   bm.sharedWith.length > 0 && 
+                                   (bm.sharedWith.includes(env.VIEW_EMAIL) || 
+                                    bm.sharedWith.includes("team:Embed_Users"));
             
             if (DEBUG) {
-              console.log(`Bookmark "${bm.name}" (ID: ${bm.id}):`, {
+              console.log(`Bookmark "${bm.name}" (ID: ${bm.id}) filter check:`, {
                 sharedWith: bm.sharedWith,
                 viewEmail: env.VIEW_EMAIL,
                 currentUser: currentUserEmail,
-                canView: canView
+                isSharedWithUser: isSharedWithUser,
+                isArray: Array.isArray(bm.sharedWith),
+                hasLength: bm.sharedWith?.length > 0,
+                includesUser: bm.sharedWith?.includes(env.VIEW_EMAIL),
+                includesTeam: bm.sharedWith?.includes("team:Embed_Users")
               });
             }
             
-            return canView;
+            return isSharedWithUser;
           }
-          // For any other user (including Build), show all bookmarks
+          
+          // For Build user or any other user, show all bookmarks
+          if (DEBUG) {
+            console.log(`Bookmark "${bm.name}" (ID: ${bm.id}) - showing for Build user:`, currentUserEmail);
+          }
           return true;
         });
         
         if (DEBUG) {
           console.log(`Filtered ${filteredBookmarks.length} of ${bookmarks.length} bookmarks for user:`, currentUserEmail);
+          console.log("Filtered bookmarks:", filteredBookmarks.map(bm => ({ name: bm.name, id: bm.id, sharedWith: bm.sharedWith })));
         }
 
         // Add divider if there are any filtered bookmarks to show
@@ -760,18 +824,24 @@
           select.appendChild(dividerOpt);
         }
 
-        suppressBookmarkChange = true; // 🔒 guard to prevent double triggering
+        // Use a flag to prevent double triggering of change events
+        suppressBookmarkChange = true;
 
+        // Populate dropdown with filtered bookmarks
         filteredBookmarks.forEach((bm) => {
           const opt = document.createElement("option");
           opt.value = bm.id;
           opt.textContent = bm.name;
           if (String(bm.id) === String(selectedBookmarkId)) {
             opt.selected = true;
-            if (DEBUG) console.log(`Selected newly created bookmark: ${bm.name} (${bm.id})`);
+            if (DEBUG) console.log(`Selected bookmark: ${bm.name} (${bm.id})`);
           }
           select.appendChild(opt);
         });
+        
+        if (DEBUG) {
+          console.log(`Populated dropdown with ${filteredBookmarks.length} bookmarks`);
+        }
 
         // Enable bookmark controls if we have bookmarks
         function renderManageBookmarksPanel() {
@@ -802,7 +872,7 @@
               // 1. Shared with View User specifically, or
               // 2. Shared with Embed_Users team
               // Note: Empty sharedWith array means NOT shared (private to creator)
-              return b.sharedWith && 
+              return Array.isArray(b.sharedWith) && 
                      b.sharedWith.length > 0 && 
                      (b.sharedWith.includes(env.VIEW_EMAIL) || 
                       b.sharedWith.includes("team:Embed_Users"));
@@ -834,27 +904,40 @@
           });
         }
 
-        // Explicitly set select.value — avoids subtle mismatch
+        // Ensure the correct value is selected
         select.value = selectedBookmarkId || "";
+        
+        // Add a small delay to ensure DOM is fully updated before re-enabling events
+        await new Promise(resolve => setTimeout(resolve, 50));
+        suppressBookmarkChange = false;
 
-        setTimeout(() => {
-          suppressBookmarkChange = false; // 🔓 unlock shortly after DOM updates
-        }, 100);
-
-        // Attach change event listener AFTER loading options
+        // Remove any existing event listeners to prevent duplicates
         select.removeEventListener("change", handleBookmarkSelectionForEmbed);
+        // Attach change event listener AFTER loading options
         select.addEventListener("change", handleBookmarkSelectionForEmbed);
 
-        // prevent stale data from previous workbook
+        // Update button states based on current state
         updateBookmarkButtonState();
         
         // If a specific bookmark was requested (e.g., newly created), load its embed
         if (selectedBookmarkId && filteredBookmarks.some(bm => String(bm.id) === String(selectedBookmarkId))) {
-          if (DEBUG) console.log("Auto-loading embed for selected bookmark:", selectedBookmarkId);
+          if (DEBUG) console.log("✅ Auto-loading embed for selected bookmark:", selectedBookmarkId);
           loadEmbed(selectedBookmarkId);
+        } else if (selectedBookmarkId) {
+          if (DEBUG) {
+            console.warn("❌ Could not find requested bookmark ID in filtered results:", selectedBookmarkId);
+            console.log("Available filtered bookmark IDs:", filteredBookmarks.map(bm => bm.id));
+          }
         }
 
-        if (DEBUG) console.log("Bookmarks loaded:", bookmarks);
+        if (DEBUG) {
+          console.log(`✅ Bookmarks loading completed:`);
+          console.log(`  - Total bookmarks: ${bookmarks.length}`);
+          console.log(`  - Filtered for ${currentUserEmail}: ${filteredBookmarks.length}`);
+          console.log(`  - Selected bookmark ID: ${selectedBookmarkId || 'none'}`);
+          console.log(`  - Dropdown options count: ${select.children.length}`);
+          console.log(`  - suppressBookmarkChange: ${suppressBookmarkChange}`);
+        }
       } catch (err) {
         console.error("Failed to load bookmarks:", err);
         toggleBookmarkControls(false);
@@ -1028,7 +1111,7 @@
 
         form.elements["bookmarkName"].value = bookmark.name || "";
         form.elements["descr"].value = bookmark.descr || "";
-        form.elements["isDefault"].checked = !!bookmark.isDefault;
+        // Note: isDefault checkbox was removed from UI, skip this line
 
         const radios = form.querySelectorAll("input[name='sharedWith']");
         radios.forEach((r) => {
@@ -1063,6 +1146,7 @@
       }
 
       try {
+        // Step 1: Delete from API
         const res = await fetch(`/api/bookmarks_db/bookmarks/${bookmarkId}`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
@@ -1072,17 +1156,29 @@
           }),
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`API Error: ${res.status} - ${errorText}`);
+        }
 
-        alert("Bookmark deleted.");
-        resetBookmarkForm();
-        document.getElementById("bookmarkPanel").classList.remove("open");
-        updateBookmarkToggleLabel();
-        renderManageBookmarksPanel();
-        await loadBookmarks();
+        // Step 2: API deletion successful, now update UI
+        alert("Bookmark deleted successfully.");
+        
+        try {
+          resetBookmarkForm();
+          document.getElementById("bookmarkPanel").classList.remove("open");
+          updateBookmarkToggleLabel();
+          renderManageBookmarksPanel();
+          await loadBookmarks();
+          if (DEBUG) console.log("✅ UI cleanup after bookmark deletion completed");
+        } catch (uiError) {
+          console.error("⚠️ UI cleanup error after successful deletion:", uiError);
+          // Don't show error to user since deletion was successful
+        }
+        
       } catch (err) {
-        console.error("Failed to delete bookmark - Front End Function", err);
-        alert("Failed to delete bookmark - Front End Function");
+        console.error("❌ Failed to delete bookmark:", err);
+        alert(`Failed to delete bookmark: ${err.message}`);
       }
     }
 
@@ -1332,6 +1428,9 @@
           updateBookmarkToggleLabel();
           // Reload bookmarks and select the newly created one
           const newBookmarkId = data.bookmarkId;
+          if (DEBUG) {
+            console.log("🔄 Reloading bookmarks to select new bookmark:", newBookmarkId);
+          }
           return loadBookmarks(newBookmarkId);
         })
         .catch((err) => {
@@ -1348,19 +1447,27 @@
         if (DEBUG) console.log("🔁 Suppressing bookmark change event");
         return;
       }
+      
+      if (DEBUG) {
+        console.log(`Bookmark selection changed to: ${selectedId || 'Original Workbook'}`);
+      }
 
       if (selectedId === "") {
-        // Only reset form if user is actively interacting (not during programmatic changes)
-        if (!suppressBookmarkChange) {
-          resetBookmarkForm(); // Clear form when switching to original workbook
-        }
+        // User selected "Original Workbook" - clear form and load original embed
+        resetBookmarkForm();
         loadEmbed(); // reload without bookmark
         return;
       }
+      
+      // Validate that the selected bookmark exists in our filtered list
+      const bookmarkExists = loadedBookmarks.some(bm => String(bm.id) === String(selectedId));
+      if (!bookmarkExists) {
+        if (DEBUG) console.warn(`Selected bookmark ${selectedId} not found in loaded bookmarks`);
+        return;
+      }
 
-      if (DEBUG)
-        console.log("📥 selectedBookmarkId passed into loadEmbed:", selectedId);
-      loadEmbed(selectedId); // no fetch, no form logic
+      if (DEBUG) console.log("📥 Loading embed for bookmark:", selectedId);
+      loadEmbed(selectedId);
     }
 
     // Apply a bookmark by ID — looks up the exploreKey from loaded bookmarks and reloads the embed
@@ -1414,6 +1521,37 @@
         if (DEBUG) console.log("🔗 Generated Embed URL from new bookmark:", embedUrl);
       }
     });
+
+    // ============================================================================
+    // DEBUG UTILITIES
+    // ============================================================================
+    
+    /**
+     * Debug function to diagnose bookmark loading issues
+     * Call from browser console: debugBookmarks()
+     */
+    window.debugBookmarks = function() {
+      console.log("🔍 BOOKMARK DEBUG INFO:");
+      console.log("  - currentUserEmail:", currentUserEmail);
+      console.log("  - env.VIEW_EMAIL:", env.VIEW_EMAIL);
+      console.log("  - window.selectedworkbookUrlId:", window.selectedworkbookUrlId);
+      console.log("  - loadedBookmarks:", loadedBookmarks);
+      console.log("  - suppressBookmarkChange:", suppressBookmarkChange);
+      
+      const select = document.getElementById("bookmarkSelect");
+      console.log("  - Dropdown element:", select);
+      console.log("  - Dropdown options:", Array.from(select?.children || []));
+      console.log("  - Dropdown value:", select?.value);
+      console.log("  - Dropdown disabled:", select?.disabled);
+      
+      // Force reload bookmarks
+      console.log("🔄 Force reloading bookmarks...");
+      loadBookmarks().then(() => {
+        console.log("✅ Force reload complete");
+      }).catch(err => {
+        console.error("❌ Force reload failed:", err);
+      });
+    };
 
     // ============================================================================
     // APPLICATION INITIALIZATION
@@ -1488,6 +1626,37 @@
         if (DEBUG) console.warn("Toggle Info Panel setup failed - button:", !!toggleButton, "sidebar:", !!sidebar);
       }
 
+      // Set initial button visibility based on current user (if any)
+      // Add small delay to ensure DOM is fully settled
+      setTimeout(() => {
+        const roleSelect = document.getElementById("roleSelect");
+        const bookmarkToggle = document.getElementById("bookmarkToggle");
+        const clearAllBtn = document.getElementById("clearAllBookmarks");
+        
+        if (DEBUG) {
+          console.log("🔍 BUTTON DEBUG INFO:");
+          console.log("  - roleSelect found:", !!roleSelect, "value:", roleSelect?.value);
+          console.log("  - bookmarkToggle found:", !!bookmarkToggle);
+          console.log("  - clearAllBtn found:", !!clearAllBtn);
+          console.log("  - currentUserEmail before check:", currentUserEmail);
+          console.log("  - env.VIEW_EMAIL:", env.VIEW_EMAIL);
+        }
+        
+        if (roleSelect && roleSelect.value) {
+          currentUserEmail = roleSelect.value;
+          const selected = roleSelect.selectedOptions[0];
+          currentMode = selected?.dataset.mode || "view";
+          if (DEBUG) {
+            console.log("🔄 Auto-detected initial user:", currentUserEmail, "mode:", currentMode);
+          }
+        }
+        
+        if (DEBUG) {
+          console.log("📞 Calling updateBookmarkButtonState() from initialization");
+        }
+        updateBookmarkButtonState();
+      }, 100);
+      
       if (DEBUG) console.log("Application initialized");
     }
     // ============================================================================
