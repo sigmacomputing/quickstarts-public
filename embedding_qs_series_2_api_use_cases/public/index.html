@@ -19,15 +19,32 @@
     <h1>Sigma Embedding API QuickStarts</h1>
 
     <select id="qsSelector">
-      <option value="" disabled>Select a QuickStart</option>
+      <option value="" disabled selected>Select a QuickStart</option>
     </select>
 
     <br/>
     <button onclick="goToQS()">Go</button>
-    <input type="button" onclick="location.href='http://localhost:3000/tools/preload-users.html';" value="Provision Users" />
+    <input type="button" onclick="location.href='/tools/preload-users.html';" value="Provision Users" />
     </div>
 
   <script>
+    // Environment and debug configuration
+    let DEBUG = false;
+    let env = {};
+
+    // Load environment configuration
+    async function loadEnv() {
+      try {
+        const res = await fetch("/env.json");
+        env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode enabled");
+      } catch (err) {
+        if (DEBUG) console.warn("Failed to load environment config:", err);
+      }
+    }
+
+    // Load QuickStart options
     async function loadQuickStarts() {
       try {
         const response = await fetch('/assets/qs-manifest.json');
@@ -41,19 +58,27 @@
           selector.appendChild(option);
         });
 
-        selector.value = "getting_started";
+        // Ensure placeholder remains selected
+        selector.value = "";
+        if (DEBUG) console.log("QuickStart options loaded:", quickStarts.length);
       } catch (error) {
-        console.error('Failed to load QuickStart manifest:', error);
+        if (DEBUG) console.error('Failed to load QuickStart manifest:', error);
       }
     }
 
+    // Navigate to selected QuickStart
     function goToQS() {
       const selected = document.getElementById('qsSelector').value;
       if (!selected) return alert("Please select a QuickStart.");
+      if (DEBUG) console.log("Navigating to QuickStart:", selected);
       window.location.href = `/${selected}/?mode=${selected}`;
     }
 
-    loadQuickStarts();
+    // Initialize the application
+    (async () => {
+      await loadEnv();
+      await loadQuickStarts();
+    })();
   </script>
 </body>
 </html>

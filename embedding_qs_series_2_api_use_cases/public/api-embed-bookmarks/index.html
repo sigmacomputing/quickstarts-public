@@ -5,105 +5,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>API Bookmarks QuickStart</title>
-    <link rel="stylesheet" href="/styles/layout.css" />
+    <link rel="stylesheet" href="/styles/main.css" />
     <link rel="icon" href="data:," />
 
-    <style>
-      body {
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        margin: 0;
-        font-family: sans-serif;
-      }
-      .layout-topbar {
-        background: #f57c00;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        padding: 0.5rem 1rem;
-      }
-
-      .header-title {
-        font-size: 1rem;
-        margin-left: auto;
-        white-space: nowrap;
-      }
-
-      .control-panel {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 10px;
-        font-size: 14px;
-      }
-
-      .control-group label {
-        font-weight: bold;
-        font-size: 13px;
-      }
-
-      .control-group select {
-        font-size: 13px;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-      }
-
-      #collapse-info {
-        width: fit-content;
-        margin-top: 4px;
-        margin-left: 0;
-        font-size: 14px;
-        cursor: pointer;
-        border-radius: 4px;
-        border: 1px solid #ccc;
-      }
-
-      .main {
-        flex: 1;
-        display: flex;
-        overflow: hidden;
-      }
-
-      .sidebar {
-        width: 280px;
-        background: #f4f4f4;
-        padding: 1.5rem;
-        border-right: 1px solid #ddd;
-        overflow-y: auto;
-        transition: width 0.3s ease, padding 0.3s ease;
-      }
-
-      .sidebar.collapsed {
-        width: 0;
-        padding: 0;
-        overflow: hidden;
-      }
-
-      .content {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow-y: auto;
-        padding: 1.5rem;
-        background: #ffffff;
-      }
-
-      iframe {
-        flex: 1 0 auto;
-        min-height: 500px;
-        border: none;
-        border-radius: 6px;
-      }
-
-      .layout-footer {
-        background: lightgray;
-        text-align: center;
-        line-height: 35px;
-        height: 34px;
-      }
-    </style>
   </head>
 
   <body>
@@ -165,15 +69,20 @@
         </div>
 
         <!-- Bookmark Name + Create Button (Initially Hidden) -->
-        <div id="bookmarkControls" class="control-group" style="display: none">
+        <div id="bookmarkControls" class="control-group" style="display: none;">
           <label for="bookmarkName"><strong>Bookmark Name:</strong></label>
-          <input id="bookmarkName" type="text" placeholder="Enter name…" />
-          <button id="create-bookmark-btn">Create Bookmark</button>
+          <div style="display: flex; gap: 8px;">
+            <input id="bookmarkName" type="text" placeholder="Enter name…" />
+            <button id="create-bookmark-btn">Create Bookmark</button>
+          </div>
         </div>
       </div>
 
-      <!-- Toggle info panel (own row, aligned left) -->
-      <button id="collapse-info">Toggle Info Panel</button>
+      <!-- Toggle info panel and README link (own row, aligned left) -->
+      <div style="white-space: nowrap;">
+        <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
+        <button onclick="window.open('/api-embed-bookmarks/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+      </div>
     </header>
 
     <!-- === Main Layout === -->
@@ -207,23 +116,43 @@
     <footer class="layout-footer">Sigma &copy; 2025</footer>
   </body>
   <script>
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
     let DEBUG = false;
     let env = {};
     let latestExploreKey = null;
     let currentMode = "view";
     let pendingBookmarkKey = null;
 
+    // ============================================================================
+    // ENVIRONMENT & CONFIGURATION
+    // ============================================================================
+    
+    /**
+     * Loads environment configuration from the server
+     * Sets DEBUG flag and populates global env object with .env variables
+     */
     async function loadEnv() {
       try {
-        const res = await fetch("/env");
+        const res = await fetch("/env.json");
         env = await res.json();
         DEBUG = String(env.DEBUG).toLowerCase() === "true";
-        if (DEBUG) console.log("DEBUG mode enabled via /env");
+        if (DEBUG) console.log("DEBUG mode enabled via /env.json");
       } catch (err) {
-        console.warn("Failed to load /env:", err);
+        if (DEBUG) console.warn("Failed to load /env.json config:", err.message);
       }
     }
 
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Decodes a JWT token into header and payload components
+     * @param {string} token - JWT token string
+     * @returns {object} Object containing header and payload or error
+     */
     function decodeJwt(token) {
       try {
         const [headerB64, payloadB64] = token.split(".");
@@ -242,6 +171,10 @@
       }
     }
 
+    /**
+     * Shows or hides bookmark creation controls based on user permissions
+     * @param {boolean} show - Whether to show the bookmark controls
+     */
     function toggleBookmarkControls(show) {
       const controls = document.getElementById("bookmarkControls");
       const createBtn = document.getElementById("create-bookmark-btn");
@@ -250,16 +183,24 @@
       if (DEBUG) console.log("Toggling bookmark controls:", show);
 
       if (controls && createBtn && bookmarkNameInput) {
-        controls.style.display = show ? "inline-block" : "none";
+        controls.style.display = show ? "flex" : "none";
         createBtn.disabled = !show;
         if (!show) bookmarkNameInput.value = "";
       }
     }
 
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Populates the user role dropdown with View and Build users from environment config
+     * Sets up event handler to update currentMode when user selection changes
+     */
     async function loadUserOptions() {
       const select = document.getElementById("roleSelect");
       if (!select) {
-        console.warn("Missing roleSelect element!");
+        if (DEBUG) console.warn("Missing roleSelect element!");
         return;
       }
 
@@ -274,7 +215,7 @@
       select.addEventListener("change", (e) => {
         const selected = e.target.selectedOptions[0];
         currentMode = selected.dataset.mode || "view";
-        console.log("🔍 currentMode set to:", currentMode);
+        if (DEBUG) console.log("🔍 currentMode set to:", currentMode);
 
         const workbookSelect = document.getElementById("workbookSelect");
         const selectedWorkbook = workbookSelect?.value;
@@ -287,6 +228,10 @@
       });
     }
 
+    /**
+     * Fetches available workbooks from Sigma API and populates dropdown
+     * Sets up event handler to trigger embed loading when workbook is selected
+     */
     async function loadWorkbooks() {
       const select = document.getElementById("workbookSelect");
       try {
@@ -309,10 +254,14 @@
           loadEmbed();
         });
       } catch (err) {
-        console.error("Failed to load workbooks:", err);
+        if (DEBUG) console.error("Failed to load workbooks:", err);
       }
     }
 
+    /**
+     * Fetches available bookmarks for the selected workbook and populates dropdown
+     * @param {string} selectedBookmarkId - Optional bookmark ID to select after loading
+     */
     async function loadBookmarks(selectedBookmarkId = "") {
       const select = document.getElementById("bookmarkSelect");
       if (!select) return;
@@ -326,7 +275,7 @@
         const { entries: bookmarks = [] } = await res.json();
 
         select.innerHTML = `
-        <option value="" disabled selected style="color:gray;font-style:italic">Original Workbook</option>
+        <option value="" selected style="color:black;font-weight:normal">Original Workbook</option>
       `;
 
         bookmarks.forEach((bookmark) => {
@@ -345,17 +294,26 @@
 
         if (DEBUG) console.log("Bookmarks loaded:", bookmarks);
       } catch (err) {
-        console.error("Failed to load bookmarks:", err);
+        if (DEBUG) console.error("Failed to load bookmarks:", err);
       }
     }
 
+    // ============================================================================
+    // SIGMA EMBED FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Generates JWT token and loads Sigma embed with optional bookmark
+     * Supports applying bookmarks and exploreKeys to customize the view
+     * @param {string} selectedBookmarkId - Optional bookmark ID to apply to the embed
+     */
     async function loadEmbed(selectedBookmarkId = "") {
       const selectedUser = document.getElementById("roleSelect").value;
       const workbookUrlId = window.selectedworkbookUrlId;
       const embedType = "workbook";
 
       if (!selectedUser || !workbookUrlId) {
-        console.warn("Embed not loaded — missing required fields.");
+        if (DEBUG) console.warn("Embed not loaded — missing required fields.");
         return;
       }
 
@@ -392,13 +350,25 @@
               hide_folder_navigation: hideFolderNav,
               hide_menu: hideMenu,
               menu_position: menuPosition,
+              disable_auto_refresh: env.DISABLE_AUTO_REFRESH,
+              disable_mobile_view: env.DISABLE_MOBILE_VIEW,
+              hide_page_controls: env.HIDE_PAGE_CONTROLS,
+              hide_reload_button: env.HIDE_RELOAD_BUTTON,
+              hide_title: env.HIDE_TITLE,
+              hide_tooltip: env.HIDE_TOOLTIP,
+              hide_view_select: env.HIDE_VIEW_SELECT,
+              lng: env.LNG,
+              page_id: env.PAGE_ID,
+              responsive_height: env.RESPONSIVE_HEIGHT,
+              theme: env.THEME,
+              view_id: env.VIEW_ID,
             }),
           }
         );
 
         if (!res.ok) {
           const errText = await res.text();
-          console.error("Failed to fetch embed:", res.status, errText);
+          if (DEBUG) console.error("Failed to fetch embed:", res.status, errText);
           return;
         }
 
@@ -422,11 +392,13 @@
            <h3>Decoded JWT Payload:</h3>
            <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>`;
       } catch (err) {
-        console.error("loadEmbed() failed:", err);
+        if (DEBUG) console.error("loadEmbed() failed:", err);
       }
     }
 
-    // === Event Listeners ===
+    // ============================================================================
+    // EVENT LISTENERS
+    // ============================================================================
 
     document
       .getElementById("bookmarkSelect")
@@ -437,9 +409,7 @@
         toggleBookmarkControls(false);
       });
 
-    document.getElementById("collapse-info").addEventListener("click", () => {
-      document.querySelector(".sidebar").classList.toggle("collapsed");
-    });
+    // Moved to initialization section
 
     document
       .getElementById("create-bookmark-btn")
@@ -481,12 +451,14 @@
           document.getElementById("bookmarkName").value = "";
           await loadBookmarks();
         } catch (err) {
-          console.error("Failed to create bookmark:", err);
+          if (DEBUG) console.error("Failed to create bookmark:", err);
           alert("Bookmark creation failed.");
         }
       });
 
-    // === Startup Logic ===
+    // ============================================================================
+    // APPLICATION INITIALIZATION
+    // ============================================================================
 
     (async () => {
       await loadEnv();
@@ -530,6 +502,31 @@
 
       await loadUserOptions();
       await loadWorkbooks();
+
+      // ============================================================================
+      // UI INTERACTIONS - TOGGLE INFO PANEL
+      // ============================================================================
+      try {
+        console.log("Setting up Toggle Info Panel...");
+        const sidebar = document.querySelector(".sidebar");
+        const toggleButton = document.getElementById("collapse-info");
+        
+        console.log("Sidebar element found:", !!sidebar);
+        console.log("Toggle button found:", !!toggleButton);
+        
+        if (toggleButton && sidebar) {
+          toggleButton.addEventListener("click", () => {
+            console.log("Toggle button clicked!");
+            sidebar.classList.toggle("collapsed");
+            console.log("Sidebar collapsed state:", sidebar.classList.contains("collapsed"));
+          });
+          console.log("Toggle Info Panel event listener successfully attached");
+        } else {
+          console.error("Missing elements - Toggle button:", !!toggleButton, "Sidebar:", !!sidebar);
+        }
+      } catch (error) {
+        console.error("Error setting up Toggle Info Panel:", error);
+      }
     })();
   </script>
 </html>

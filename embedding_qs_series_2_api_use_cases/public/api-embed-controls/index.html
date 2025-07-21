@@ -4,129 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>API Embed Controls QuickStart</title>
-    <link rel="stylesheet" href="/styles/layout.css" />
+    <link rel="stylesheet" href="/styles/main.css" />
     <link rel="icon" href="data:," />
-    <style>
-       {
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        margin: 0;
-        font-family: sans-serif;
-      }
-
-      .layout-topbar {
-        background: #f57c00;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        padding: 0.5rem 1rem;
-        gap: 0.5rem;
-      }
-
-      .menu-button:hover {
-        background-color: #ffe1c4;
-        color: #c65100;
-      }
-
-      .header-title {
-        font-size: 1rem;
-        margin-left: auto;
-        white-space: nowrap;
-      }
-      .main {
-        flex: 1;
-        display: flex;
-        overflow: hidden;
-      }
-
-      .sidebar {
-        width: 280px;
-        background: #f4f4f4;
-        padding: 1.5rem;
-        border-right: 1px solid #ddd;
-        overflow-y: auto;
-        transition: width 0.3s ease, padding 0.3s ease;
-      }
-
-      .sidebar.collapsed {
-        width: 0;
-        padding: 0;
-        overflow: hidden;
-      }
-
-      #collapse-info {
-        display: flex;
-        flex-direction: column;
-        width: fit-content;
-      }
-
-      .content {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow-y: auto; /* This makes the right panel scrollable */
-        padding: 1.5rem;
-        background: #ffffff;
-      }
-
-      iframe {
-        flex: 1 0 auto;
-        min-height: 500px;
-        border: none;
-        border-radius: 6px;
-      }
-
-      .layout-footer {
-        background: lightgray;
-        text-align: center;
-        line-height: 35px;
-        height: 34px;
-      }
-
-      select {
-        font-size: 1rem;
-        padding: 6px;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-      }
-
-      .control-panel {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 10px;
-        font-size: 14px;
-      }
-
-      .control-group {
-        flex-direction: column;
-        gap: 4px;
-      }
-
-      .control-group label {
-        font-weight: bold;
-        font-size: 13px;
-      }
-
-      .control-group select {
-        font-size: 13px;
-        padding: 4px 6px;
-      }
-
-      .control-group label {
-        display: block;
-        margin-bottom: 4px;
-        font-weight: bold;
-      }
-
-      .left-controls {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-      }
-    </style>
   </head>
   <body>
     <header class="layout-topbar">
@@ -197,7 +76,11 @@
         </div>
       </div>
 
-      <button id="collapse-info">Toggle Info Panel</button>
+      <!-- Toggle info panel and README link -->
+      <div style="white-space: nowrap;">
+        <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
+        <button onclick="window.open('/api-embed-controls/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+      </div>
     </header>
 
     <div class="main">
@@ -228,32 +111,61 @@
     <footer class="layout-footer">Sigma &copy; 2025</footer>
   </body>
   <script>
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
     let DEBUG = false;
     let env = {};
     let currentMode = "view";
 
+    // ============================================================================
+    // ENVIRONMENT & CONFIGURATION
+    // ============================================================================
+    
+    /**
+     * Loads environment configuration from the server
+     * Sets DEBUG flag and populates global env object with .env variables
+     */
     async function loadEnv() {
       try {
-        const res = await fetch("/env");
+        const res = await fetch("/env.json");
         env = await res.json();
         DEBUG = String(env.DEBUG).toLowerCase() === "true";
         if (DEBUG) console.log("DEBUG mode enabled via /env");
       } catch (err) {
-        console.warn("Failed to load /env config:", err.message);
+        if (DEBUG) console.warn("Failed to load /env config:", err.message);
       }
     }
 
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Decodes a base64url-encoded string (used for JWT components)
+     * @param {string} str - Base64url encoded string
+     * @returns {string|null} Decoded string or null if decoding fails
+     */
     function base64UrlDecode(str) {
       try {
         const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
         const padded = base64 + "===".slice((base64.length + 3) % 4);
         return atob(padded);
       } catch (e) {
-        console.warn("Base64 decode failed:", e);
+        if (DEBUG) console.warn("Base64 decode failed:", e);
         return null;
       }
     }
 
+    // ============================================================================
+    // SIGMA EMBED FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Generates JWT token and loads Sigma embed based on selected embed type
+     * Supports workbook, page, and element embeds with different controls
+     * @param {string} mode - API endpoint mode (default: "api-embed-controls")
+     */
     async function loadEmbed(mode = "api-embed-controls") {
       const embedType = document.getElementById("embedType").value;
       const workbookUrlId = window.selectedworkbookUrlId;
@@ -263,7 +175,7 @@
       const embedFrame = document.getElementById("sigma-embed");
 
       if (!selectedUser || !workbookUrlId || !embedType) {
-        console.warn("Embed not loaded — missing required fields.");
+        if (DEBUG) console.warn("Embed not loaded — missing required fields.");
         embedFrame.style.display = "none";
         return;
       }
@@ -311,6 +223,18 @@
             hide_folder_navigation: hideFolderNav,
             hide_menu: hideMenu,
             menu_position: menuPosition,
+            disable_auto_refresh: env.DISABLE_AUTO_REFRESH,
+            disable_mobile_view: env.DISABLE_MOBILE_VIEW,
+            hide_page_controls: env.HIDE_PAGE_CONTROLS,
+            hide_reload_button: env.HIDE_RELOAD_BUTTON,
+            hide_title: env.HIDE_TITLE,
+            hide_tooltip: env.HIDE_TOOLTIP,
+            hide_view_select: env.HIDE_VIEW_SELECT,
+            lng: env.LNG,
+            page_id: env.PAGE_ID,
+            responsive_height: env.RESPONSIVE_HEIGHT,
+            theme: env.THEME,
+            view_id: env.VIEW_ID,
           }),
         });
 
@@ -344,7 +268,7 @@
           decodeBlock.innerHTML = `<p style="color:red;">Invalid JWT format</p>`;
         }
       } catch (err) {
-        console.error("loadEmbed() failed:", err);
+        if (DEBUG) console.error("loadEmbed() failed:", err);
         embedFrame.style.display = "none";
         document.getElementById("debug-embed-url").textContent =
           "Error loading embed.";
@@ -352,10 +276,18 @@
       }
     }
 
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Populates the user role dropdown with View and Build users from environment config
+     * Sets up event handler to update currentMode when user selection changes
+     */
     async function loadUserOptions() {
       const select = document.getElementById("roleSelect");
       try {
-        const res = await fetch("/env");
+        const res = await fetch("/env.json");
         const env = await res.json();
 
         select.innerHTML = `
@@ -371,10 +303,14 @@
           loadEmbed();
         });
       } catch (err) {
-        console.error("Failed to load user options:", err);
+        if (DEBUG) console.error("Failed to load user options:", err);
       }
     }
 
+    /**
+     * Fetches available workbooks from Sigma API and populates dropdown
+     * Sets up event handler to trigger embed loading when workbook is selected
+     */
     async function loadWorkbooks() {
       const select = document.getElementById("workbookSelect");
       try {
@@ -398,15 +334,21 @@
           loadEmbed();
         });
       } catch (err) {
-        console.error("Failed to load workbooks:", err);
+        if (DEBUG) console.error("Failed to load workbooks:", err);
         select.innerHTML = `<option value="">Error loading workbooks</option>`;
       }
     }
 
+    // ============================================================================
+    // UI INTERACTIONS
+    // ============================================================================
+    
+    // Setup sidebar toggle functionality
     document.getElementById("collapse-info").addEventListener("click", () => {
       document.querySelector(".sidebar").classList.toggle("collapsed");
     });
 
+    // Setup embed type change handler to show/hide page and element dropdowns
     document
       .getElementById("embedType")
       .addEventListener("change", async () => {
@@ -415,11 +357,11 @@
         document.getElementById("element-id-group").style.display = "none";
 
         if (embedType === "page") {
-          document.getElementById("page-id-group").style.display = "block";
+          document.getElementById("page-id-group").style.display = "flex";
           loadTargetIdOptions("page");
         } else if (embedType === "element") {
-          document.getElementById("page-id-group").style.display = "block";
-          document.getElementById("element-id-group").style.display = "block";
+          document.getElementById("page-id-group").style.display = "flex";
+          document.getElementById("element-id-group").style.display = "flex";
           loadTargetIdOptions("element");
         } else {
           loadEmbed();
@@ -428,6 +370,11 @@
         document.getElementById("sigma-embed").style.display = "none";
       });
 
+    /**
+     * Loads page and element options based on selected embed type
+     * Dynamically populates page dropdown and element dropdown for hierarchical selection
+     * @param {string} embedType - Type of embed ("page" or "element")
+     */
     async function loadTargetIdOptions(embedType) {
       const workbookUrlId = window.selectedworkbookUrlId;
       const selectedUser = document.getElementById("roleSelect")?.value;
@@ -479,15 +426,20 @@
 
               elementSelect.onchange = () => loadEmbed();
             } catch (err) {
-              console.error("Failed to fetch elements:", err);
+              if (DEBUG) console.error("Failed to fetch elements:", err);
             }
           };
         }
       } catch (err) {
-        console.error("Failed to load pages:", err);
+        if (DEBUG) console.error("Failed to load pages:", err);
       }
     }
 
+    // ============================================================================
+    // APPLICATION INITIALIZATION
+    // ============================================================================
+    
+    // Initialize the application on page load
     (async () => {
       await loadEnv();
       await loadUserOptions();

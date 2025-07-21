@@ -101,7 +101,6 @@ router.post("/:mode", async (req, res) => {
     const jwt = generateJwt({ embedUrl, mode, sub, permissions });
 
     if (process.env.DEBUG === "true") {
-      console.log("Final embed URL:", embedUrl);
       console.log("JWT:", jwt);
     }
 

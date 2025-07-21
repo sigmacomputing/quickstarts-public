@@ -82,9 +82,9 @@ async function deleteAllBookmarks(workbookId, resetLocal = false) {
     const bookmarksPath = path.resolve(__dirname, "../../data/bookmarks.json");
     try {
       fs.writeFileSync(bookmarksPath, JSON.stringify({ bookmarks: [] }, null, 2));
-      console.log("✅ Local lowdb bookmarks.json reset.");
+      console.log("Local lowdb bookmarks.json reset.");
     } catch (err) {
-      console.error("❌ Failed to reset local bookmarks file:", err.message);
+      console.error("Failed to reset local bookmarks file:", err.message);
     }
   }
 

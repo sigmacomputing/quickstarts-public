@@ -1,12 +1,17 @@
 // File: embedding_qs_series_2_api_use_cases/server/server.js
+// Main Express server for Sigma Embedding API QuickStarts
+// Provides endpoints for JWT generation, workbook/page/element access, and user provisioning
 
 const express = require("express");
 const dotenv = require("dotenv");
 const path = require("path");
 const { lookupMemberId, provisionEmbedUser } = require("../helpers/provision");
-const DEBUG = process.env.DEBUG === "true";
 
+// Load environment variables
 require("dotenv").config();
+
+// Initialize debug mode from environment
+const DEBUG = process.env.DEBUG === "true";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,6 +29,7 @@ app.use("/api/bookmarks", require("../routes/api/bookmarks"));
 app.use("/api/bookmarks_db", require("../routes/api/bookmarks_db"));
 
 // GET /provision-users — One-time provisioning for build/view users
+// Creates embed users with specified permissions and returns their member IDs
 app.get("/provision-users", async (req, res) => {
   try {
     const result = {
@@ -55,7 +61,7 @@ app.get("/provision-users", async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    console.error("Provisioning error:", err.message);
+    if (DEBUG) console.error("Provisioning error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -72,6 +78,11 @@ app.get("/env.json", (req, res) => {
     BUILD_EMAIL: process.env.BUILD_EMAIL || "",
     VIEW_EMAIL: process.env.VIEW_EMAIL || "",
     ADMIN_EMAIL: process.env.ADMIN_EMAIL || "",
+    
+    // Application Constants
+    ORG_SLUG: process.env.ORG_SLUG,
+    WORKBOOK_NAME: process.env.WORKBOOK_NAME,
+    EMBED_URL_BASE: process.env.EMBED_URL_BASE,
 
     // Optional Embed Parameters
     DISABLE_AUTO_REFRESH: process.env.DISABLE_AUTO_REFRESH,
@@ -95,13 +106,14 @@ app.get("/env.json", (req, res) => {
 // Static files
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-// Debug route
+// Debug route - only active when DEBUG is enabled
 app.get("/debug-test", (req, res) => {
-  console.log("/debug-test hit");
+  if (DEBUG) console.log("/debug-test hit");
   res.send("Debug route works");
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Sigma Embed QuickStart server running at http://localhost:${PORT}`);
+  if (DEBUG) console.log("Debug mode is enabled");
 });

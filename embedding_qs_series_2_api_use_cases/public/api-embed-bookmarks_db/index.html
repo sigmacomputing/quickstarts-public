@@ -5,98 +5,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>API Bookmark Sharing with Local DB</title>
-    <link rel="stylesheet" href="/styles/layout.css" />
+    <link rel="stylesheet" href="/styles/main.css" />
     <link rel="icon" href="data:," />
 
     <style>
-      body {
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        margin: 0;
-        font-family: sans-serif;
-      }
-
-      .layout-topbar {
-        background: #f57c00;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        padding: 0.5rem 1rem;
-      }
-
-      .header-title {
-        font-size: 1rem;
-        margin-left: auto;
-        white-space: nowrap;
-      }
-
-      .control-panel {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 10px;
-        font-size: 14px;
-      }
-
-      .control-group label {
-        font-weight: bold;
-        font-size: 13px;
-      }
-
-      .control-group select {
-        font-size: 13px;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-      }
-
-      #collapse-info {
-        width: fit-content;
-        margin-top: 4px;
-        margin-left: 0;
-        font-size: 14px;
-        cursor: pointer;
-        border-radius: 4px;
-        border: 1px solid #ccc;
-      }
-
-      .main {
-        flex: 1;
-        display: flex;
-        overflow: hidden;
-      }
-
-      .sidebar {
-        width: 280px;
-        background: #f4f4f4;
-        padding: 1.5rem;
-        border-right: 1px solid #ddd;
-        overflow-y: auto;
-        transition: width 0.3s ease, padding 0.3s ease;
-      }
-
-      .sidebar.collapsed {
-        width: 0;
-        padding: 0;
-        overflow: hidden;
-      }
-
-      .content {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow-y: auto;
-        padding: 1.5rem;
-        background: #ffffff;
-      }
-
-      iframe {
-        flex: 1 0 auto;
-        min-height: 500px;
-        border: none;
-        border-radius: 6px;
-      }
+      /* Specific styles for bookmark management functionality that extend main.css */
 
       /* ---- Bookmark Toggle Button ---- */
       #bookmarkToggle {
@@ -213,17 +126,10 @@
         cursor: pointer;
       }
 
-      /* ---- Footer ---- */
-      .layout-footer {
-        background: lightgray;
-        text-align: center;
-        line-height: 35px;
-        height: 34px;
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        z-index: 900;
+      /* Hide fixed buttons when bookmark panel is open */
+      .slide-panel.open ~ #bookmarkToggle,
+      .slide-panel.open ~ #clearAllBookmarks {
+        display: none;
       }
     </style>
   </head>
@@ -294,8 +200,11 @@
         </div>
       </div>
 
-      <!-- Toggle info panel (own row, aligned left) -->
-      <button id="collapse-info">Toggle Info Panel</button>
+      <!-- Toggle info panel and README link (own row, aligned left) -->
+      <div style="white-space: nowrap;">
+        <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
+        <button onclick="window.open('/api-embed-bookmarks_db/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+      </div>
     </header>
 
     <!-- === Main Layout === -->
@@ -324,6 +233,25 @@
     </main>
     <!-- Toggle Button -->
     <button id="bookmarkToggle">Manage Bookmarks</button>
+    
+    <!-- Clear All Bookmarks Button -->
+    <button id="clearAllBookmarks" style="
+      position: fixed;
+      top: 90px;
+      right: 12px;
+      z-index: 1100;
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      transition: background 0.2s ease;
+    " onmouseover="this.style.background='#c82333'" onmouseout="this.style.background='#dc3545'">
+      Clear All Bookmarks
+    </button>
 
     <!-- Slide-out Bookmark Panel -->
     <div id="bookmarkPanel" class="slide-panel">
@@ -353,24 +281,12 @@
             View User</label
           >
           <label
-            ><input
-              type="radio"
-              name="sharedWith"
-              value="build.embed@example.com"
-            />
-            Build User</label
-          >
-          <label
             ><input type="radio" name="sharedWith" value="team:Embed_Users" />
             Embed_Users Team</label
           >
         </div>
         <hr />
         <div class="checkbox-group">
-          <label
-            ><input type="checkbox" name="isDefault" /> Set as the default for
-            the workbook</label
-          ><br />
           <label
             ><input type="checkbox" name="isShared" checked disabled />Shared
             with others</label
@@ -403,9 +319,11 @@
     <footer class="layout-footer">Sigma &copy; 2025</footer>
   </body>
   <script>
-    // =============================================================================
-    // GLOBAL STATE & CONFIGURATION
-    // =============================================================================
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+    let DEBUG = false;
+    let env = {};
     let envConfig = {};
     let latestExploreKey = null;
     let currentMode = "view";
@@ -414,31 +332,52 @@
     let suppressBookmarkChange = false;
     let currentWorkbookId = null;
 
+    // ============================================================================
+    // ENVIRONMENT & CONFIGURATION
+    // ============================================================================
+    
+    /**
+     * Loads environment configuration from the server
+     * Sets DEBUG flag and populates global env and envConfig objects
+     */
     async function loadEnvConfig() {
       if (Object.keys(envConfig).length > 0) return; // already loaded
 
       try {
         const res = await fetch("/env.json");
         envConfig = await res.json();
+        env = envConfig; // Keep both for compatibility
+        DEBUG = String(envConfig.DEBUG).toLowerCase() === "true";
         if (DEBUG) console.log("✅ Loaded envConfig:", envConfig);
       } catch (err) {
-        console.warn("⚠️ Failed to load env.json:", err);
+        if (DEBUG) console.warn("⚠️ Failed to load env.json:", err);
       }
     }
 
-    // set DEBUG mode
-    let DEBUG = false;
-    fetch("/env.json")
-      .then((res) => res.json())
-      .then((env) => {
-        DEBUG = String(env.DEBUG).toLowerCase() === "true";
-      });
+    /**
+     * Early DEBUG mode initialization
+     * This ensures DEBUG is available immediately for early logging
+     */
+    (async () => {
+      try {
+        const res = await fetch("/env.json");
+        const envData = await res.json();
+        DEBUG = String(envData.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode initialized early");
+      } catch (err) {
+        console.warn("Failed to initialize DEBUG mode:", err.message);
+      }
+    })();
 
-    // =============================================================================
+    // ============================================================================
     // UTILITY FUNCTIONS
-    // =============================================================================
+    // ============================================================================
 
-    // function to consolidate environment-based defaults.
+    /**
+     * Consolidates environment-based embed parameters with current mode overrides
+     * @param {string} currentMode - Current user mode ("build" or "view")
+     * @returns {object} Object containing all embed parameters
+     */
     function getEmbedParamsFromEnv(currentMode) {
       const isBuild = currentMode === "build";
 
@@ -464,7 +403,11 @@
       };
     }
 
-    // Decode JWT token into header and payload
+    /**
+     * Decodes a JWT token into header and payload components
+     * @param {string} token - JWT token string
+     * @returns {object} Object containing header and payload or error
+     */
     function decodeJwt(token) {
       try {
         const [headerB64, payloadB64] = token.split(".");
@@ -497,6 +440,62 @@
     // (Optional) Placeholder for enabling/disabling UI controls as needed
     function toggleBookmarkControls(enabled) {
       // Implement UI enable/disable behavior here if needed
+    }
+    
+    /**
+     * Resets the entire page to its initial load state
+     * Forces user to reselect all dropdown values
+     */
+    function resetToInitialState() {
+      if (DEBUG) console.log("Resetting page to initial state");
+      
+      // Reset user selection
+      const userSelect = document.getElementById("roleSelect");
+      if (userSelect) {
+        userSelect.selectedIndex = 0; // Select "Select a user" option
+        currentUserEmail = null;
+      }
+      
+      // Reset workbook selection
+      const workbookSelect = document.getElementById("workbookSelect");
+      if (workbookSelect) {
+        workbookSelect.selectedIndex = 0; // Select "Select a workbook" option
+        window.selectedworkbookUrlId = null;
+        window.selectedworkbookId = null;
+      }
+      
+      // Reset bookmark selection
+      const bookmarkSelect = document.getElementById("bookmarkSelect");
+      if (bookmarkSelect) {
+        bookmarkSelect.innerHTML = `<option value="" selected style="color:gray;font-style:italic">Select a workbook first</option>`;
+        bookmarkSelect.disabled = true;
+      }
+      
+      // Clear iframe
+      const embedContainer = document.getElementById("embedContainer");
+      if (embedContainer) {
+        embedContainer.innerHTML = "";
+      }
+      
+      // Reset sidebar info panel
+      document.getElementById("debug-embed-url").textContent = "N/A";
+      document.getElementById("jwt-display").textContent = "Loading JWT...";
+      document.getElementById("jwt-decoded").innerHTML = "<p>Loading...</p>";
+      
+      // Reset global state
+      latestExploreKey = null;
+      loadedBookmarks = [];
+      currentMode = "view";
+      
+      // Reset bookmark form
+      resetBookmarkForm();
+      
+      // Close bookmark panel if open
+      const bookmarkPanel = document.getElementById("bookmarkPanel");
+      if (bookmarkPanel && bookmarkPanel.classList.contains("open")) {
+        bookmarkPanel.classList.remove("open");
+        updateBookmarkToggleLabel();
+      }
     }
 
     //  Set Manage Bookmarks label upon save and slider closing
@@ -560,47 +559,51 @@
     }) {
       await loadEnvConfig();
 
-      const base = `https://app.sigmacomputing.com/${orgSlug}/workbook/${workbookName}-${workbookUrlId}`;
+      const embedUrlBase = envConfig.EMBED_URL_BASE || "https://app.sigmacomputing.com";
+      const base = `${embedUrlBase}/${orgSlug}/workbook/${workbookName}-${workbookUrlId}`;
       const params = new URLSearchParams();
 
       params.set(":embed", "true");
       if (bookmarkId) params.set(":bookmark", bookmarkId);
       if (exploreKey) params.set(":explore", exploreKey);
 
-      const isBuild = currentMode === "build";
-
+      // Set embed parameters from environment config
       params.set(
         ":hide_folder_navigation",
         envConfig.HIDE_FOLDER_NAVIGATION || "true"
       );
       params.set(":hide_menu", envConfig.HIDE_MENU || "true");
       params.set(":menu_position", envConfig.MENU_POSITION || "none");
-
-      // OPTIONAL: Add more envConfig options if needed here
-      // params.set(":theme", envConfig.THEME || "Lite");
-      // params.set(":lng", envConfig.LNG || "English");
+      params.set(":theme", envConfig.THEME || "Lite");
+      params.set(":lng", envConfig.LNG || "English");
 
       return `${base}?${params.toString()}`;
     }
 
-    // =============================================================================
-    // API & DATA LOADING FUNCTIONS
-    // =============================================================================
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
 
-    // Load environment settings from backend
+    /**
+     * Loads environment configuration from the server (legacy function)
+     * @deprecated Use loadEnvConfig() instead
+     */
     async function loadEnv() {
       try {
         const res = await fetch("/env.json");
         env = await res.json();
         DEBUG = String(env.DEBUG).toLowerCase() === "true";
-        if (DEBUG) console.log("DEBUG mode enabled via /env");
+        if (DEBUG) console.log("DEBUG mode enabled via /env.json");
       } catch (err) {
-        console.warn("Failed to load /env:", err);
+        if (DEBUG) console.warn("Failed to load /env.json config:", err.message);
       }
     }
 
-    // Populate the user role dropdown and set up its event listener
-    let currentUserEmail = null; // <-- GLOBAL variable
+    /**
+     * Populates the user role dropdown with View and Build users from environment config
+     * Sets up event handler to update currentMode when user selection changes
+     */
+    let currentUserEmail = null; // Global variable to track selected user
 
     async function loadUserOptions() {
       const select = document.getElementById("roleSelect");
@@ -647,11 +650,12 @@
           opt.dataset.workbookid = wb.id;
           select.appendChild(opt);
         });
-        select.addEventListener("change", (e) => {
+        select.addEventListener("change", async (e) => {
           const selectedOption = e.target.selectedOptions[0];
           window.selectedworkbookUrlId = e.target.value;
           window.selectedworkbookId =
             selectedOption?.dataset.workbookid || null;
+          await loadBookmarks(); // Load bookmarks for the selected workbook
           loadEmbed();
         });
       } catch (err) {
@@ -664,12 +668,16 @@
       const select = document.getElementById("bookmarkSelect");
       const toggleBtn = document.getElementById("bookmarkToggle");
 
-      if (DEBUG) console.log("loadBookmarks() called");
-
       try {
         const workbookUrlId = window.selectedworkbookUrlId;
+        
+        if (DEBUG) {
+          console.log("loadBookmarks() called with workbookUrlId:", workbookUrlId);
+          console.log("API URL will be:", `/api/bookmarks_db?workbookUrlId=${encodeURIComponent(workbookUrlId || '')}`);
+        }
+        
         if (!workbookUrlId) {
-          console.warn("No workbook selected");
+          if (DEBUG) console.warn("No workbook selected");
           return;
         }
 
@@ -680,23 +688,27 @@
         const data = await res.json();
         const bookmarks = data.bookmarks || [];
         loadedBookmarks = bookmarks;
+        
+        if (DEBUG) {
+          console.log("API response data:", data);
+          console.log(`Found ${bookmarks.length} bookmarks for workbook:`, workbookUrlId);
+          bookmarks.forEach(bm => console.log(`  - Bookmark: ${bm.name} (ID: ${bm.id})`));
+        }
 
         // Reset dropdown
         select.innerHTML = "";
 
-        // Handle empty bookmarks
+        // Always add "Original Workbook" option first
+        const defaultOpt = document.createElement("option");
+        defaultOpt.value = "";
+        defaultOpt.textContent = "Original Workbook";
+        if (!selectedBookmarkId) defaultOpt.selected = true;
+        select.appendChild(defaultOpt);
+        
+        // Handle empty bookmarks - but still show Original Workbook
         if (bookmarks.length === 0) {
-          if (DEBUG) console.log("No bookmarks returned for selected workbook");
-
-          const opt = document.createElement("option");
-          opt.value = "";
-          opt.textContent = "No bookmarks available";
-          opt.disabled = true;
-          opt.selected = true;
-          opt.style.fontStyle = "italic";
-          select.appendChild(opt);
-          select.disabled = true;
-
+          if (DEBUG) console.log("No bookmarks returned for selected workbook - showing only Original Workbook");
+          select.disabled = false; // Enable so user can select Original Workbook
           toggleBookmarkControls(false);
           return;
         }
@@ -706,27 +718,57 @@
 
         select.disabled = false;
 
-        // Add "Original Workbook" option at the top
-        const defaultOpt = document.createElement("option");
-        defaultOpt.value = "";
-        defaultOpt.textContent = "Original Workbook";
-        if (!selectedBookmarkId) defaultOpt.selected = true;
-        select.appendChild(defaultOpt);
+        // Filter bookmarks based on current user permissions FIRST
+        const filteredBookmarks = bookmarks.filter((bm) => {
+          // Build user can see all bookmarks (but we removed Build User from UI)
+          // View user can only see bookmarks shared with them or Embed_Users team
+          if (currentUserEmail === env.VIEW_EMAIL) {
+            // View user: only show bookmarks that are:
+            // 1. Shared with View User specifically, or
+            // 2. Shared with Embed_Users team
+            // Note: Empty sharedWith array means NOT shared (private to creator)
+            const canView = bm.sharedWith && 
+                           bm.sharedWith.length > 0 && 
+                           (bm.sharedWith.includes(env.VIEW_EMAIL) || 
+                            bm.sharedWith.includes("team:Embed_Users"));
+            
+            if (DEBUG) {
+              console.log(`Bookmark "${bm.name}" (ID: ${bm.id}):`, {
+                sharedWith: bm.sharedWith,
+                viewEmail: env.VIEW_EMAIL,
+                currentUser: currentUserEmail,
+                canView: canView
+              });
+            }
+            
+            return canView;
+          }
+          // For any other user (including Build), show all bookmarks
+          return true;
+        });
+        
+        if (DEBUG) {
+          console.log(`Filtered ${filteredBookmarks.length} of ${bookmarks.length} bookmarks for user:`, currentUserEmail);
+        }
 
-        // Add divider (optional visual separation)
-        const dividerOpt = document.createElement("option");
-        dividerOpt.disabled = true;
-        dividerOpt.textContent = "──────────";
-        select.appendChild(dividerOpt);
+        // Add divider if there are any filtered bookmarks to show
+        const hasFilteredBookmarks = filteredBookmarks.length > 0;
+        if (hasFilteredBookmarks) {
+          const dividerOpt = document.createElement("option");
+          dividerOpt.disabled = true;
+          dividerOpt.textContent = "──────────";
+          select.appendChild(dividerOpt);
+        }
 
         suppressBookmarkChange = true; // 🔒 guard to prevent double triggering
 
-        bookmarks.forEach((bm) => {
+        filteredBookmarks.forEach((bm) => {
           const opt = document.createElement("option");
           opt.value = bm.id;
           opt.textContent = bm.name;
           if (String(bm.id) === String(selectedBookmarkId)) {
             opt.selected = true;
+            if (DEBUG) console.log(`Selected newly created bookmark: ${bm.name} (${bm.id})`);
           }
           select.appendChild(opt);
         });
@@ -748,12 +790,26 @@
             return;
           }
 
-          const filtered = loadedBookmarks.filter(
-            (b) =>
-              b.workbookUrlId === workbookUrlId &&
-              (b.userEmail === currentUser ||
-                b.sharedWith?.includes("team:Embed_Users"))
-          );
+          const filtered = loadedBookmarks.filter((b) => {
+            // Must match current workbook
+            if (b.workbookUrlId !== workbookUrlId) {
+              return false;
+            }
+            
+            // Apply same filtering logic as dropdown
+            if (currentUser === env.VIEW_EMAIL) {
+              // View user: only show bookmarks that are:
+              // 1. Shared with View User specifically, or
+              // 2. Shared with Embed_Users team
+              // Note: Empty sharedWith array means NOT shared (private to creator)
+              return b.sharedWith && 
+                     b.sharedWith.length > 0 && 
+                     (b.sharedWith.includes(env.VIEW_EMAIL) || 
+                      b.sharedWith.includes("team:Embed_Users"));
+            }
+            // For any other user (including Build), show all bookmarks
+            return true;
+          });
 
           if (DEBUG) {
             console.log("🔧 Rendering manage panel bookmarks:", filtered);
@@ -791,6 +847,12 @@
 
         // prevent stale data from previous workbook
         updateBookmarkButtonState();
+        
+        // If a specific bookmark was requested (e.g., newly created), load its embed
+        if (selectedBookmarkId && filteredBookmarks.some(bm => String(bm.id) === String(selectedBookmarkId))) {
+          if (DEBUG) console.log("Auto-loading embed for selected bookmark:", selectedBookmarkId);
+          loadEmbed(selectedBookmarkId);
+        }
 
         if (DEBUG) console.log("Bookmarks loaded:", bookmarks);
       } catch (err) {
@@ -799,7 +861,14 @@
       }
     }
 
-    // Load the Sigma embed for the selected workbook and user
+    // ============================================================================
+    // SIGMA EMBED FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Loads the Sigma embed for the selected workbook and user with optional bookmark
+     * @param {string} selectedBookmarkId - Optional bookmark ID to apply to the embed
+     */
     async function loadEmbed(selectedBookmarkId = "") {
       const selectedUser = document.getElementById("roleSelect").value;
       const workbookUrlId = window.selectedworkbookUrlId;
@@ -852,8 +921,8 @@
 
       // Now that exploreKey is defined, build the embed URL
       const embedUrl = await buildSigmaEmbedUrl({
-        orgSlug: "quick-starts-fundamentals",
-        workbookName: "Embed_API_QuickStart",
+        orgSlug: envConfig.ORG_SLUG || "quick-starts-fundamentals",
+        workbookName: envConfig.WORKBOOK_NAME || "Embed_API_QuickStart",
         workbookUrlId,
         bookmarkId: selectedBookmarkId,
         exploreKey,
@@ -872,6 +941,21 @@
               sub: selectedUser,
               bookmarkId: selectedBookmarkId || undefined,
               exploreKey,
+              hide_folder_navigation: env.HIDE_FOLDER_NAVIGATION,
+              hide_menu: env.HIDE_MENU,
+              menu_position: env.MENU_POSITION,
+              disable_auto_refresh: env.DISABLE_AUTO_REFRESH,
+              disable_mobile_view: env.DISABLE_MOBILE_VIEW,
+              hide_page_controls: env.HIDE_PAGE_CONTROLS,
+              hide_reload_button: env.HIDE_RELOAD_BUTTON,
+              hide_title: env.HIDE_TITLE,
+              hide_tooltip: env.HIDE_TOOLTIP,
+              hide_view_select: env.HIDE_VIEW_SELECT,
+              lng: env.LNG,
+              page_id: env.PAGE_ID,
+              responsive_height: env.RESPONSIVE_HEIGHT,
+              theme: env.THEME,
+              view_id: env.VIEW_ID,
             }),
           }
         );
@@ -879,7 +963,7 @@
         const data = await res.json(); // ✅ Only call once
         if (DEBUG) console.log("🔍 JWT fetch result:", data);
 
-        const { jwt } = data; // ✅ Extract after parsing
+        const { embedUrl, jwt } = data;
 
         const container = document.getElementById("embedContainer");
         if (!container) {
@@ -888,7 +972,7 @@
         }
 
         const iframe = document.createElement("iframe");
-        iframe.src = embedUrl; 
+        iframe.src = embedUrl;
         iframe.width = "100%";
         iframe.height = "800";
         iframe.style.border = "none";
@@ -897,15 +981,32 @@
         container.innerHTML = ""; // clear previous iframe
         container.appendChild(iframe);
 
+        // Update sidebar information panel
+        document.getElementById("debug-embed-url").textContent = embedUrl || "N/A";
+        document.getElementById("jwt-display").textContent = jwt;
+
+        // Decode and display JWT information
+        const decoded = decodeJwt(jwt);
+        const decodedBlock = document.getElementById("jwt-decoded");
+        if (decoded.error) {
+          decodedBlock.innerHTML = `<p style="color:red;">${decoded.error}</p>`;
+        } else {
+          decodedBlock.innerHTML = `
+            <h3>Decoded JWT Header:</h3>
+            <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
+            <h3>Decoded JWT Payload:</h3>
+            <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>`;
+        }
+
         if (DEBUG) console.log("✅ Embed iframe injected:", iframe.src);
       } catch (err) {
         console.error("❌ Failed to fetch JWT or load embed", err);
       }
     }
 
-    // =============================================================================
+    // ============================================================================
     // BOOKMARK MANAGEMENT FUNCTIONS
-    // =============================================================================
+    // ============================================================================
 
     // Load a saved bookmark into the form for editing
     async function loadBookmarkForEditing(bookmarkId) {
@@ -985,9 +1086,70 @@
       }
     }
 
-    // =============================================================================
+    /**
+     * Handles clearing all bookmarks for the selected workbook
+     * Shows warning dialog and deletes from both Sigma and local database
+     */
+    async function handleClearAllBookmarks() {
+      const workbookUrlId = window.selectedworkbookUrlId;
+      const workbookId = window.selectedworkbookId;
+      
+      if (!workbookUrlId || !workbookId) {
+        alert("Please select a workbook first.");
+        return;
+      }
+      
+      if (!currentUserEmail) {
+        alert("Please select a user first.");
+        return;
+      }
+      
+      // Show warning dialog
+      const confirmed = confirm(
+        "Caution, this will delete all bookmarks from the currently selected workbook from local storage and Sigma.\n\n" +
+        "This action cannot be undone. Are you sure you want to continue?"
+      );
+      
+      if (!confirmed) {
+        return;
+      }
+      
+      try {
+        if (DEBUG) console.log("Clearing all bookmarks for workbook:", workbookUrlId);
+        
+        // Call the clear all bookmarks API endpoint
+        const res = await fetch(`/api/bookmarks_db/clear-all`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workbookUrlId,
+            workbookId,
+            userEmail: currentUserEmail
+          }),
+        });
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`Failed to clear bookmarks: ${res.status} ${errorText}`);
+        }
+        
+        const result = await res.json();
+        if (DEBUG) console.log("Clear all bookmarks result:", result);
+        
+        alert(`Successfully deleted ${result.deletedCount || 0} bookmarks.`);
+        
+        // Reset the entire page to initial state
+        resetToInitialState();
+        
+      } catch (err) {
+        if (DEBUG) console.error("Error clearing all bookmarks:", err);
+        alert(`Error clearing bookmarks: ${err.message}`);
+      }
+    }
+
+    // ============================================================================
     // EVENT HANDLERS
-    // =============================================================================
+    // ============================================================================
 
     function handlePostMessage(event) {
       const { data } = event;
@@ -1121,6 +1283,17 @@
         alert("Please select a user before saving.");
         return;
       }
+      
+      if (!latestExploreKey) {
+        alert("Please interact with the embed to create an exploration before saving a bookmark.");
+        return;
+      }
+      
+      if (!window.selectedworkbookUrlId) {
+        alert("Please select a workbook first.");
+        return;
+      }
+      
       const userEmail = currentUserEmail;
 
       const payload = {
@@ -1157,11 +1330,13 @@
           resetBookmarkForm();
           document.getElementById("bookmarkPanel").classList.remove("open");
           updateBookmarkToggleLabel();
-          return loadBookmarks();
+          // Reload bookmarks and select the newly created one
+          const newBookmarkId = data.bookmarkId;
+          return loadBookmarks(newBookmarkId);
         })
         .catch((err) => {
-          console.error("Error saving bookmark:", err);
-          alert("Error saving bookmark.");
+          if (DEBUG) console.error("Error saving bookmark:", err);
+          alert(`Error saving bookmark: ${err.message}`);
         });
     }
 
@@ -1175,6 +1350,10 @@
       }
 
       if (selectedId === "") {
+        // Only reset form if user is actively interacting (not during programmatic changes)
+        if (!suppressBookmarkChange) {
+          resetBookmarkForm(); // Clear form when switching to original workbook
+        }
         loadEmbed(); // reload without bookmark
         return;
       }
@@ -1225,20 +1404,20 @@
         const exploreKey = msg.exploreKey;
 
         const embedUrl = buildSigmaEmbedUrl({
-          orgSlug: "quick-starts-fundamentals",
-          workbookName: "Embed_API_QuickStart",
-          workbookUrlId: "r0WXMPpc0YtQCTFR7CdDK",
+          orgSlug: envConfig.ORG_SLUG || "quick-starts-fundamentals",
+          workbookName: envConfig.WORKBOOK_NAME || "Embed_API_QuickStart",
+          workbookUrlId: window.selectedworkbookUrlId,
           bookmarkId,
-          exploreKey, // include temporarily for analysis
+          exploreKey,
         });
 
-        console.log("🔗 Generated Embed URL from new bookmark:", embedUrl);
+        if (DEBUG) console.log("🔗 Generated Embed URL from new bookmark:", embedUrl);
       }
     });
 
-    // =============================================================================
-    // INITIALIZATION
-    // =============================================================================
+    // ============================================================================
+    // APPLICATION INITIALIZATION
+    // ============================================================================
 
     // Setup all event listeners and default UI state for bookmark controls
     function initializeBookmarkControls() {
@@ -1284,14 +1463,36 @@
         form.addEventListener("submit", handleBookmarkFormSubmit);
       }
 
+      // Clear All Bookmarks button handler
+      const clearAllBtn = document.getElementById("clearAllBookmarks");
+      if (clearAllBtn) {
+        clearAllBtn.addEventListener("click", handleClearAllBookmarks);
+      }
+
       // Global postMessage listener for iframe events
       window.addEventListener("message", handlePostMessage);
 
+      // ============================================================================
+      // UI INTERACTIONS - TOGGLE INFO PANEL
+      // ============================================================================
+      const sidebar = document.querySelector(".sidebar");
+      const toggleButton = document.getElementById("collapse-info");
+      
+      if (toggleButton && sidebar) {
+        toggleButton.addEventListener("click", () => {
+          sidebar.classList.toggle("collapsed");
+          if (DEBUG) console.log("Toggle Info Panel clicked - collapsed:", sidebar.classList.contains("collapsed"));
+        });
+        if (DEBUG) console.log("Toggle Info Panel event listener attached");
+      } else {
+        if (DEBUG) console.warn("Toggle Info Panel setup failed - button:", !!toggleButton, "sidebar:", !!sidebar);
+      }
+
       if (DEBUG) console.log("Application initialized");
     }
-    // =============================================================================
+    // ============================================================================
     // MAIN EXECUTION
-    // =============================================================================
+    // ============================================================================
 
     // Wait for full DOM load before initializing app logic
     document.addEventListener("DOMContentLoaded", initialize);
