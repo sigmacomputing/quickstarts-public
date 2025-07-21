@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Page metadata and layout styles -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Bookmark Sharing with Local DB</title>
+    <link rel="stylesheet" href="/styles/main.css" />
+    <link rel="icon" href="data:," />
+
+    <style>
+      /* Specific styles for bookmark management functionality that extend main.css */
+
+      /* ---- Bookmark Toggle Button ---- */
+      #bookmarkToggle {
+        position: fixed;
+        top: 45px;
+        right: 12px;
+        z-index: 1100;
+        background: #333;
+        color: white;
+        border: none;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: background 0.2s ease, opacity 0.2s ease;
+      }
+
+      #bookmarkToggle:hover {
+        background: #555;
+      }
+
+      #bookmarkToggle:disabled {
+        opacity: 0.5;
+        pointer-events: none;
+        cursor: not-allowed;
+      }
+
+      /* ---- Bookmark Panel ---- */
+      #bookmarkPanel {
+        background-color: #f5f5f5;
+        padding: 24px;
+        border-left: 1px solid #ccc;
+        font-family: sans-serif;
+      }
+
+      #bookmarkPanel h2 {
+        margin-top: 0;
+        font-size: 20px;
+      }
+
+      #bookmarkPanel label {
+        display: block;
+        margin: 12px 0 4px;
+        font-weight: bold;
+        color: black;
+      }
+
+      #bookmarkPanel input[type="text"],
+      #bookmarkPanel textarea {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 8px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+
+      #bookmarkPanel .radio-group {
+        margin: 8px 0 16px;
+      }
+
+      #bookmarkPanel .checkbox-group {
+        margin-bottom: 16px;
+      }
+
+      #bookmarkPanel button[type="submit"] {
+        width: 100%;
+        padding: 10px;
+        background-color: #444;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      #bookmarkPanel button[type="submit"]:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+
+      #bookmarkPanel .warning {
+        color: red;
+        font-weight: bold;
+        margin-bottom: 12px;
+      }
+
+      /* ---- Slide Panel ---- */
+      .slide-panel {
+        position: fixed;
+        top: 0;
+        right: -800px;
+        width: 400px;
+        background-color: white;
+        box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
+        transition: right 0.3s ease-in-out;
+        z-index: 1000;
+        padding: 24px;
+        overflow-y: auto;
+        border-left: 1px solid #ccc;
+      }
+
+      .slide-panel.open {
+        right: 0;
+      }
+
+      .close-btn {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        font-size: 20px;
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+
+      /* Hide fixed buttons when bookmark panel is open */
+      .slide-panel.open ~ #bookmarkToggle,
+      .slide-panel.open ~ #clearAllBookmarks {
+        display: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- === Top bar === -->
+    <header class="layout-topbar" style="background-color: #f57c00">
+      <!-- Navigation and title -->
+      <div style="display: flex; align-items: center; gap: 0.5rem">
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+        <span class="header-title" style="font-weight: bold"
+          >API Bookmark Sharing with Local DB QuickStart</span
+        >
+      </div>
+
+      <!-- Combined Control Panel -->
+      <div
+        class="control-panel"
+        style="display: flex; flex-wrap: wrap; gap: 24px; margin-top: 10px"
+      >
+        <!-- User Select -->
+        <div class="control-group">
+          <label for="roleSelect">Current User:</label>
+          <select id="roleSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a user
+            </option>
+          </select>
+        </div>
+
+        <!-- Workbook Select -->
+        <div class="control-group">
+          <label for="workbookSelect">Workbook:</label>
+          <select id="workbookSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a workbook
+            </option>
+          </select>
+        </div>
+
+        <!-- Bookmark Dropdown (Always Visible) -->
+        <div class="control-group">
+          <label for="bookmarkSelect"><strong>Saved Bookmark:</strong></label>
+          <select id="bookmarkSelect" style="min-width: 180px" disabled>
+            <option value="" selected style="color: gray; font-style: italic">
+              Original Workbook
+            </option>
+          </select>
+        </div>
+
+        <!-- Bookmark Name + Create Button (Initially Hidden) -->
+        <div id="bookmarkControls" class="control-group" style="display: none">
+          <label for="bookmarkName"><strong>Bookmark Name:</strong></label>
+          <input id="bookmarkName" type="text" placeholder="Enter name…" />
+          <button id="create-bookmark-btn">Create Bookmark</button>
+        </div>
+      </div>
+
+      <!-- Toggle info panel and README link (own row, aligned left) -->
+      <div style="white-space: nowrap;">
+        <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
+        <button onclick="window.open('/api-embed-bookmarks_db/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+      </div>
+    </header>
+
+    <!-- === Main Layout === -->
+    <main class="main">
+      <!-- === Sidebar Info Panel === -->
+      <aside class="sidebar">
+        <h2>Information:</h2>
+        <p>
+          The embedded content should render in the iframe on the right, based
+          on your .env file configuration.
+        </p>
+        <code id="debug-embed-url">N/A</code>
+
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <p>Loading...</p>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+      </aside>
+
+      <!-- === iFrame === -->
+      <div id="embedContainer" class="content"></div>
+    </main>
+    <!-- Toggle Button -->
+    <button id="bookmarkToggle">Manage Bookmarks</button>
+    
+    <!-- Clear All Bookmarks Button -->
+    <button id="clearAllBookmarks" style="
+      position: fixed;
+      top: 90px;
+      right: 12px;
+      z-index: 1100;
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      transition: background 0.2s ease;
+    " onmouseover="this.style.background='#c82333'" onmouseout="this.style.background='#dc3545'">
+      Clear All Bookmarks
+    </button>
+
+    <!-- Slide-out Bookmark Panel -->
+    <div id="bookmarkPanel" class="slide-panel">
+      <button id="closePanelBtn" class="close-btn"></button>
+
+      <form id="bookmarkForm">
+        <h2>Save Bookmark</h2>
+        <div class="warning" id="explore-warning">
+          <br />
+          ⚠️ Create an exploration before saving a bookmark!
+        </div>
+        <label for="bookmarkName">Bookmark Name:</label>
+
+        <input type="text" name="bookmarkName" id="bookmarkName" required />
+
+        <label for="descr">Description:</label>
+        <textarea name="descr" id="descr" rows="2"></textarea>
+
+        <label>Share with:</label>
+        <div class="radio-group">
+          <label
+            ><input
+              type="radio"
+              name="sharedWith"
+              value="view.embed@example.com"
+            />
+            View User</label
+          >
+          <label
+            ><input type="radio" name="sharedWith" value="team:Embed_Users" />
+            Embed_Users Team</label
+          >
+        </div>
+        <hr />
+        <div class="checkbox-group">
+          <label
+            ><input type="checkbox" name="isShared" checked disabled />Shared
+            with others</label
+          >
+        </div>
+        <button type="submit">Create New</button>
+
+        <!-- Delete Button (initially hidden) -->
+        <button
+          id="delete-bookmark-btn"
+          type="button"
+          style="
+            margin-top: 12px;
+            display: none;
+            background-color: #b00020;
+            color: white;
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+          "
+        >
+          Delete Bookmark
+        </button>
+      </form>
+    </div>
+
+    <!-- === Footer === -->
+    <footer class="layout-footer">Sigma &copy; 2025</footer>
+  </body>
+  <script>
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+    let DEBUG = false;
+    let env = {};
+    let envConfig = {};
+    let latestExploreKey = null;
+    let currentMode = "view";
+    let pendingBookmarkKey = null;
+    let loadedBookmarks = [];
+    let suppressBookmarkChange = false;
+    let currentWorkbookId = null;
+
+    // ============================================================================
+    // ENVIRONMENT & CONFIGURATION
+    // ============================================================================
+    
+    /**
+     * Loads environment configuration from the server
+     * Sets DEBUG flag and populates global env and envConfig objects
+     */
+    async function loadEnvConfig() {
+      if (Object.keys(envConfig).length > 0) return; // already loaded
+
+      try {
+        const res = await fetch("/env.json");
+        envConfig = await res.json();
+        env = envConfig; // Keep both for compatibility
+        DEBUG = String(envConfig.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("✅ Loaded envConfig:", envConfig);
+      } catch (err) {
+        if (DEBUG) console.warn("⚠️ Failed to load env.json:", err);
+      }
+    }
+
+    /**
+     * Early DEBUG mode initialization
+     * This ensures DEBUG is available immediately for early logging
+     */
+    (async () => {
+      try {
+        const res = await fetch("/env.json");
+        const envData = await res.json();
+        DEBUG = String(envData.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode initialized early");
+      } catch (err) {
+        console.warn("Failed to initialize DEBUG mode:", err.message);
+      }
+    })();
+
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
+
+    /**
+     * Consolidates environment-based embed parameters with current mode overrides
+     * @param {string} currentMode - Current user mode ("build" or "view")
+     * @returns {object} Object containing all embed parameters
+     */
+    function getEmbedParamsFromEnv(currentMode) {
+      const isBuild = currentMode === "build";
+
+      return {
+        ":embed": "true",
+        ":bookmark": undefined, // Set dynamically in buildSigmaEmbedUrl
+        ":explore": undefined, // Optional
+        ":disable_auto_refresh": envConfig.DISABLE_AUTO_REFRESH || "false",
+        ":disable_mobile_view": envConfig.DISABLE_MOBILE_VIEW || "false",
+        ":hide_folder_navigation": envConfig.HIDE_FOLDER_NAVIGATION || "true",
+        ":hide_menu": isBuild ? "false" : envConfig.HIDE_MENU || "true",
+        ":hide_page_controls": envConfig.HIDE_PAGE_CONTROLS || "false",
+        ":hide_reload_button": envConfig.HIDE_RELOAD_BUTTON || "false",
+        ":hide_title": envConfig.HIDE_TITLE || "false",
+        ":hide_tooltip": envConfig.HIDE_TOOLTIP || "false",
+        ":hide_view_select": envConfig.HIDE_VIEW_SELECT || "false",
+        ":lng": envConfig.LNG || "English",
+        ":menu_position": envConfig.MENU_POSITION || "none",
+        ":responsive_height": envConfig.RESPONSIVE_HEIGHT || "false",
+        ":theme": envConfig.THEME || "Lite",
+        ":page_id": envConfig.PAGE_ID || "",
+        ":view_id": envConfig.VIEW_ID || "",
+      };
+    }
+
+    /**
+     * Decodes a JWT token into header and payload components
+     * @param {string} token - JWT token string
+     * @returns {object} Object containing header and payload or error
+     */
+    function decodeJwt(token) {
+      try {
+        const [headerB64, payloadB64] = token.split(".");
+        const decodePart = (str) => {
+          const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+          const padded = base64 + "===".slice((base64.length + 3) % 4);
+          return JSON.parse(atob(padded));
+        };
+        return {
+          header: decodePart(headerB64),
+          payload: decodePart(payloadB64),
+        };
+      } catch (err) {
+        console.warn("JWT decode error:", err);
+        return { error: "Failed to decode JWT." };
+      }
+    }
+
+    // Reset the bookmark form UI and internal state
+    function resetBookmarkForm() {
+      const form = document.getElementById("bookmarkForm");
+      if (!form) return;
+
+      form.reset();
+      form.removeAttribute("data-bookmark-id");
+      form.querySelector("button[type='submit']").disabled = true;
+      document.getElementById("delete-bookmark-btn").style.display = "none";
+    }
+
+    // (Optional) Placeholder for enabling/disabling UI controls as needed
+    function toggleBookmarkControls(enabled) {
+      // Implement UI enable/disable behavior here if needed
+    }
+    
+    /**
+     * Resets the entire page to its initial load state
+     * Forces user to reselect all dropdown values
+     */
+    function resetToInitialState() {
+      if (DEBUG) console.log("Resetting page to initial state");
+      
+      // Reset user selection
+      const userSelect = document.getElementById("roleSelect");
+      if (userSelect) {
+        userSelect.selectedIndex = 0; // Select "Select a user" option
+        currentUserEmail = null;
+      }
+      
+      // Reset workbook selection
+      const workbookSelect = document.getElementById("workbookSelect");
+      if (workbookSelect) {
+        workbookSelect.selectedIndex = 0; // Select "Select a workbook" option
+        window.selectedworkbookUrlId = null;
+        window.selectedworkbookId = null;
+      }
+      
+      // Reset bookmark selection
+      const bookmarkSelect = document.getElementById("bookmarkSelect");
+      if (bookmarkSelect) {
+        bookmarkSelect.innerHTML = `<option value="" selected style="color:gray;font-style:italic">Select a workbook first</option>`;
+        bookmarkSelect.disabled = true;
+      }
+      
+      // Clear iframe
+      const embedContainer = document.getElementById("embedContainer");
+      if (embedContainer) {
+        embedContainer.innerHTML = "";
+      }
+      
+      // Reset sidebar info panel
+      document.getElementById("debug-embed-url").textContent = "N/A";
+      document.getElementById("jwt-display").textContent = "Loading JWT...";
+      document.getElementById("jwt-decoded").innerHTML = "<p>Loading...</p>";
+      
+      // Reset global state
+      latestExploreKey = null;
+      loadedBookmarks = [];
+      currentMode = "view";
+      
+      // Reset bookmark form
+      resetBookmarkForm();
+      
+      // Close bookmark panel if open
+      const bookmarkPanel = document.getElementById("bookmarkPanel");
+      if (bookmarkPanel && bookmarkPanel.classList.contains("open")) {
+        bookmarkPanel.classList.remove("open");
+        updateBookmarkToggleLabel();
+      }
+    }
+
+    //  Set Manage Bookmarks label upon save and slider closing
+    function updateBookmarkButtonState() {
+      const form = document.getElementById("bookmarkForm");
+      const bookmarkToggle = document.getElementById("bookmarkToggle");
+      const saveBtn = form?.querySelector("button[type='submit']");
+      const nameInput = form?.querySelector("input[name='bookmarkName']");
+
+      if (!form || !bookmarkToggle || !saveBtn || !nameInput) return;
+
+      // ✅ Guard: if we are loading a bookmark for editing, avoid updating state mid-load
+      if (form.dataset.bookmarkId && nameInput.value.trim() === "") {
+        if (DEBUG)
+          console.log(
+            "⏳ Skipping button state update — bookmark form still populating..."
+          );
+        return;
+      }
+
+      const hasName = nameInput.value.trim().length > 0;
+      const hasExploreKey = latestExploreKey !== null;
+
+      // Enable/disable toggle button
+      if (hasExploreKey) {
+        bookmarkToggle.disabled = false;
+        bookmarkToggle.style.opacity = "1";
+        bookmarkToggle.style.cursor = "pointer";
+        bookmarkToggle.style.pointerEvents = "";
+      } else {
+        bookmarkToggle.disabled = true;
+        bookmarkToggle.style.opacity = "0.5";
+        bookmarkToggle.style.cursor = "not-allowed";
+      }
+
+      // Enable/disable Save button
+      saveBtn.disabled = !(hasName && hasExploreKey);
+      saveBtn.style.opacity = saveBtn.disabled ? "0.5" : "1";
+      saveBtn.style.pointerEvents = saveBtn.disabled ? "none" : "";
+      saveBtn.style.cursor = saveBtn.disabled ? "not-allowed" : "pointer";
+
+      if (DEBUG) {
+        console.log("🔎 updateBookmarkButtonState triggered");
+        console.log("  ➤ latestExploreKey =", latestExploreKey);
+        console.log("  ➤ bookmark name =", nameInput.value.trim());
+        console.log(
+          "  ➤ Save button should be:",
+          hasName && hasExploreKey ? "ENABLED" : "DISABLED"
+        );
+      }
+    }
+
+    // Build the Sigma embed URL based on provided parameters (done here only for logging and debugging reasons)
+    async function buildSigmaEmbedUrl({
+      orgSlug,
+      workbookName,
+      workbookUrlId,
+      bookmarkId,
+      exploreKey,
+      currentMode = "view",
+    }) {
+      await loadEnvConfig();
+
+      const embedUrlBase = envConfig.EMBED_URL_BASE || "https://app.sigmacomputing.com";
+      const base = `${embedUrlBase}/${orgSlug}/workbook/${workbookName}-${workbookUrlId}`;
+      const params = new URLSearchParams();
+
+      params.set(":embed", "true");
+      if (bookmarkId) params.set(":bookmark", bookmarkId);
+      if (exploreKey) params.set(":explore", exploreKey);
+
+      // Set embed parameters from environment config
+      params.set(
+        ":hide_folder_navigation",
+        envConfig.HIDE_FOLDER_NAVIGATION || "true"
+      );
+      params.set(":hide_menu", envConfig.HIDE_MENU || "true");
+      params.set(":menu_position", envConfig.MENU_POSITION || "none");
+      params.set(":theme", envConfig.THEME || "Lite");
+      params.set(":lng", envConfig.LNG || "English");
+
+      return `${base}?${params.toString()}`;
+    }
+
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
+
+    /**
+     * Loads environment configuration from the server (legacy function)
+     * @deprecated Use loadEnvConfig() instead
+     */
+    async function loadEnv() {
+      try {
+        const res = await fetch("/env.json");
+        env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode enabled via /env.json");
+      } catch (err) {
+        if (DEBUG) console.warn("Failed to load /env.json config:", err.message);
+      }
+    }
+
+    /**
+     * Populates the user role dropdown with View and Build users from environment config
+     * Sets up event handler to update currentMode when user selection changes
+     */
+    let currentUserEmail = null; // Global variable to track selected user
+
+    async function loadUserOptions() {
+      const select = document.getElementById("roleSelect");
+      if (!select) return;
+
+      select.innerHTML = `
+                <option value="" disabled selected style="color:gray;font-style:italic">Select a user</option>
+                <option value="${env.VIEW_EMAIL}" data-mode="view">${env.VIEW_EMAIL}</option>
+                <option value="${env.BUILD_EMAIL}" data-mode="build">${env.BUILD_EMAIL}</option>
+              `;
+
+      select.disabled = false;
+
+      select.addEventListener("change", (e) => {
+        const selected = e.target.selectedOptions[0];
+        currentMode = selected.dataset.mode || "view";
+        currentUserEmail = selected.value; // <-- Store selected email globally
+
+        const selectedWorkbook =
+          document.getElementById("workbookSelect")?.value;
+        if (selectedWorkbook) {
+          window.selectedworkbookUrlId = selectedWorkbook;
+          loadEmbed();
+        }
+      });
+    }
+
+    // Fetch the list of available workbooks from the API
+    async function loadWorkbooks() {
+      const select = document.getElementById("workbookSelect");
+      if (!select) return;
+
+      try {
+        const res = await fetch("/api/workbooks");
+        const data = await res.json();
+        const workbooks = data.workbooks || [];
+
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select a workbook</option>`;
+
+        workbooks.forEach((wb) => {
+          const opt = document.createElement("option");
+          opt.value = wb.url.split("/").pop();
+          opt.textContent = wb.name;
+          opt.dataset.workbookid = wb.id;
+          select.appendChild(opt);
+        });
+        select.addEventListener("change", async (e) => {
+          const selectedOption = e.target.selectedOptions[0];
+          window.selectedworkbookUrlId = e.target.value;
+          window.selectedworkbookId =
+            selectedOption?.dataset.workbookid || null;
+          await loadBookmarks(); // Load bookmarks for the selected workbook
+          loadEmbed();
+        });
+      } catch (err) {
+        console.error("Failed to load workbooks:", err);
+      }
+    }
+
+    // Fetch saved bookmarks from local DB and populate the dropdown
+    async function loadBookmarks(selectedBookmarkId = "") {
+      const select = document.getElementById("bookmarkSelect");
+      const toggleBtn = document.getElementById("bookmarkToggle");
+
+      try {
+        const workbookUrlId = window.selectedworkbookUrlId;
+        
+        if (DEBUG) {
+          console.log("loadBookmarks() called with workbookUrlId:", workbookUrlId);
+          console.log("API URL will be:", `/api/bookmarks_db?workbookUrlId=${encodeURIComponent(workbookUrlId || '')}`);
+        }
+        
+        if (!workbookUrlId) {
+          if (DEBUG) console.warn("No workbook selected");
+          return;
+        }
+
+        const res = await fetch(
+          `/api/bookmarks_db?workbookUrlId=${encodeURIComponent(workbookUrlId)}`
+        );
+
+        const data = await res.json();
+        const bookmarks = data.bookmarks || [];
+        loadedBookmarks = bookmarks;
+        
+        if (DEBUG) {
+          console.log("API response data:", data);
+          console.log(`Found ${bookmarks.length} bookmarks for workbook:`, workbookUrlId);
+          bookmarks.forEach(bm => console.log(`  - Bookmark: ${bm.name} (ID: ${bm.id})`));
+        }
+
+        // Reset dropdown
+        select.innerHTML = "";
+
+        // Always add "Original Workbook" option first
+        const defaultOpt = document.createElement("option");
+        defaultOpt.value = "";
+        defaultOpt.textContent = "Original Workbook";
+        if (!selectedBookmarkId) defaultOpt.selected = true;
+        select.appendChild(defaultOpt);
+        
+        // Handle empty bookmarks - but still show Original Workbook
+        if (bookmarks.length === 0) {
+          if (DEBUG) console.log("No bookmarks returned for selected workbook - showing only Original Workbook");
+          select.disabled = false; // Enable so user can select Original Workbook
+          toggleBookmarkControls(false);
+          return;
+        }
+
+        // Populate bookmarks dropdown
+        if (DEBUG) console.log(`Loaded ${bookmarks.length} bookmarks`);
+
+        select.disabled = false;
+
+        // Filter bookmarks based on current user permissions FIRST
+        const filteredBookmarks = bookmarks.filter((bm) => {
+          // Build user can see all bookmarks (but we removed Build User from UI)
+          // View user can only see bookmarks shared with them or Embed_Users team
+          if (currentUserEmail === env.VIEW_EMAIL) {
+            // View user: only show bookmarks that are:
+            // 1. Shared with View User specifically, or
+            // 2. Shared with Embed_Users team
+            // Note: Empty sharedWith array means NOT shared (private to creator)
+            const canView = bm.sharedWith && 
+                           bm.sharedWith.length > 0 && 
+                           (bm.sharedWith.includes(env.VIEW_EMAIL) || 
+                            bm.sharedWith.includes("team:Embed_Users"));
+            
+            if (DEBUG) {
+              console.log(`Bookmark "${bm.name}" (ID: ${bm.id}):`, {
+                sharedWith: bm.sharedWith,
+                viewEmail: env.VIEW_EMAIL,
+                currentUser: currentUserEmail,
+                canView: canView
+              });
+            }
+            
+            return canView;
+          }
+          // For any other user (including Build), show all bookmarks
+          return true;
+        });
+        
+        if (DEBUG) {
+          console.log(`Filtered ${filteredBookmarks.length} of ${bookmarks.length} bookmarks for user:`, currentUserEmail);
+        }
+
+        // Add divider if there are any filtered bookmarks to show
+        const hasFilteredBookmarks = filteredBookmarks.length > 0;
+        if (hasFilteredBookmarks) {
+          const dividerOpt = document.createElement("option");
+          dividerOpt.disabled = true;
+          dividerOpt.textContent = "──────────";
+          select.appendChild(dividerOpt);
+        }
+
+        suppressBookmarkChange = true; // 🔒 guard to prevent double triggering
+
+        filteredBookmarks.forEach((bm) => {
+          const opt = document.createElement("option");
+          opt.value = bm.id;
+          opt.textContent = bm.name;
+          if (String(bm.id) === String(selectedBookmarkId)) {
+            opt.selected = true;
+            if (DEBUG) console.log(`Selected newly created bookmark: ${bm.name} (${bm.id})`);
+          }
+          select.appendChild(opt);
+        });
+
+        // Enable bookmark controls if we have bookmarks
+        function renderManageBookmarksPanel() {
+          const panel = document.getElementById("manageBookmarksList"); // Your container
+          if (!panel) {
+            console.warn("Missing #manageBookmarksList container");
+            return;
+          }
+
+          panel.innerHTML = "";
+
+          const workbookUrlId = window.selectedworkbookUrlId;
+          const currentUser = window.currentUserEmail || currentUserEmail; // depends on global
+          if (!workbookUrlId || !loadedBookmarks?.length) {
+            console.warn("Missing required data to render manage panel");
+            return;
+          }
+
+          const filtered = loadedBookmarks.filter((b) => {
+            // Must match current workbook
+            if (b.workbookUrlId !== workbookUrlId) {
+              return false;
+            }
+            
+            // Apply same filtering logic as dropdown
+            if (currentUser === env.VIEW_EMAIL) {
+              // View user: only show bookmarks that are:
+              // 1. Shared with View User specifically, or
+              // 2. Shared with Embed_Users team
+              // Note: Empty sharedWith array means NOT shared (private to creator)
+              return b.sharedWith && 
+                     b.sharedWith.length > 0 && 
+                     (b.sharedWith.includes(env.VIEW_EMAIL) || 
+                      b.sharedWith.includes("team:Embed_Users"));
+            }
+            // For any other user (including Build), show all bookmarks
+            return true;
+          });
+
+          if (DEBUG) {
+            console.log("🔧 Rendering manage panel bookmarks:", filtered);
+          }
+
+          if (filtered.length === 0) {
+            panel.innerHTML = "<p><i>No bookmarks available to manage</i></p>";
+            return;
+          }
+
+          filtered.forEach((bm) => {
+            const row = document.createElement("div");
+            row.className = "bookmark-row";
+            row.textContent = bm.name || "(Untitled)";
+            row.onclick = ((id) => () => {
+              console.log("🟢 Loading bookmark from panel row:", id);
+              loadBookmarkForEditing(id);
+              updateBookmarkToggleLabel();
+            })(bm.id);
+
+            panel.appendChild(row);
+          });
+        }
+
+        // Explicitly set select.value — avoids subtle mismatch
+        select.value = selectedBookmarkId || "";
+
+        setTimeout(() => {
+          suppressBookmarkChange = false; // 🔓 unlock shortly after DOM updates
+        }, 100);
+
+        // Attach change event listener AFTER loading options
+        select.removeEventListener("change", handleBookmarkSelectionForEmbed);
+        select.addEventListener("change", handleBookmarkSelectionForEmbed);
+
+        // prevent stale data from previous workbook
+        updateBookmarkButtonState();
+        
+        // If a specific bookmark was requested (e.g., newly created), load its embed
+        if (selectedBookmarkId && filteredBookmarks.some(bm => String(bm.id) === String(selectedBookmarkId))) {
+          if (DEBUG) console.log("Auto-loading embed for selected bookmark:", selectedBookmarkId);
+          loadEmbed(selectedBookmarkId);
+        }
+
+        if (DEBUG) console.log("Bookmarks loaded:", bookmarks);
+      } catch (err) {
+        console.error("Failed to load bookmarks:", err);
+        toggleBookmarkControls(false);
+      }
+    }
+
+    // ============================================================================
+    // SIGMA EMBED FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Loads the Sigma embed for the selected workbook and user with optional bookmark
+     * @param {string} selectedBookmarkId - Optional bookmark ID to apply to the embed
+     */
+    async function loadEmbed(selectedBookmarkId = "") {
+      const selectedUser = document.getElementById("roleSelect").value;
+      const workbookUrlId = window.selectedworkbookUrlId;
+      const embedType = "workbook";
+
+      if (DEBUG) {
+        console.log(
+          "selectedBookmarkId passed into loadEmbed:",
+          selectedBookmarkId
+        );
+        console.log(
+          "📄 Loaded bookmark IDs:",
+          loadedBookmarks?.map((b) => b.id)
+        );
+      }
+
+      if (!selectedUser || !workbookUrlId) {
+        console.warn("Embed not loaded — missing required fields.");
+        return;
+      }
+
+      // 🔍 Look up exploreKey from loadedBookmarks if a bookmark is selected
+      let exploreKey = undefined;
+      if (selectedBookmarkId && Array.isArray(loadedBookmarks)) {
+        const found = loadedBookmarks.find(
+          (bm) => String(bm.id).trim() === String(selectedBookmarkId).trim()
+        );
+
+        if (DEBUG) {
+          console.log("🔍 Trying to find bookmarkId:", selectedBookmarkId);
+          console.log(
+            "📄 All loaded bookmark IDs:",
+            loadedBookmarks.map((b) => b.id)
+          );
+        }
+
+        if (found) {
+          exploreKey = found.exploreKey;
+          latestExploreKey = exploreKey;
+          updateBookmarkButtonState();
+
+          const form = document.getElementById("bookmarkForm");
+          if (form) {
+            form.dataset.bookmarkId = found.id;
+          }
+
+          await loadBookmarkForEditing(found.id);
+        }
+      }
+
+      // Now that exploreKey is defined, build the embed URL
+      const embedUrl = await buildSigmaEmbedUrl({
+        orgSlug: envConfig.ORG_SLUG || "quick-starts-fundamentals",
+        workbookName: envConfig.WORKBOOK_NAME || "Embed_API_QuickStart",
+        workbookUrlId,
+        bookmarkId: selectedBookmarkId,
+        exploreKey,
+        currentMode,
+      });
+
+      try {
+        const res = await fetch(
+          `/api/jwt/api-embed-bookmarks_db?workbookUrlId=${encodeURIComponent(
+            workbookUrlId
+          )}&embedType=${embedType}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sub: selectedUser,
+              bookmarkId: selectedBookmarkId || undefined,
+              exploreKey,
+              hide_folder_navigation: env.HIDE_FOLDER_NAVIGATION,
+              hide_menu: env.HIDE_MENU,
+              menu_position: env.MENU_POSITION,
+              disable_auto_refresh: env.DISABLE_AUTO_REFRESH,
+              disable_mobile_view: env.DISABLE_MOBILE_VIEW,
+              hide_page_controls: env.HIDE_PAGE_CONTROLS,
+              hide_reload_button: env.HIDE_RELOAD_BUTTON,
+              hide_title: env.HIDE_TITLE,
+              hide_tooltip: env.HIDE_TOOLTIP,
+              hide_view_select: env.HIDE_VIEW_SELECT,
+              lng: env.LNG,
+              page_id: env.PAGE_ID,
+              responsive_height: env.RESPONSIVE_HEIGHT,
+              theme: env.THEME,
+              view_id: env.VIEW_ID,
+            }),
+          }
+        );
+
+        const data = await res.json(); // ✅ Only call once
+        if (DEBUG) console.log("🔍 JWT fetch result:", data);
+
+        const { embedUrl, jwt } = data;
+
+        const container = document.getElementById("embedContainer");
+        if (!container) {
+          console.error("Embed container not found.");
+          return;
+        }
+
+        const iframe = document.createElement("iframe");
+        iframe.src = embedUrl;
+        iframe.width = "100%";
+        iframe.height = "800";
+        iframe.style.border = "none";
+        iframe.setAttribute("allowfullscreen", "true");
+
+        container.innerHTML = ""; // clear previous iframe
+        container.appendChild(iframe);
+
+        // Update sidebar information panel
+        document.getElementById("debug-embed-url").textContent = embedUrl || "N/A";
+        document.getElementById("jwt-display").textContent = jwt;
+
+        // Decode and display JWT information
+        const decoded = decodeJwt(jwt);
+        const decodedBlock = document.getElementById("jwt-decoded");
+        if (decoded.error) {
+          decodedBlock.innerHTML = `<p style="color:red;">${decoded.error}</p>`;
+        } else {
+          decodedBlock.innerHTML = `
+            <h3>Decoded JWT Header:</h3>
+            <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
+            <h3>Decoded JWT Payload:</h3>
+            <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>`;
+        }
+
+        if (DEBUG) console.log("✅ Embed iframe injected:", iframe.src);
+      } catch (err) {
+        console.error("❌ Failed to fetch JWT or load embed", err);
+      }
+    }
+
+    // ============================================================================
+    // BOOKMARK MANAGEMENT FUNCTIONS
+    // ============================================================================
+
+    // Load a saved bookmark into the form for editing
+    async function loadBookmarkForEditing(bookmarkId) {
+      console.log("🔧 loadBookmarkForEditing called with:", bookmarkId);
+      console.trace("📌 loadBookmarkForEditing call trace");
+      try {
+        const res = await fetch(`/api/bookmarks_db?bookmarkId=${bookmarkId}`);
+        const { bookmark } = await res.json();
+
+        if (!bookmark) {
+          alert(
+            "Bookmark not found - Load a saved bookmark into the form for editing"
+          );
+          return;
+        }
+
+        const form = document.getElementById("bookmarkForm");
+        if (!form) return;
+
+        form.elements["bookmarkName"].value = bookmark.name || "";
+        form.elements["descr"].value = bookmark.descr || "";
+        form.elements["isDefault"].checked = !!bookmark.isDefault;
+
+        const radios = form.querySelectorAll("input[name='sharedWith']");
+        radios.forEach((r) => {
+          r.checked = r.value === bookmark.sharedWith?.[0];
+        });
+
+        form.dataset.bookmarkId = bookmarkId;
+
+        document.getElementById("delete-bookmark-btn").style.display = "block";
+      } catch (err) {
+        console.error("Failed to load bookmark:", err);
+      }
+    }
+
+    async function deleteBookmark() {
+      const form = document.getElementById("bookmarkForm");
+      const bookmarkId = form.dataset.bookmarkId;
+      const workbookId = window.selectedworkbookId;
+
+      if (!bookmarkId || !workbookId) {
+        alert("Missing bookmark ID or workbook reference.");
+        return;
+      }
+
+      if (!currentUserEmail) {
+        alert("Please select a user before deleting.");
+        return;
+      }
+
+      if (!confirm("Are you sure you want to delete this bookmark?")) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/bookmarks_db/bookmarks/${bookmarkId}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workbookId,
+            userEmail: currentUserEmail,
+          }),
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        alert("Bookmark deleted.");
+        resetBookmarkForm();
+        document.getElementById("bookmarkPanel").classList.remove("open");
+        updateBookmarkToggleLabel();
+        renderManageBookmarksPanel();
+        await loadBookmarks();
+      } catch (err) {
+        console.error("Failed to delete bookmark - Front End Function", err);
+        alert("Failed to delete bookmark - Front End Function");
+      }
+    }
+
+    /**
+     * Handles clearing all bookmarks for the selected workbook
+     * Shows warning dialog and deletes from both Sigma and local database
+     */
+    async function handleClearAllBookmarks() {
+      const workbookUrlId = window.selectedworkbookUrlId;
+      const workbookId = window.selectedworkbookId;
+      
+      if (!workbookUrlId || !workbookId) {
+        alert("Please select a workbook first.");
+        return;
+      }
+      
+      if (!currentUserEmail) {
+        alert("Please select a user first.");
+        return;
+      }
+      
+      // Show warning dialog
+      const confirmed = confirm(
+        "Caution, this will delete all bookmarks from the currently selected workbook from local storage and Sigma.\n\n" +
+        "This action cannot be undone. Are you sure you want to continue?"
+      );
+      
+      if (!confirmed) {
+        return;
+      }
+      
+      try {
+        if (DEBUG) console.log("Clearing all bookmarks for workbook:", workbookUrlId);
+        
+        // Call the clear all bookmarks API endpoint
+        const res = await fetch(`/api/bookmarks_db/clear-all`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workbookUrlId,
+            workbookId,
+            userEmail: currentUserEmail
+          }),
+        });
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`Failed to clear bookmarks: ${res.status} ${errorText}`);
+        }
+        
+        const result = await res.json();
+        if (DEBUG) console.log("Clear all bookmarks result:", result);
+        
+        alert(`Successfully deleted ${result.deletedCount || 0} bookmarks.`);
+        
+        // Reset the entire page to initial state
+        resetToInitialState();
+        
+      } catch (err) {
+        if (DEBUG) console.error("Error clearing all bookmarks:", err);
+        alert(`Error clearing bookmarks: ${err.message}`);
+      }
+    }
+
+    // ============================================================================
+    // EVENT HANDLERS
+    // ============================================================================
+
+    function handlePostMessage(event) {
+      const { data } = event;
+      if (!data || typeof data !== "object") return;
+
+      if (DEBUG) console.log("Received message:", data);
+
+      // Case 1: embed has generated a new exploreKey
+      const isExploreCreated =
+        data.eventName === "exploration:created" ||
+        data.type === "exploreCreated" ||
+        data.type === "workbook:exploreKey:onchange";
+
+      if (isExploreCreated) {
+        latestExploreKey = data.payload?.exploreKey || data.exploreKey;
+
+        if (latestExploreKey) {
+          if (DEBUG)
+            console.log(
+              "📌 exploreKey received (exploreCreated):",
+              latestExploreKey
+            );
+          console.log("🔎 updateBookmarkButtonState triggered");
+          console.log("  ➤ latestExploreKey =", latestExploreKey);
+          console.log(
+            "  ➤ bookmark name =",
+            document.getElementById("bookmarkName")?.value
+          );
+          updateBookmarkButtonState();
+        }
+      }
+
+      // ✅ Case 2: user or embed loads a saved bookmark (Sigma sends bookmarkId)
+      if (data.type === "workbook:bookmark:onchange") {
+        // We don’t get exploreKey here, but we can enable buttons if needed
+        if (DEBUG)
+          console.log(
+            "📑 Bookmark changed:",
+            data.bookmarkName,
+            data.bookmarkId
+          );
+        // Optionally trigger re-check of UI state
+        updateBookmarkButtonState();
+      }
+    }
+
+    // Handle text input into the bookmark name field to update save button state
+    function handleBookmarkNameInput() {
+      updateBookmarkButtonState();
+    }
+
+    // Toggle open/close state of the bookmark panel and reset form if closing
+    function handleBookmarkToggle(preloadBookmarkId = null) {
+      const panel = document.getElementById("bookmarkPanel");
+      const isOpen = panel.classList.contains("open");
+
+      if (isOpen) {
+        panel.classList.remove("open");
+        resetBookmarkForm();
+      } else {
+        panel.classList.add("open");
+
+        const currentBookmarkId =
+          preloadBookmarkId || document.getElementById("bookmarkSelect")?.value;
+        if (currentBookmarkId) {
+          loadBookmarkForEditing(currentBookmarkId);
+        }
+      }
+
+      updateBookmarkToggleLabel();
+    }
+
+    // Update the label of the bookmark toggle button based on panel state
+    function updateBookmarkToggleLabel() {
+      const panel = document.getElementById("bookmarkPanel");
+      const toggleBtn = document.getElementById("bookmarkToggle");
+
+      if (!panel || !toggleBtn) return;
+
+      const isOpen = panel.classList.contains("open");
+      toggleBtn.textContent = isOpen ? "Close" : "Manage Bookmarks";
+    }
+
+    // Trigger loading of a selected bookmark into the form for editing
+    function handleBookmarkSelection(event) {
+      const selectedBookmarkId = event.target.value;
+      if (DEBUG) {
+        console.log(
+          "📥 Selected bookmarkId from dropdown:",
+          selectedBookmarkId
+        );
+        console.log("📄 Available bookmark IDs:");
+        loadedBookmarks.forEach((b) => console.log(" -", b.id));
+      }
+
+      if (DEBUG) {
+        console.log("🔍 Comparing selectedBookmarkId:", selectedBookmarkId);
+        loadedBookmarks.forEach((b) => console.log(" - Comparing to:", b.id));
+      }
+
+      const bookmark = loadedBookmarks.find(
+        (b) => String(b.id).trim() === String(selectedBookmarkId).trim()
+      );
+
+      if (!bookmark) {
+        console.warn(
+          "❌ Bookmark not found for selected ID- Trigger loading of a selected bookmark:",
+          selectedBookmarkId
+        );
+        return;
+      }
+
+      // Reload the embed with that exploreKey
+      if (DEBUG) console.log("Applying bookmark:", bookmark);
+      loadEmbed(bookmark.id);
+    }
+
+    // Handle bookmark form submission — save to local DB and reload UI
+    function handleBookmarkFormSubmit(event) {
+      event.preventDefault();
+
+      const form = document.getElementById("bookmarkForm");
+      const bookmarkName = form.bookmarkName?.value?.trim();
+      const descr = form.descr?.value?.trim();
+      const isDefault = form.isDefault?.checked;
+      const sharedWith = Array.from(form.sharedWith || [])
+        .filter((r) => r.checked)
+        .map((r) => r.value);
+
+      if (!currentUserEmail) {
+        alert("Please select a user before saving.");
+        return;
+      }
+      
+      if (!latestExploreKey) {
+        alert("Please interact with the embed to create an exploration before saving a bookmark.");
+        return;
+      }
+      
+      if (!window.selectedworkbookUrlId) {
+        alert("Please select a workbook first.");
+        return;
+      }
+      
+      const userEmail = currentUserEmail;
+
+      const payload = {
+        bookmarkName,
+        descr,
+        isDefault,
+        sharedWith,
+        exploreKey: latestExploreKey,
+        workbookUrlId: window.selectedworkbookUrlId,
+        userEmail,
+      };
+
+      if (DEBUG) {
+        console.log("📤 Saving bookmark with payload:", payload);
+      }
+
+      fetch("/api/bookmarks_db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(
+              `Failed to save bookmark: ${res.status} ${errorText}`
+            );
+          }
+          return res.json();
+        })
+        .then((data) => {
+          if (DEBUG) console.log("Bookmark saved:", data);
+          alert("Bookmark saved.");
+          resetBookmarkForm();
+          document.getElementById("bookmarkPanel").classList.remove("open");
+          updateBookmarkToggleLabel();
+          // Reload bookmarks and select the newly created one
+          const newBookmarkId = data.bookmarkId;
+          return loadBookmarks(newBookmarkId);
+        })
+        .catch((err) => {
+          if (DEBUG) console.error("Error saving bookmark:", err);
+          alert(`Error saving bookmark: ${err.message}`);
+        });
+    }
+
+    // Handle bookmark selection from dropdown — reloads embed with selected exploreKey
+    function handleBookmarkSelectionForEmbed(event) {
+      const selectedId = event.target.value;
+
+      if (suppressBookmarkChange) {
+        if (DEBUG) console.log("🔁 Suppressing bookmark change event");
+        return;
+      }
+
+      if (selectedId === "") {
+        // Only reset form if user is actively interacting (not during programmatic changes)
+        if (!suppressBookmarkChange) {
+          resetBookmarkForm(); // Clear form when switching to original workbook
+        }
+        loadEmbed(); // reload without bookmark
+        return;
+      }
+
+      if (DEBUG)
+        console.log("📥 selectedBookmarkId passed into loadEmbed:", selectedId);
+      loadEmbed(selectedId); // no fetch, no form logic
+    }
+
+    // Apply a bookmark by ID — looks up the exploreKey from loaded bookmarks and reloads the embed
+    function applyBookmarkById(bookmarkId) {
+      console.log("➡️ applyBookmarkById called with ID:", bookmarkId);
+      console.log("🔎 loadedBookmarks available:", loadedBookmarks);
+      loadedBookmarks.forEach((b) => console.log(" -", b.id));
+      const bm = loadedBookmarks.find((b) => b.id === bookmarkId);
+      if (!bm) {
+        console.warn("Bookmark not found - Apply a bookmark by ID", bookmarkId);
+        return;
+      }
+
+      if (DEBUG) {
+        console.log("🔁 Applying bookmark:", bm);
+      }
+
+      // Reload the Sigma embed using the bookmark's exploreKey
+      loadEmbed(bm.id);
+    }
+
+    async function handleBookmarkClick(bm) {
+      console.log("✅ Triggering loadEmbed with selected bookmark ID:", bm.id);
+      console.log("🔑 Matching exploreKey:", bm.exploreKey);
+
+      console.log(
+        "📄 Loaded bookmarks at time of embed:",
+        loadedBookmarks.map((b) => b.id)
+      );
+      await loadEmbed(bm.id);
+    }
+
+    // Listener for URL build logging only
+    window.addEventListener("message", (event) => {
+      const msg = event.data;
+
+      if (msg?.type === "bookmark:created") {
+        console.log("📌 Bookmark created:", msg);
+
+        const bookmarkId = msg.bookmarkId;
+        const exploreKey = msg.exploreKey;
+
+        const embedUrl = buildSigmaEmbedUrl({
+          orgSlug: envConfig.ORG_SLUG || "quick-starts-fundamentals",
+          workbookName: envConfig.WORKBOOK_NAME || "Embed_API_QuickStart",
+          workbookUrlId: window.selectedworkbookUrlId,
+          bookmarkId,
+          exploreKey,
+        });
+
+        if (DEBUG) console.log("🔗 Generated Embed URL from new bookmark:", embedUrl);
+      }
+    });
+
+    // ============================================================================
+    // APPLICATION INITIALIZATION
+    // ============================================================================
+
+    // Setup all event listeners and default UI state for bookmark controls
+    function initializeBookmarkControls() {
+      const toggleBtn = document.getElementById("bookmarkToggle");
+      const nameInput = document.querySelector(
+        "#bookmarkForm input[name='bookmarkName']"
+      );
+      const bookmarkSelect = document.getElementById("bookmarkSelect");
+      const deleteBtn = document.getElementById("delete-bookmark-btn");
+
+      // Initialize toggle button for opening/closing bookmark panel
+      if (toggleBtn) {
+        toggleBtn.disabled = true;
+        toggleBtn.style.opacity = "0.5";
+        toggleBtn.style.cursor = "not-allowed";
+        toggleBtn.addEventListener("click", () => handleBookmarkToggle());
+
+        if (DEBUG) console.log("Bookmark toggle button initialized");
+      }
+
+      // Enable real-time validation on bookmark name input
+      if (nameInput) {
+        nameInput.addEventListener("input", handleBookmarkNameInput);
+      }
+
+      // Enable delete logic for loaded bookmarks
+      if (deleteBtn) {
+        deleteBtn.addEventListener("click", deleteBookmark);
+      }
+    }
+
+    // Global app initialization — loads env, dropdowns, listeners
+    async function initialize() {
+      await loadEnv(); // Load environment vars from /env
+      await loadUserOptions(); // Populate user role dropdown
+      await loadWorkbooks(); // Populate workbook dropdown
+
+      initializeBookmarkControls(); // Setup all bookmark UI controls
+
+      // Save bookmark listener (form submit)
+      const form = document.getElementById("bookmarkForm");
+      if (form) {
+        form.addEventListener("submit", handleBookmarkFormSubmit);
+      }
+
+      // Clear All Bookmarks button handler
+      const clearAllBtn = document.getElementById("clearAllBookmarks");
+      if (clearAllBtn) {
+        clearAllBtn.addEventListener("click", handleClearAllBookmarks);
+      }
+
+      // Global postMessage listener for iframe events
+      window.addEventListener("message", handlePostMessage);
+
+      // ============================================================================
+      // UI INTERACTIONS - TOGGLE INFO PANEL
+      // ============================================================================
+      const sidebar = document.querySelector(".sidebar");
+      const toggleButton = document.getElementById("collapse-info");
+      
+      if (toggleButton && sidebar) {
+        toggleButton.addEventListener("click", () => {
+          sidebar.classList.toggle("collapsed");
+          if (DEBUG) console.log("Toggle Info Panel clicked - collapsed:", sidebar.classList.contains("collapsed"));
+        });
+        if (DEBUG) console.log("Toggle Info Panel event listener attached");
+      } else {
+        if (DEBUG) console.warn("Toggle Info Panel setup failed - button:", !!toggleButton, "sidebar:", !!sidebar);
+      }
+
+      if (DEBUG) console.log("Application initialized");
+    }
+    // ============================================================================
+    // MAIN EXECUTION
+    // ============================================================================
+
+    // Wait for full DOM load before initializing app logic
+    document.addEventListener("DOMContentLoaded", initialize);
+  </script>
+</html>

@@ -8,6 +8,7 @@ const {
 } = require("../../helpers/provision");
 
 router.get("/", async (req, res) => {
+  console.log("🔥 DELETE route hit");
   try {
     const adminEmail = process.env.ADMIN_EMAIL;
     const buildEmail = process.env.BUILD_EMAIL;
@@ -15,7 +16,8 @@ router.get("/", async (req, res) => {
 
     if (!adminEmail || !buildEmail || !viewEmail) {
       return res.status(400).json({
-        error: "Missing one or more required env vars: ADMIN_EMAIL, BUILD_EMAIL, VIEW_EMAIL",
+        error:
+          "Missing one or more required env vars: ADMIN_EMAIL, BUILD_EMAIL, VIEW_EMAIL",
       });
     }
 
