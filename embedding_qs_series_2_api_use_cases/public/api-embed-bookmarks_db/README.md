@@ -9,7 +9,8 @@ This advanced QuickStart extends basic bookmark functionality with local databas
 - **User Selection**: Switch between View Users and Build Users with different permission levels
 - **Workbook Selection**: Choose from available workbooks
 - **Bookmark Management**: Create, view, delete, and switch between bookmarks
-- **Clear All Bookmarks**: Bulk delete all bookmarks with confirmation dialog
+- **Clear All Bookmarks**: Bulk delete all bookmarks with confirmation dialog (Build Users only)
+- **Auto-State Management**: Automatic panel closure and form reset when switching to View Users
 
 ### Advanced Features
 - **Local Database Storage**: Bookmarks stored in local `bookmarks.json` with additional metadata
@@ -23,15 +24,17 @@ This advanced QuickStart extends basic bookmark functionality with local databas
 
 ### User Interface
 - **Toggle Info Panel**: Collapsible sidebar with JWT and debug information
-- **Bookmark Toggle Button**: Quick access to bookmark management panel
-- **Responsive Design**: Mobile-friendly interface with proper state management
+- **Bookmark Management Panel**: Slide-out panel for creating, editing, and deleting bookmarks
+- **Permission-Based UI**: Management buttons only visible to Build Users
+- **Smart State Management**: Form automatically resets when switching between Original Workbook and bookmarks
+- **Responsive Design**: Mobile-friendly interface with proper button positioning and panel behavior
 
 ## How It Works
 
 ### Database-Enhanced Workflow
 1. **User & Workbook Selection**: Choose user type and workbook
 2. **Bookmark Creation** (Build Users only):
-   - Click "Save Bookmark" button to open the bookmark panel
+   - Click "Manage Bookmarks" button to open the bookmark panel
    - Interact with embedded content to generate `exploreKey`
    - Fill out bookmark details:
      - Name and description
@@ -78,10 +81,12 @@ The system maintains a local `bookmarks.json` file that stores:
 - `POST /api/jwt/api-embed-bookmarks_db` - JWT generation with bookmark support
 
 ### Advanced Features
-- **State Management**: Comprehensive page reset after bulk operations
+- **State Management**: Comprehensive form reset and panel management
+- **User Role Enforcement**: Automatic UI changes and panel closure when switching between user types
 - **Error Handling**: Graceful handling of API failures with user feedback  
-- **Debug Logging**: Extensive DEBUG mode logging for troubleshooting
+- **Debug Logging**: Extensive DEBUG mode logging for troubleshooting and state tracking
 - **Throttling**: API rate limiting for bulk operations
+- **Button Overlap Prevention**: Smart CSS and state management prevents UI conflicts
 
 ## File Structure
 ```
@@ -110,9 +115,9 @@ Configure your `.env` with:
 2. Start server: `npm start`  
 3. Navigate to `/api-embed-bookmarks_db`
 4. Select Build User and workbook
-5. Click "Save Bookmark" to open bookmark panel
+5. Click "Manage Bookmarks" to open bookmark panel
 6. Interact with embedded content and create bookmarks
-7. Switch to View User to test permission filtering
+7. Switch to View User to test permission filtering and automatic panel management
 
 ### Testing Sharing Features
 1. Create bookmarks as Build User with different sharing settings:
@@ -128,6 +133,8 @@ Enable `DEBUG=true` to see:
 - Permission filtering logic
 - API synchronization between Sigma and local database
 - State management during operations
+- User role switching and panel management
+- Button visibility and CSS state changes
 
 ## Important Notes
 

@@ -493,6 +493,20 @@
         }
 
         try {
+          // First, get the list of bookmarks that will be deleted for logging
+          if (DEBUG) {
+            try {
+              const listRes = await fetch(`/api/bookmarks/list?workbookUrlId=${encodeURIComponent(workbookUrlId)}`);
+              const { entries: bookmarksToDelete = [] } = await listRes.json();
+              console.log(`📋 About to delete ${bookmarksToDelete.length} bookmarks:`);
+              bookmarksToDelete.forEach((bookmark, index) => {
+                console.log(`  ${index + 1}. ${bookmark.name} (ID: ${bookmark.bookmarkId})`);
+              });
+            } catch (listErr) {
+              console.warn("Could not fetch bookmark list for logging:", listErr.message);
+            }
+          }
+
           const res = await fetch("/api/bookmarks/clear-all", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
@@ -508,7 +522,11 @@
           }
           
           const result = await res.json();
-          if (DEBUG) console.log("Clear all bookmarks response:", result);
+          if (DEBUG) {
+            console.log("✅ Clear all bookmarks completed successfully");
+            console.log(`📊 Total bookmarks deleted: ${result.deletedCount}`);
+            console.log("Full response:", result);
+          }
           
           alert(`Successfully deleted ${result.deletedCount} bookmarks.`);
           
@@ -517,7 +535,7 @@
           loadEmbed(""); // Load original workbook without bookmark
           
         } catch (err) {
-          if (DEBUG) console.error("Failed to clear all bookmarks:", err);
+          if (DEBUG) console.error("❌ Failed to clear all bookmarks:", err);
           alert(`Failed to clear all bookmarks: ${err.message}`);
         }
       });
