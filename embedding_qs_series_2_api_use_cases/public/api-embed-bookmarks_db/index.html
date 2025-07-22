@@ -127,9 +127,18 @@
       }
 
       /* Hide fixed buttons when bookmark panel is open */
-      .slide-panel.open ~ #bookmarkToggle,
-      .slide-panel.open ~ #clearAllBookmarks {
+      .slide-panel.open ~ #bookmarkToggle {
         display: none;
+      }
+      
+      /* Hide Clear All button when panel is open (use class-based approach) */
+      body.panel-open #clearAllBookmarks {
+        display: none !important;
+      }
+
+      /* Hide Clear All button for View Users */
+      #clearAllBookmarks.hidden-for-view-user {
+        display: none !important;
       }
     </style>
   </head>
@@ -331,6 +340,7 @@
     let loadedBookmarks = [];
     let suppressBookmarkChange = false;
     let currentWorkbookId = null;
+    let isSubmittingBookmark = false;
 
     // ============================================================================
     // ENVIRONMENT & CONFIGURATION
@@ -494,6 +504,8 @@
       const bookmarkPanel = document.getElementById("bookmarkPanel");
       if (bookmarkPanel && bookmarkPanel.classList.contains("open")) {
         bookmarkPanel.classList.remove("open");
+        document.body.classList.remove("panel-open");
+        if (DEBUG) console.log("🔒 Panel closed during role change - removed panel-open class from body");
         updateBookmarkToggleLabel();
       }
     }
@@ -524,8 +536,19 @@
         bookmarkToggle.style.display = "none";
         const clearAllBtn = document.getElementById("clearAllBookmarks");
         if (clearAllBtn) {
-          clearAllBtn.style.display = "none";
+          clearAllBtn.classList.add("hidden-for-view-user");
         }
+        
+        // Force close the bookmark panel if it's open when switching to view user
+        const bookmarkPanel = document.getElementById("bookmarkPanel");
+        if (bookmarkPanel && bookmarkPanel.classList.contains("open")) {
+          bookmarkPanel.classList.remove("open");
+          document.body.classList.remove("panel-open");
+          resetBookmarkForm();
+          updateBookmarkToggleLabel();
+          if (DEBUG) console.log("🔒 Force-closed bookmark panel when switching to View User");
+        }
+        
         if (DEBUG) console.log("🔒 Hiding Manage Bookmarks and Clear All buttons for View User");
         return; // Exit early, no need to update other bookmark controls
       }
@@ -534,8 +557,10 @@
       bookmarkToggle.style.display = "block";
       const clearAllBtn = document.getElementById("clearAllBookmarks");
       if (clearAllBtn) {
-        clearAllBtn.style.display = "block";
+        clearAllBtn.classList.remove("hidden-for-view-user");
       }
+      
+      // Note: Form reset logic moved to user role change handler to prevent interference with user input
       if (hasExploreKey) {
         bookmarkToggle.disabled = false;
         bookmarkToggle.style.opacity = "1";
@@ -645,6 +670,15 @@
 
         // Update button visibility based on user permissions
         updateBookmarkButtonState();
+
+        // Reset bookmark form if switching to build user and dropdown shows "Original Workbook"
+        if (currentMode === "build") {
+          const bookmarkSelect = document.getElementById("bookmarkSelect");
+          if (bookmarkSelect && bookmarkSelect.value === "") {
+            resetBookmarkForm();
+            if (DEBUG) console.log("🔄 Reset bookmark form when switching to Build User - Original Workbook selected");
+          }
+        }
 
         // If we have a workbook selected, reload bookmarks with new user filtering
         const selectedWorkbook = document.getElementById("workbookSelect")?.value;
@@ -1165,11 +1199,22 @@
         alert("Bookmark deleted successfully.");
         
         try {
+          // Reset form and close panel
           resetBookmarkForm();
-          document.getElementById("bookmarkPanel").classList.remove("open");
+          const panel = document.getElementById("bookmarkPanel");
+          panel.classList.remove("open");
+          document.body.classList.remove("panel-open");
           updateBookmarkToggleLabel();
-          renderManageBookmarksPanel();
-          await loadBookmarks();
+          
+          // Reload bookmarks to update dropdown (will reset to "Original Workbook")
+          await loadBookmarks("");
+          
+          // Load original workbook without any bookmark
+          loadEmbed("");
+          
+          // Update button states to ensure Clear All button is visible for Build Users
+          updateBookmarkButtonState();
+          
           if (DEBUG) console.log("✅ UI cleanup after bookmark deletion completed");
         } catch (uiError) {
           console.error("⚠️ UI cleanup error after successful deletion:", uiError);
@@ -1304,9 +1349,13 @@
 
       if (isOpen) {
         panel.classList.remove("open");
+        document.body.classList.remove("panel-open");
+        if (DEBUG) console.log("🔒 Panel closed - removed panel-open class from body");
         resetBookmarkForm();
       } else {
         panel.classList.add("open");
+        document.body.classList.add("panel-open");
+        if (DEBUG) console.log("🔓 Panel opened - added panel-open class to body");
 
         const currentBookmarkId =
           preloadBookmarkId || document.getElementById("bookmarkSelect")?.value;
@@ -1367,6 +1416,12 @@
     function handleBookmarkFormSubmit(event) {
       event.preventDefault();
 
+      // Prevent double-click/double-submission
+      if (isSubmittingBookmark) {
+        if (DEBUG) console.log("🚫 Bookmark submission already in progress, ignoring duplicate request");
+        return;
+      }
+
       const form = document.getElementById("bookmarkForm");
       const bookmarkName = form.bookmarkName?.value?.trim();
       const descr = form.descr?.value?.trim();
@@ -1406,6 +1461,9 @@
         console.log("📤 Saving bookmark with payload:", payload);
       }
 
+      // Set submission flag to prevent double-clicks
+      isSubmittingBookmark = true;
+
       fetch("/api/bookmarks_db", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1425,6 +1483,7 @@
           alert("Bookmark saved.");
           resetBookmarkForm();
           document.getElementById("bookmarkPanel").classList.remove("open");
+          document.body.classList.remove("panel-open");
           updateBookmarkToggleLabel();
           // Reload bookmarks and select the newly created one
           const newBookmarkId = data.bookmarkId;
@@ -1436,6 +1495,11 @@
         .catch((err) => {
           if (DEBUG) console.error("Error saving bookmark:", err);
           alert(`Error saving bookmark: ${err.message}`);
+        })
+        .finally(() => {
+          // Always reset the submission flag when done (success or error)
+          isSubmittingBookmark = false;
+          if (DEBUG) console.log("✅ Bookmark submission completed, flag reset");
         });
     }
 
@@ -1605,6 +1669,19 @@
       const clearAllBtn = document.getElementById("clearAllBookmarks");
       if (clearAllBtn) {
         clearAllBtn.addEventListener("click", handleClearAllBookmarks);
+      }
+
+      // Close panel button handler
+      const closePanelBtn = document.getElementById("closePanelBtn");
+      if (closePanelBtn) {
+        closePanelBtn.addEventListener("click", () => {
+          const panel = document.getElementById("bookmarkPanel");
+          panel.classList.remove("open");
+          document.body.classList.remove("panel-open");
+          if (DEBUG) console.log("🔒 Panel closed via close button - removed panel-open class from body");
+          resetBookmarkForm();
+          updateBookmarkToggleLabel();
+        });
       }
 
       // Global postMessage listener for iframe events
