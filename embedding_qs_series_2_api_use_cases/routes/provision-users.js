@@ -8,7 +8,7 @@ const {
 } = require("../../helpers/provision");
 
 router.get("/", async (req, res) => {
-  console.log("🔥 DELETE route hit");
+  console.log("DELETE route hit");
   try {
     const adminEmail = process.env.ADMIN_EMAIL;
     const buildEmail = process.env.BUILD_EMAIL;

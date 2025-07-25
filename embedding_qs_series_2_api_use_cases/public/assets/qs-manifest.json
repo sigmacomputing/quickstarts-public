@@ -2,5 +2,6 @@
   { "slug": "api-getting-started", "label": "Getting Started" },
   { "slug": "api-embed-controls", "label": "Embed Controls" },
   { "slug": "api-embed-bookmarks", "label": "Embed Bookmarks" },
-  { "slug": "api-embed-bookmarks_db", "label": "Bookmark Sharing with Local DB" }
+  { "slug": "api-embed-bookmarks_db", "label": "Bookmark Sharing with Local DB" },
+  { "slug": "api-embed-export-modal", "label": "Exports" }
 ]
