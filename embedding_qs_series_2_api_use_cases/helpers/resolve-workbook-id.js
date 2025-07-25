@@ -11,6 +11,11 @@ const { getWorkbooksByTeam } = require("./get-workbooks");
 async function resolveWorkbookId(workbookUrlId) {
   const workbooks = await getWorkbooksByTeam();
 
+  if (process.env.DEBUG === "true") {
+    console.log("Available workbooks:", workbooks.map(w => ({ name: w.name, urlId: w.urlId, id: w.id })));
+    console.log("Looking for URL ID:", workbookUrlId);
+  }
+
   const match = workbooks.find((w) => {
     if (process.env.DEBUG === "true") {
       console.log("Comparing:", w.urlId, "vs", workbookUrlId);

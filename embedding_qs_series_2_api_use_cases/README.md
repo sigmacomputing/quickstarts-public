@@ -4,12 +4,13 @@ A comprehensive collection of examples demonstrating Sigma Computing's embedding
 
 ## Overview
 
-This project provides four distinct QuickStart examples that progressively demonstrate Sigma's embedding features:
+This project provides five distinct QuickStart examples that progressively demonstrate Sigma's embedding features:
 
 1. **Getting Started** - Basic embedding with JWT authentication
 2. **Embed Bookmarks** - Direct Sigma API bookmark functionality  
 3. **Bookmark Sharing with Local DB** - Enhanced bookmarks with local storage and sharing
 4. **Embed Controls** - Flexible embedding (workbook/page/element types)
+5. **API Export Modal** - Scheduled export functionality using the Sigma API
 
 Each QuickStart includes a complete web interface with user switching, debug information, and comprehensive documentation.
 
@@ -46,6 +47,7 @@ embedding_qs_series_2_api_use_cases/
 │   ├── api-embed-bookmarks/         # Direct API bookmarks
 │   ├── api-embed-bookmarks_db/      # Database-enhanced bookmarks
 │   ├── api-embed-controls/          # Flexible embed types
+│   ├── api-embed-export-modal/      # Scheduled export functionality
 │   └── styles/                      # Shared CSS styles
 ├── routes/                          # Express.js API routes
 │   └── api/                         # API endpoints
@@ -124,6 +126,34 @@ embedding_qs_series_2_api_use_cases/
 
 **Best For**: Applications requiring granular content embedding
 
+### 5. API Export Modal (`/api-embed-export-modal`)
+**Purpose**: Extend an embedded Sigma workbook with scheduled export functionality using the Sigma REST API
+
+This QuickStart demonstrates how to create a comprehensive export management system within a host application. Unlike basic embedding, this implementation provides `View` users with the ability to create, manage, and immediately send scheduled exports directly from the embedded interface.
+
+**Features**:
+- **Export Scheduling**: Create email-based export schedules with custom recipients, subjects, and messages
+- **Format Selection**: Support for PDF, CSV, and Excel export formats with configurable options
+- **Frequency Management**: Configure daily, weekly, or monthly export schedules with custom timing
+- **Export Management**: View, edit, delete, and immediately run existing export schedules
+- **Workbook Integration**: Seamless integration with embedded workbook selection and preview
+- **Security Features**: View-only embed permissions with recipient privacy protection
+
+We will cover these key workflows:
+
+**1: Schedule an Export:**<br>
+Allow users to create scheduled exports by configuring recipients, format, frequency, and timing. The system handles workbook ID resolution and validates all export parameters before creating the schedule via the Sigma API.
+
+**2: Manage Export Schedules:**<br>
+Provide users with a comprehensive management interface to view existing schedules, edit configurations (with recipient re-entry for security), and delete schedules they no longer need.
+
+**3: Run Exports Immediately:**<br>
+Enable users to trigger immediate export delivery using existing schedule configurations, with the ability to specify custom recipients for ad-hoc sharing.
+
+This approach enables a complete export management experience directly within the embedded environment. It's especially useful for SaaS providers, internal dashboards, or any scenario where users need to share Sigma content via email without requiring direct access to the Sigma interface.
+
+**Best For**: Applications requiring comprehensive export functionality with embedded workbook management
+
 ## Configuration
 
 ### Environment Variables
@@ -165,6 +195,13 @@ The application includes user provisioning capabilities:
 - `GET /api/bookmarks_db` - Enhanced bookmark listing with filtering
 - `POST /api/bookmarks_db` - Create bookmark with local storage
 - `DELETE /api/bookmarks_db/clear-all` - Bulk delete bookmarks
+
+### Export Endpoints
+- `POST /api/exports` - Create new export schedule
+- `GET /api/exports/:workbookId` - List export schedules for a workbook
+- `PATCH /api/exports/:scheduleId` - Update existing export schedule
+- `DELETE /api/exports/:workbookId/:scheduleId` - Delete export schedule
+- `POST /api/exports/:workbookId/send/:scheduleId` - Send export immediately
 
 ### Content Discovery
 - `GET /api/pages` - List pages in a workbook

@@ -71,7 +71,7 @@ module.exports = function buildEmbedUrl({
 
   const params = [];
 
-  // ⚠️ IMPORTANT: Only one of these should be used — bookmark takes precedence
+  // IMPORTANT: Only one of these should be used — bookmark takes precedence
   if (bookmarkId) {
     params.push(`:bookmark=${encodeURIComponent(bookmarkId)}`);
   } else if (exploreKey) {

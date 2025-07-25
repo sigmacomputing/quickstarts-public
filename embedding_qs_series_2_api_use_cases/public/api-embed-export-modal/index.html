@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Page metadata and layout styles -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Export Modal QuickStart</title>
+    <link rel="stylesheet" href="/styles/main.css" />
+    <link rel="icon" href="data:," />
+
+  </head>
+
+  <body>
+    <!-- === Top bar === -->
+    <header class="layout-topbar">
+      <!-- Navigation and title -->
+      <div style="display: flex; align-items: center; gap: 0.5rem">
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+        <span class="header-title" style="font-weight: bold; color: white;">
+          API Export Modal QuickStart
+        </span>
+      </div>
+
+      <!-- Simple Control Panel - Just Workbook Selection -->
+      <div
+        class="control-panel"
+        style="display: flex; flex-wrap: wrap; gap: 24px; margin-top: 10px"
+      >
+        <!-- Workbook Select -->
+        <div class="control-group">
+          <label for="workbookSelect" style="color: white;">Workbook:</label>
+          <select id="workbookSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a workbook
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Toggle info panel and README link -->
+      <div style="white-space: nowrap; margin-top: 10px;">
+        <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
+        <button onclick="window.open('/api-embed-export-modal/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+      </div>
+    </header>
+
+    <!-- === Main Layout === -->
+    <main class="main">
+      <!-- === Sidebar Info Panel === -->
+      <aside class="sidebar">
+        <h2>Information:</h2>
+        <p>
+          The embedded content should render in the iframe on the right, based
+          on your .env file configuration.
+        </p>
+        <code id="debug-embed-url">N/A</code>
+
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <p>Loading...</p>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+      </aside>
+
+      <!-- === iFrame === -->
+      <div id="embedContainer" class="content"></div>
+    </main>
+
+    <!-- Export Modal Button -->
+    <button id="exportModalBtn">Schedule Export</button>
+    
+    <!-- Manage Exports Button -->
+    <button id="manageExportsBtn" style="display: none;">Manage Exports</button>
+
+    <!-- Export Modal -->
+    <div id="exportModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Schedule exports</h2>
+          <button class="modal-close" type="button">×</button>
+        </div>
+
+        <form id="exportForm">
+          <!-- Export via email section -->
+          <div class="form-section">
+            <h3>Export via email</h3>
+            
+            <div class="form-group">
+              <label for="recipients">Recipient</label>
+              <input 
+                type="email" 
+                id="recipients" 
+                name="recipients" 
+                placeholder="Use a comma to separate email addresses"
+                required
+              />
+              <div id="recipients-helper" style="color: #888; font-style: italic; font-size: 0.9em; margin-top: 4px; display: none;">
+                Please reenter the intended recipient
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="subject">Subject</label>
+              <input 
+                type="text" 
+                id="subject" 
+                name="subject" 
+                value="Your scheduled report"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="message">Message</label>
+              <textarea 
+                id="message" 
+                name="message" 
+                placeholder="Hello, you've received a document."
+              ></textarea>
+            </div>
+          </div>
+
+          <!-- Attachments section -->
+          <div class="form-section">
+            <h3>Attachments</h3>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="format">Format</label>
+                <select id="format" name="format" required>
+                  <option value="PDF">PDF</option>
+                  <option value="CSV">CSV</option>
+                  <option value="XLSX">Excel</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Frequency section -->
+          <div class="form-section">
+            <h3>Frequency</h3>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="frequency">Frequency</label>
+                <select id="frequency" name="frequency" required>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="time">Time</label>
+                <input 
+                  type="time" 
+                  id="time" 
+                  name="time" 
+                  value="09:00"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal Actions -->
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="createBtn">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Manage Exports Modal -->
+    <div id="manageExportsModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Manage Export Schedules</h2>
+          <button class="modal-close" type="button" id="manageExportsClose">×</button>
+        </div>
+
+        <div id="exportsList">
+          <!-- Export schedules will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- === Footer === -->
+    <footer class="layout-footer">Sigma © 2025</footer>
+  </body>
+
+  <script>
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+    let DEBUG = false;
+    let env = {};
+    let currentWorkbookId = null;
+    let isSubmittingExport = false;
+    let currentExports = [];
+    let editingExportId = null;
+
+    // ============================================================================
+    // ENVIRONMENT & CONFIGURATION
+    // ============================================================================
+    
+    /**
+     * Loads environment configuration from the server
+     * Sets DEBUG flag and populates global env object
+     */
+    async function loadEnv() {
+      try {
+        const res = await fetch("/env.json");
+        env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode enabled via /env.json");
+      } catch (err) {
+        if (DEBUG) console.warn("Failed to load /env.json config:", err.message);
+      }
+    }
+
+    /**
+     * Decodes a JWT token into header and payload components
+     * @param {string} token - JWT token string
+     * @returns {object} Object containing header and payload or error
+     */
+    function decodeJwt(token) {
+      try {
+        const [headerB64, payloadB64] = token.split(".");
+        const decodePart = (str) => {
+          const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+          const padded = base64 + "===".slice((base64.length + 3) % 4);
+          return JSON.parse(atob(padded));
+        };
+        return {
+          header: decodePart(headerB64),
+          payload: decodePart(payloadB64),
+        };
+      } catch (err) {
+        console.warn("JWT decode error:", err);
+        return { error: "Failed to decode JWT." };
+      }
+    }
+
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
+
+    /**
+     * Fetch the list of available workbooks from the API
+     * Filters to only show workbooks accessible to View users
+     */
+    async function loadWorkbooks() {
+      const select = document.getElementById("workbookSelect");
+      if (!select) return;
+
+      try {
+        const res = await fetch("/api/workbooks");
+        const data = await res.json();
+        const workbooks = data.workbooks || [];
+
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select a workbook</option>`;
+
+        workbooks.forEach((wb) => {
+          const opt = document.createElement("option");
+          opt.value = wb.url.split("/").pop();
+          opt.textContent = wb.name;
+          opt.dataset.workbookid = wb.id;
+          select.appendChild(opt);
+        });
+
+        select.addEventListener("change", async (e) => {
+          const selectedOption = e.target.selectedOptions[0];
+          window.selectedworkbookUrlId = e.target.value;
+          window.selectedworkbookId = selectedOption?.dataset.workbookid || null;
+          currentWorkbookId = window.selectedworkbookUrlId; // Use URL ID, not UUID
+          
+          if (DEBUG) {
+            console.log(`Workbook changed to: ${window.selectedworkbookUrlId} (ID: ${currentWorkbookId})`);
+          }
+          
+          // Load embed for selected workbook
+          await loadEmbed();
+          
+          // Enable export button and load exports
+          updateExportButtonState();
+          await loadExportSchedules();
+        });
+      } catch (err) {
+        console.error("Failed to load workbooks:", err);
+      }
+    }
+
+    // ============================================================================
+    // SIGMA EMBED FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Loads the Sigma embed for the selected workbook using View user
+     */
+    async function loadEmbed() {
+      const workbookUrlId = window.selectedworkbookUrlId;
+      const embedType = "workbook";
+
+      if (!workbookUrlId) {
+        console.warn("Embed not loaded — no workbook selected.");
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `/api/jwt/api-embed-export-modal?workbookUrlId=${encodeURIComponent(
+            workbookUrlId
+          )}&embedType=${embedType}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sub: env.VIEW_EMAIL, // Always use View user for this demo
+              hide_folder_navigation: env.HIDE_FOLDER_NAVIGATION,
+              hide_menu: env.HIDE_MENU,
+              menu_position: env.MENU_POSITION,
+              disable_auto_refresh: env.DISABLE_AUTO_REFRESH,
+              disable_mobile_view: env.DISABLE_MOBILE_VIEW,
+              hide_page_controls: env.HIDE_PAGE_CONTROLS,
+              hide_reload_button: env.HIDE_RELOAD_BUTTON,
+              hide_title: env.HIDE_TITLE,
+              hide_tooltip: env.HIDE_TOOLTIP,
+              hide_view_select: env.HIDE_VIEW_SELECT,
+              lng: env.LNG,
+              page_id: env.PAGE_ID,
+              responsive_height: env.RESPONSIVE_HEIGHT,
+              theme: env.THEME,
+              view_id: env.VIEW_ID,
+            }),
+          }
+        );
+
+        const data = await res.json();
+        if (DEBUG) console.log("JWT fetch result:", data);
+
+        const { embedUrl, jwt } = data;
+
+        const container = document.getElementById("embedContainer");
+        if (!container) {
+          console.error("Embed container not found.");
+          return;
+        }
+
+        const iframe = document.createElement("iframe");
+        iframe.src = embedUrl;
+        iframe.width = "100%";
+        iframe.height = "800";
+        iframe.style.border = "none";
+        iframe.setAttribute("allowfullscreen", "true");
+
+        container.innerHTML = ""; // clear previous iframe
+        container.appendChild(iframe);
+
+        // Update sidebar information panel
+        document.getElementById("debug-embed-url").textContent = embedUrl || "N/A";
+        document.getElementById("jwt-display").textContent = jwt;
+
+        // Decode and display JWT information
+        const decoded = decodeJwt(jwt);
+        const decodedBlock = document.getElementById("jwt-decoded");
+        if (decoded.error) {
+          decodedBlock.innerHTML = `<p style="color:red;">${decoded.error}</p>`;
+        } else {
+          decodedBlock.innerHTML = `
+            <h3>Decoded JWT Header:</h3>
+            <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
+            <h3>Decoded JWT Payload:</h3>
+            <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>`;
+        }
+
+        if (DEBUG) console.log("Embed iframe injected:", iframe.src);
+      } catch (err) {
+        console.error("Failed to fetch JWT or load embed", err);
+      }
+    }
+
+    // ============================================================================
+    // EXPORT MODAL FUNCTIONS
+    // ============================================================================
+
+    /**
+     * Updates the export button state based on workbook selection
+     */
+    function updateExportButtonState() {
+      const exportBtn = document.getElementById("exportModalBtn");
+      const hasWorkbook = currentWorkbookId !== null;
+
+      if (exportBtn) {
+        exportBtn.disabled = !hasWorkbook;
+        if (DEBUG) {
+          console.log("Export button state:", hasWorkbook ? "ENABLED" : "DISABLED");
+        }
+      }
+    }
+
+    /**
+     * Opens the export modal
+     */
+    function openExportModal() {
+      const modal = document.getElementById("exportModal");
+      if (modal) {
+        modal.classList.add("open");
+        document.body.classList.add("modal-open");
+        
+        // Pre-populate subject with workbook name if available
+        const workbookSelect = document.getElementById("workbookSelect");
+        const subjectInput = document.getElementById("subject");
+        if (workbookSelect && subjectInput && workbookSelect.selectedOptions[0]) {
+          const workbookName = workbookSelect.selectedOptions[0].textContent;
+          subjectInput.value = `${workbookName} - Scheduled Report`;
+        }
+        
+        if (DEBUG) console.log("Export modal opened");
+      }
+    }
+
+    /**
+     * Closes the export modal and resets form
+     */
+    function closeExportModal() {
+      const modal = document.getElementById("exportModal");
+      const form = document.getElementById("exportForm");
+      
+      if (modal) {
+        modal.classList.remove("open");
+        document.body.classList.remove("modal-open");
+        if (DEBUG) console.log("Export modal closed");
+      }
+      
+      if (form) {
+        form.reset();
+        // Restore default values
+        document.getElementById("subject").value = "Your scheduled report";
+        document.getElementById("time").value = "09:00";
+      }
+      
+      // Hide recipients helper text
+      const recipientsHelper = document.getElementById('recipients-helper');
+      if (recipientsHelper) {
+        recipientsHelper.style.display = 'none';
+      }
+      
+      // Reset form to create mode
+      editingExportId = null;
+      const modalTitle = document.querySelector('#exportModal .modal-header h2');
+      const submitBtn = document.getElementById('createBtn');
+      
+      if (modalTitle) modalTitle.textContent = 'Schedule exports';
+      if (submitBtn) submitBtn.textContent = 'Create';
+    }
+
+    /**
+     * Handles cancel button click - returns to manage modal if editing, otherwise closes modal
+     */
+    function handleCancelClick() {
+      if (editingExportId !== null) {
+        // We're editing an export, return to manage modal
+        closeExportModal();
+        openManageExportsModal();
+        if (DEBUG) console.log("Returned to manage exports modal from edit");
+      } else {
+        // We're creating a new export, just close the modal
+        closeExportModal();
+      }
+    }
+
+    /**
+     * Handles export form submission
+     */
+    async function handleExportSubmit(event) {
+      event.preventDefault();
+
+      // Prevent double submission
+      if (isSubmittingExport) {
+        if (DEBUG) console.log("🚫 Export submission already in progress");
+        return;
+      }
+
+      const form = document.getElementById("exportForm");
+      const formData = new FormData(form);
+      
+      const exportData = {
+        workbookId: currentWorkbookId,
+        recipients: formData.get("recipients").split(",").map(email => email.trim()),
+        subject: formData.get("subject"),
+        message: formData.get("message") || "",
+        format: formData.get("format"),
+        frequency: formData.get("frequency"),
+        time: formData.get("time")
+      };
+
+      if (DEBUG) {
+        console.log("Creating export schedule with data:", exportData);
+        console.log("Current workbook ID (should be URL ID):", currentWorkbookId);
+        console.log("Selected workbook URL ID:", window.selectedworkbookUrlId);
+        console.log("Selected workbook UUID:", window.selectedworkbookId);
+      }
+
+      // Set submission flag
+      isSubmittingExport = true;
+      const createBtn = document.getElementById("createBtn");
+      if (createBtn) {
+        createBtn.disabled = true;
+        createBtn.textContent = "Creating...";
+      }
+
+      try {
+        let res, result;
+        
+        if (editingExportId) {
+          // Update existing export using PATCH
+          res = await fetch(`/api/exports/${editingExportId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(exportData),
+          });
+        } else {
+          // Create new export
+          res = await fetch("/api/exports", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(exportData),
+          });
+        }
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`Failed to ${editingExportId ? 'update' : 'create'} export: ${res.status} ${errorText}`);
+        }
+
+        result = await res.json();
+        if (DEBUG) console.log(`Export ${editingExportId ? 'updated' : 'created'}:`, result);
+
+        alert(`Export schedule ${editingExportId ? 'updated' : 'created'} successfully!`);
+        
+        // Reset edit mode
+        editingExportId = null;
+        
+        // Reload exports list
+        await loadExportSchedules();
+        
+        closeExportModal();
+
+      } catch (err) {
+        if (DEBUG) console.error("Error creating export:", err);
+        alert(`Error creating export: ${err.message}`);
+      } finally {
+        // Reset submission state
+        isSubmittingExport = false;
+        if (createBtn) {
+          createBtn.disabled = false;
+          createBtn.textContent = "Create";
+        }
+      }
+    }
+
+    // ============================================================================
+    // MANAGE EXPORTS FUNCTIONS
+    // ============================================================================
+
+    /**
+     * Load existing export schedules for the current workbook
+     */
+    async function loadExportSchedules() {
+      if (!currentWorkbookId) return [];
+
+      try {
+        const res = await fetch(`/api/exports/${currentWorkbookId}`);
+        const data = await res.json();
+        
+        if (DEBUG) {
+          console.log("Loaded export schedules:", data.schedules);
+          console.log("First export structure:", JSON.stringify(data.schedules?.[0], null, 2));
+        }
+        
+        currentExports = data.schedules || [];
+        updateManageExportsButtonVisibility();
+        return currentExports;
+      } catch (err) {
+        console.error("Failed to load export schedules:", err);
+        return [];
+      }
+    }
+
+    /**
+     * Update the visibility of the Manage Exports button
+     */
+    function updateManageExportsButtonVisibility() {
+      const manageBtn = document.getElementById("manageExportsBtn");
+      if (manageBtn) {
+        manageBtn.style.display = currentExports.length > 0 ? "block" : "none";
+        if (DEBUG) {
+          console.log("Manage exports button:", currentExports.length > 0 ? "VISIBLE" : "HIDDEN", `(${currentExports.length} exports)`);
+        }
+      }
+    }
+
+    /**
+     * Open the manage exports modal
+     */
+    function openManageExportsModal() {
+      const modal = document.getElementById("manageExportsModal");
+      if (modal) {
+        modal.classList.add("open");
+        document.body.classList.add("modal-open");
+        renderExportsList();
+        if (DEBUG) console.log("Manage exports modal opened");
+      }
+    }
+
+    /**
+     * Close the manage exports modal
+     */
+    function closeManageExportsModal() {
+      const modal = document.getElementById("manageExportsModal");
+      if (modal) {
+        modal.classList.remove("open");
+        document.body.classList.remove("modal-open");
+        if (DEBUG) console.log("Manage exports modal closed");
+      }
+    }
+
+    /**
+     * Render the list of export schedules
+     */
+    function renderExportsList() {
+      const container = document.getElementById("exportsList");
+      if (!container) return;
+
+      if (currentExports.length === 0) {
+        container.innerHTML = '<div class="empty-state">No export schedules found.</div>';
+        return;
+      }
+
+      const html = currentExports.map(exportItem => {
+        const cronParts = exportItem.schedule?.cronSpec?.split(' ') || [];
+        const timeDisplay = cronParts.length >= 2 ? `${cronParts[1].padStart(2, '0')}:${cronParts[0].padStart(2, '0')}` : 'Unknown';
+        
+        let frequencyDisplay = 'Unknown';
+        if (cronParts.length === 5) {
+          if (cronParts[2] === '*' && cronParts[3] === '*' && cronParts[4] === '*') {
+            frequencyDisplay = 'Daily';
+          } else if (cronParts[4] !== '*') {
+            frequencyDisplay = 'Weekly';
+          } else if (cronParts[2] !== '*') {
+            frequencyDisplay = 'Monthly';
+          }
+        }
+
+        // Use the correct field name from API response
+        const scheduleId = exportItem.scheduledNotificationId;
+        
+        // Debug: Log the schedule ID being used
+        if (DEBUG) {
+          console.log('Export item schedule ID:', scheduleId, 'for item:', exportItem.configV2?.title);
+        }
+        
+        // Recipients are not available through Sigma's API for security reasons
+        const recipients = 'Recipients configured';
+        
+        const title = exportItem.configV2?.title || exportItem.name || 'Untitled Export';
+
+        return `
+          <div class="export-item">
+            <div class="export-item-header">
+              <h4 class="export-item-title">${title}</h4>
+            </div>
+            <div class="export-item-schedule">Schedule: ${frequencyDisplay} at ${timeDisplay}</div>
+            <div class="export-item-actions">
+              <button class="btn-small btn-edit" onclick="editExport('${scheduleId}')">Edit</button>
+              <button class="btn-small btn-run" onclick="runExportNow('${scheduleId}')">Run Now</button>
+              <button class="btn-small btn-delete" onclick="deleteExport('${scheduleId}', '${title}')">Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = html;
+    }
+
+    /**
+     * Edit an existing export schedule
+     */
+    async function editExport(scheduleId) {
+      if (DEBUG) {
+        console.log('Looking for schedule ID:', scheduleId);
+        console.log('Available exports:', currentExports.map(e => ({
+          scheduledNotificationId: e.scheduledNotificationId,
+          title: e.configV2?.title,
+          fullObject: e
+        })));
+      }
+      
+      const exportItem = currentExports.find(e => e.scheduledNotificationId === scheduleId);
+      
+      if (!exportItem) {
+        alert('Export schedule not found');
+        console.error('Export not found for ID:', scheduleId);
+        return;
+      }
+
+      editingExportId = scheduleId;
+      
+      // Extract available information from the export schedule
+      const title = exportItem.configV2?.title || '';
+      const message = exportItem.configV2?.messageBody || '';
+      
+      // Parse cron spec to get time and frequency
+      const cronParts = exportItem.schedule?.cronSpec?.split(' ') || [];
+      let time = '09:00';
+      let frequency = 'daily';
+      
+      if (cronParts.length >= 2) {
+        const hours = parseInt(cronParts[1]) || 9;
+        const minutes = parseInt(cronParts[0]) || 0;
+        time = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      }
+      
+      if (cronParts.length === 5) {
+        if (cronParts[4] !== '*') frequency = 'weekly';
+        else if (cronParts[2] !== '*') frequency = 'monthly';
+        else frequency = 'daily';
+      }
+
+      // Get format from notification attachments
+      const formatOptions = exportItem.configV2?.notificationAttachments?.[0]?.formatOptions;
+      const format = formatOptions?.type || 'PDF';
+
+      // Populate form fields (recipients left empty with helper text)
+      document.getElementById('recipients').value = '';
+      document.getElementById('subject').value = title;
+      document.getElementById('message').value = message;
+      document.getElementById('format').value = format;
+      document.getElementById('frequency').value = frequency;
+      document.getElementById('time').value = time;
+
+      // Show helper text for recipients when editing
+      const recipientsHelper = document.getElementById('recipients-helper');
+      if (recipientsHelper) {
+        recipientsHelper.style.display = 'block';
+      }
+
+      // Update form title and button text
+      const modalTitle = document.querySelector('#exportModal .modal-header h2');
+      const submitBtn = document.getElementById('createBtn');
+      
+      if (modalTitle) modalTitle.textContent = 'Edit Export Schedule';
+      if (submitBtn) submitBtn.textContent = 'Update';
+
+      // Close manage modal and open edit modal
+      closeManageExportsModal();
+      openExportModal();
+      
+      if (DEBUG) console.log('Editing export schedule:', scheduleId);
+    }
+
+
+    /**
+     * Run an export schedule immediately using the /send endpoint
+     */
+    async function runExportNow(scheduleId) {
+      if (!scheduleId) {
+        alert('Invalid schedule ID');
+        console.error('Schedule ID is undefined or null');
+        return;
+      }
+      
+      const exportItem = currentExports.find(e => e.scheduledNotificationId === scheduleId);
+      if (!exportItem) {
+        alert('Export schedule not found');
+        console.error('Export not found for ID:', scheduleId);
+        return;
+      }
+
+      // Since we can't get recipients from the API, prompt the user
+      const recipients = prompt(
+        'Enter recipient email addresses (comma-separated):',
+        ''
+      );
+      
+      if (!recipients || recipients.trim() === '') {
+        return; // User cancelled or entered no recipients
+      }
+
+      // Validate email addresses
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const recipientEmails = recipients.split(',').map(email => email.trim());
+      const invalidEmails = recipientEmails.filter(email => !emailRegex.test(email));
+      
+      if (invalidEmails.length > 0) {
+        alert(`Invalid email addresses: ${invalidEmails.join(', ')}`);
+        return;
+      }
+
+      if (!confirm(`Send this export now to: ${recipientEmails.join(', ')}?`)) {
+        return;
+      }
+
+      if (DEBUG) {
+        console.log('Sending export immediately with schedule ID:', scheduleId);
+        console.log('Recipients:', recipientEmails);
+      }
+
+      try {
+        const res = await fetch(`/api/exports/${currentWorkbookId}/send/${scheduleId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            recipients: recipientEmails
+          })
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`Failed to send export: ${res.status} ${errorText}`);
+        }
+
+        const result = await res.json();
+        alert('Export has been sent successfully!');
+        
+        if (DEBUG) console.log('Export sent:', result);
+      } catch (err) {
+        console.error('Error sending export:', err);
+        alert(`Error sending export: ${err.message}`);
+      }
+    }
+
+    /**
+     * Delete an export schedule
+     */
+    async function deleteExport(scheduleId, title) {
+      if (!scheduleId) {
+        alert('Invalid schedule ID');
+        console.error('Schedule ID is undefined or null');
+        return;
+      }
+      
+      if (!confirm(`Delete export schedule "${title}"?`)) return;
+
+      if (DEBUG) {
+        console.log('Deleting export with schedule ID:', scheduleId);
+      }
+
+      try {
+        const res = await fetch(`/api/exports/${currentWorkbookId}/${scheduleId}`, {
+          method: 'DELETE'
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`Failed to delete export: ${res.status} ${errorText}`);
+        }
+
+        // Reload exports list
+        await loadExportSchedules();
+        renderExportsList();
+        
+        alert('Export schedule deleted successfully!');
+        if (DEBUG) console.log('Export deleted:', scheduleId);
+      } catch (err) {
+        console.error('Error deleting export:', err);
+        alert(`Error deleting export: ${err.message}`);
+      }
+    }
+
+    // ============================================================================
+    // EVENT HANDLERS
+    // ============================================================================
+
+    /**
+     * Initialize export modal event listeners
+     */
+    function initializeExportModal() {
+      const exportBtn = document.getElementById("exportModalBtn");
+      const modal = document.getElementById("exportModal");
+      const closeBtn = document.querySelector(".modal-close");
+      const cancelBtn = document.getElementById("cancelBtn");
+      const form = document.getElementById("exportForm");
+
+      // Open modal
+      if (exportBtn) {
+        exportBtn.addEventListener("click", () => {
+          if (!currentWorkbookId) {
+            alert("Please select a workbook first.");
+            return;
+          }
+          openExportModal();
+        });
+      }
+
+      // Close modal handlers
+      if (closeBtn) {
+        closeBtn.addEventListener("click", closeExportModal);
+      }
+
+      if (cancelBtn) {
+        cancelBtn.addEventListener("click", handleCancelClick);
+      }
+
+      // Close on overlay click
+      if (modal) {
+        modal.addEventListener("click", (e) => {
+          if (e.target === modal) {
+            closeExportModal();
+          }
+        });
+      }
+
+      // Form submission
+      if (form) {
+        form.addEventListener("submit", handleExportSubmit);
+      }
+
+      // ESC key to close modal
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modal && modal.classList.contains("open")) {
+          closeExportModal();
+        }
+      });
+
+      if (DEBUG) console.log("Export modal initialized");
+    }
+
+    /**
+     * Initialize manage exports modal event listeners
+     */
+    function initializeManageExportsModal() {
+      const manageBtn = document.getElementById("manageExportsBtn");
+      const modal = document.getElementById("manageExportsModal");
+      const closeBtn = document.getElementById("manageExportsClose");
+
+      // Open manage exports modal
+      if (manageBtn) {
+        manageBtn.addEventListener("click", () => {
+          openManageExportsModal();
+        });
+      }
+
+      // Close modal handlers
+      if (closeBtn) {
+        closeBtn.addEventListener("click", closeManageExportsModal);
+      }
+
+      // Close on overlay click
+      if (modal) {
+        modal.addEventListener("click", (e) => {
+          if (e.target === modal) {
+            closeManageExportsModal();
+          }
+        });
+      }
+
+      // ESC key to close modal
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modal && modal.classList.contains("open")) {
+          closeManageExportsModal();
+        }
+      });
+
+      if (DEBUG) console.log("Manage exports modal initialized");
+    }
+
+    // ============================================================================
+    // APPLICATION INITIALIZATION
+    // ============================================================================
+
+    /**
+     * Global app initialization
+     */
+    async function initialize() {
+      await loadEnv(); // Load environment vars from /env
+      await loadWorkbooks(); // Populate workbook dropdown
+
+      initializeExportModal(); // Setup export modal controls
+      initializeManageExportsModal(); // Setup manage exports modal controls
+      updateExportButtonState(); // Set initial button state
+
+      // Toggle Info Panel functionality
+      const sidebar = document.querySelector(".sidebar");
+      const toggleButton = document.getElementById("collapse-info");
+      
+      if (toggleButton && sidebar) {
+        toggleButton.addEventListener("click", () => {
+          sidebar.classList.toggle("collapsed");
+          if (DEBUG) console.log("Toggle Info Panel clicked - collapsed:", sidebar.classList.contains("collapsed"));
+        });
+        if (DEBUG) console.log("Toggle Info Panel event listener attached");
+      } else {
+        if (DEBUG) console.warn("Toggle Info Panel setup failed - button:", !!toggleButton, "sidebar:", !!sidebar);
+      }
+      
+      if (DEBUG) console.log("Application initialized");
+    }
+
+    // ============================================================================
+    // MAIN EXECUTION
+    // ============================================================================
+
+    // Wait for full DOM load before initializing app logic
+    document.addEventListener("DOMContentLoaded", initialize);
+  </script>
+</html>
