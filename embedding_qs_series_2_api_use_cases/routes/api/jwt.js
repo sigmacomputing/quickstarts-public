@@ -38,14 +38,14 @@ router.post("/:mode", async (req, res) => {
       return res.status(400).json({ error: "Missing workbookUrlId" });
     }
 
-    // 🔄 Map shorthand identifiers like "build" → actual email
+    // Map shorthand identifiers like "build" -> actual email
     const userMap = {
       view: process.env.VIEW_EMAIL,
       build: process.env.BUILD_EMAIL,
     };
     const sub = userMap[selectedUser] || selectedUser;
 
-    // ✅ Determine permissions based on actual user email
+    // Determine permissions based on actual user email
     let permissions = ["view"];
     if (sub === process.env.BUILD_EMAIL) {
       permissions = ["build"];
@@ -75,12 +75,12 @@ router.post("/:mode", async (req, res) => {
     }
 
     if (process.env.DEBUG === "true") {
-      console.log("📨 JWT request body:", req.body);
-      console.log("📘 embedType:", embedType);
-      console.log("📗 workbookUrlId:", workbookUrlId);
-      console.log("👤 selectedUser (sub):", sub);
-      console.log("🔖 bookmarkId:", bookmarkId);
-      console.log("🔑 exploreKey:", exploreKey);
+      console.log("JWT request body:", req.body);
+      console.log("embedType:", embedType);
+      console.log("workbookUrlId:", workbookUrlId);
+      console.log("selectedUser (sub):", sub);
+      console.log("bookmarkId:", bookmarkId);
+      console.log("exploreKey:", exploreKey);
     }
 
     const embedUrl = buildEmbedUrl({
@@ -97,7 +97,7 @@ router.post("/:mode", async (req, res) => {
       menu_position,
     });
 
-    // ✅ Now pass permissions explicitly
+    // Now pass permissions explicitly
     const jwt = generateJwt({ embedUrl, mode, sub, permissions });
 
     if (process.env.DEBUG === "true") {
@@ -109,7 +109,7 @@ router.post("/:mode", async (req, res) => {
       .status(200)
       .json({ embedUrl: `${embedUrl}${separator}:jwt=${jwt}`, jwt });
   } catch (err) {
-    console.error("❌ JWT generation error:", err.message);
+    console.error("JWT generation error:", err.message);
     res.status(500).json({ error: "Failed to generate JWT" });
   }
 });

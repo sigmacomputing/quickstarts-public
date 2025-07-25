@@ -270,7 +270,7 @@
         <h2>Save Bookmark</h2>
         <div class="warning" id="explore-warning">
           <br />
-          ⚠️ Create an exploration before saving a bookmark!
+          WARNING: Create an exploration before saving a bookmark!
         </div>
         <label for="bookmarkName">Bookmark Name:</label>
 
@@ -358,9 +358,9 @@
         envConfig = await res.json();
         env = envConfig; // Keep both for compatibility
         DEBUG = String(envConfig.DEBUG).toLowerCase() === "true";
-        if (DEBUG) console.log("✅ Loaded envConfig:", envConfig);
+        if (DEBUG) console.log("Loaded envConfig:", envConfig);
       } catch (err) {
-        if (DEBUG) console.warn("⚠️ Failed to load env.json:", err);
+        if (DEBUG) console.warn("Failed to load env.json:", err);
       }
     }
 
@@ -505,7 +505,7 @@
       if (bookmarkPanel && bookmarkPanel.classList.contains("open")) {
         bookmarkPanel.classList.remove("open");
         document.body.classList.remove("panel-open");
-        if (DEBUG) console.log("🔒 Panel closed during role change - removed panel-open class from body");
+        if (DEBUG) console.log("Panel closed during role change - removed panel-open class from body");
         updateBookmarkToggleLabel();
       }
     }
@@ -519,7 +519,7 @@
 
       if (!form || !bookmarkToggle || !saveBtn || !nameInput) return;
 
-      // ✅ Guard: if we are loading a bookmark for editing, avoid updating state mid-load
+      // Guard: if we are loading a bookmark for editing, avoid updating state mid-load
       if (form.dataset.bookmarkId && nameInput.value.trim() === "") {
         if (DEBUG)
           console.log(
@@ -546,10 +546,10 @@
           document.body.classList.remove("panel-open");
           resetBookmarkForm();
           updateBookmarkToggleLabel();
-          if (DEBUG) console.log("🔒 Force-closed bookmark panel when switching to View User");
+          if (DEBUG) console.log("Force-closed bookmark panel when switching to View User");
         }
         
-        if (DEBUG) console.log("🔒 Hiding Manage Bookmarks and Clear All buttons for View User");
+        if (DEBUG) console.log("Hiding Manage Bookmarks and Clear All buttons for View User");
         return; // Exit early, no need to update other bookmark controls
       }
       
@@ -676,7 +676,7 @@
           const bookmarkSelect = document.getElementById("bookmarkSelect");
           if (bookmarkSelect && bookmarkSelect.value === "") {
             resetBookmarkForm();
-            if (DEBUG) console.log("🔄 Reset bookmark form when switching to Build User - Original Workbook selected");
+            if (DEBUG) console.log("Reset bookmark form when switching to Build User - Original Workbook selected");
           }
         }
 
@@ -916,7 +916,7 @@
           });
 
           if (DEBUG) {
-            console.log("🔧 Rendering manage panel bookmarks:", filtered);
+            console.log("Rendering manage panel bookmarks:", filtered);
           }
 
           if (filtered.length === 0) {
@@ -955,17 +955,17 @@
         
         // If a specific bookmark was requested (e.g., newly created), load its embed
         if (selectedBookmarkId && filteredBookmarks.some(bm => String(bm.id) === String(selectedBookmarkId))) {
-          if (DEBUG) console.log("✅ Auto-loading embed for selected bookmark:", selectedBookmarkId);
+          if (DEBUG) console.log("Auto-loading embed for selected bookmark:", selectedBookmarkId);
           loadEmbed(selectedBookmarkId);
         } else if (selectedBookmarkId) {
           if (DEBUG) {
-            console.warn("❌ Could not find requested bookmark ID in filtered results:", selectedBookmarkId);
+            console.warn("Could not find requested bookmark ID in filtered results:", selectedBookmarkId);
             console.log("Available filtered bookmark IDs:", filteredBookmarks.map(bm => bm.id));
           }
         }
 
         if (DEBUG) {
-          console.log(`✅ Bookmarks loading completed:`);
+          console.log(`Bookmarks loading completed:`);
           console.log(`  - Total bookmarks: ${bookmarks.length}`);
           console.log(`  - Filtered for ${currentUserEmail}: ${filteredBookmarks.length}`);
           console.log(`  - Selected bookmark ID: ${selectedBookmarkId || 'none'}`);
@@ -997,7 +997,7 @@
           selectedBookmarkId
         );
         console.log(
-          "📄 Loaded bookmark IDs:",
+          "Loaded bookmark IDs:",
           loadedBookmarks?.map((b) => b.id)
         );
       }
@@ -1007,7 +1007,7 @@
         return;
       }
 
-      // 🔍 Look up exploreKey from loadedBookmarks if a bookmark is selected
+      // Look up exploreKey from loadedBookmarks if a bookmark is selected
       let exploreKey = undefined;
       if (selectedBookmarkId && Array.isArray(loadedBookmarks)) {
         const found = loadedBookmarks.find(
@@ -1015,9 +1015,9 @@
         );
 
         if (DEBUG) {
-          console.log("🔍 Trying to find bookmarkId:", selectedBookmarkId);
+          console.log("Trying to find bookmarkId:", selectedBookmarkId);
           console.log(
-            "📄 All loaded bookmark IDs:",
+            "All loaded bookmark IDs:",
             loadedBookmarks.map((b) => b.id)
           );
         }
@@ -1077,8 +1077,8 @@
           }
         );
 
-        const data = await res.json(); // ✅ Only call once
-        if (DEBUG) console.log("🔍 JWT fetch result:", data);
+        const data = await res.json(); // Only call once
+        if (DEBUG) console.log("JWT fetch result:", data);
 
         const { embedUrl, jwt } = data;
 
@@ -1115,9 +1115,9 @@
             <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>`;
         }
 
-        if (DEBUG) console.log("✅ Embed iframe injected:", iframe.src);
+        if (DEBUG) console.log("Embed iframe injected:", iframe.src);
       } catch (err) {
-        console.error("❌ Failed to fetch JWT or load embed", err);
+        console.error("Failed to fetch JWT or load embed", err);
       }
     }
 
@@ -1127,7 +1127,7 @@
 
     // Load a saved bookmark into the form for editing
     async function loadBookmarkForEditing(bookmarkId) {
-      console.log("🔧 loadBookmarkForEditing called with:", bookmarkId);
+      console.log("loadBookmarkForEditing called with:", bookmarkId);
       console.trace("📌 loadBookmarkForEditing call trace");
       try {
         const res = await fetch(`/api/bookmarks_db?bookmarkId=${bookmarkId}`);
@@ -1215,14 +1215,14 @@
           // Update button states to ensure Clear All button is visible for Build Users
           updateBookmarkButtonState();
           
-          if (DEBUG) console.log("✅ UI cleanup after bookmark deletion completed");
+          if (DEBUG) console.log("UI cleanup after bookmark deletion completed");
         } catch (uiError) {
-          console.error("⚠️ UI cleanup error after successful deletion:", uiError);
+          console.error("UI cleanup error after successful deletion:", uiError);
           // Don't show error to user since deletion was successful
         }
         
       } catch (err) {
-        console.error("❌ Failed to delete bookmark:", err);
+        console.error("Failed to delete bookmark:", err);
         alert(`Failed to delete bookmark: ${err.message}`);
       }
     }
@@ -1323,7 +1323,7 @@
         }
       }
 
-      // ✅ Case 2: user or embed loads a saved bookmark (Sigma sends bookmarkId)
+      // Case 2: user or embed loads a saved bookmark (Sigma sends bookmarkId)
       if (data.type === "workbook:bookmark:onchange") {
         // We don’t get exploreKey here, but we can enable buttons if needed
         if (DEBUG)
@@ -1350,12 +1350,12 @@
       if (isOpen) {
         panel.classList.remove("open");
         document.body.classList.remove("panel-open");
-        if (DEBUG) console.log("🔒 Panel closed - removed panel-open class from body");
+        if (DEBUG) console.log("Panel closed - removed panel-open class from body");
         resetBookmarkForm();
       } else {
         panel.classList.add("open");
         document.body.classList.add("panel-open");
-        if (DEBUG) console.log("🔓 Panel opened - added panel-open class to body");
+        if (DEBUG) console.log("Panel opened - added panel-open class to body");
 
         const currentBookmarkId =
           preloadBookmarkId || document.getElementById("bookmarkSelect")?.value;
@@ -1386,12 +1386,12 @@
           "📥 Selected bookmarkId from dropdown:",
           selectedBookmarkId
         );
-        console.log("📄 Available bookmark IDs:");
+        console.log("Available bookmark IDs:");
         loadedBookmarks.forEach((b) => console.log(" -", b.id));
       }
 
       if (DEBUG) {
-        console.log("🔍 Comparing selectedBookmarkId:", selectedBookmarkId);
+        console.log("Comparing selectedBookmarkId:", selectedBookmarkId);
         loadedBookmarks.forEach((b) => console.log(" - Comparing to:", b.id));
       }
 
@@ -1401,7 +1401,7 @@
 
       if (!bookmark) {
         console.warn(
-          "❌ Bookmark not found for selected ID- Trigger loading of a selected bookmark:",
+          "Bookmark not found for selected ID- Trigger loading of a selected bookmark:",
           selectedBookmarkId
         );
         return;
@@ -1458,7 +1458,7 @@
       };
 
       if (DEBUG) {
-        console.log("📤 Saving bookmark with payload:", payload);
+        console.log("Saving bookmark with payload:", payload);
       }
 
       // Set submission flag to prevent double-clicks
@@ -1488,7 +1488,7 @@
           // Reload bookmarks and select the newly created one
           const newBookmarkId = data.bookmarkId;
           if (DEBUG) {
-            console.log("🔄 Reloading bookmarks to select new bookmark:", newBookmarkId);
+            console.log("Reloading bookmarks to select new bookmark:", newBookmarkId);
           }
           return loadBookmarks(newBookmarkId);
         })
@@ -1499,7 +1499,7 @@
         .finally(() => {
           // Always reset the submission flag when done (success or error)
           isSubmittingBookmark = false;
-          if (DEBUG) console.log("✅ Bookmark submission completed, flag reset");
+          if (DEBUG) console.log("Bookmark submission completed, flag reset");
         });
     }
 
@@ -1536,7 +1536,7 @@
 
     // Apply a bookmark by ID — looks up the exploreKey from loaded bookmarks and reloads the embed
     function applyBookmarkById(bookmarkId) {
-      console.log("➡️ applyBookmarkById called with ID:", bookmarkId);
+      console.log("applyBookmarkById called with ID:", bookmarkId);
       console.log("🔎 loadedBookmarks available:", loadedBookmarks);
       loadedBookmarks.forEach((b) => console.log(" -", b.id));
       const bm = loadedBookmarks.find((b) => b.id === bookmarkId);
@@ -1554,11 +1554,11 @@
     }
 
     async function handleBookmarkClick(bm) {
-      console.log("✅ Triggering loadEmbed with selected bookmark ID:", bm.id);
-      console.log("🔑 Matching exploreKey:", bm.exploreKey);
+      console.log("Triggering loadEmbed with selected bookmark ID:", bm.id);
+      console.log("Matching exploreKey:", bm.exploreKey);
 
       console.log(
-        "📄 Loaded bookmarks at time of embed:",
+        "Loaded bookmarks at time of embed:",
         loadedBookmarks.map((b) => b.id)
       );
       await loadEmbed(bm.id);
@@ -1582,7 +1582,7 @@
           exploreKey,
         });
 
-        if (DEBUG) console.log("🔗 Generated Embed URL from new bookmark:", embedUrl);
+        if (DEBUG) console.log("Generated Embed URL from new bookmark:", embedUrl);
       }
     });
 
@@ -1595,7 +1595,7 @@
      * Call from browser console: debugBookmarks()
      */
     window.debugBookmarks = function() {
-      console.log("🔍 BOOKMARK DEBUG INFO:");
+      console.log("BOOKMARK DEBUG INFO:");
       console.log("  - currentUserEmail:", currentUserEmail);
       console.log("  - env.VIEW_EMAIL:", env.VIEW_EMAIL);
       console.log("  - window.selectedworkbookUrlId:", window.selectedworkbookUrlId);
@@ -1609,11 +1609,11 @@
       console.log("  - Dropdown disabled:", select?.disabled);
       
       // Force reload bookmarks
-      console.log("🔄 Force reloading bookmarks...");
+      console.log("Force reloading bookmarks...");
       loadBookmarks().then(() => {
-        console.log("✅ Force reload complete");
+        console.log("Force reload complete");
       }).catch(err => {
-        console.error("❌ Force reload failed:", err);
+        console.error("Force reload failed:", err);
       });
     };
 
@@ -1678,7 +1678,7 @@
           const panel = document.getElementById("bookmarkPanel");
           panel.classList.remove("open");
           document.body.classList.remove("panel-open");
-          if (DEBUG) console.log("🔒 Panel closed via close button - removed panel-open class from body");
+          if (DEBUG) console.log("Panel closed via close button - removed panel-open class from body");
           resetBookmarkForm();
           updateBookmarkToggleLabel();
         });
@@ -1711,7 +1711,7 @@
         const clearAllBtn = document.getElementById("clearAllBookmarks");
         
         if (DEBUG) {
-          console.log("🔍 BUTTON DEBUG INFO:");
+          console.log("BUTTON DEBUG INFO:");
           console.log("  - roleSelect found:", !!roleSelect, "value:", roleSelect?.value);
           console.log("  - bookmarkToggle found:", !!bookmarkToggle);
           console.log("  - clearAllBtn found:", !!clearAllBtn);
@@ -1724,7 +1724,7 @@
           const selected = roleSelect.selectedOptions[0];
           currentMode = selected?.dataset.mode || "view";
           if (DEBUG) {
-            console.log("🔄 Auto-detected initial user:", currentUserEmail, "mode:", currentMode);
+            console.log("Auto-detected initial user:", currentUserEmail, "mode:", currentMode);
           }
         }
         

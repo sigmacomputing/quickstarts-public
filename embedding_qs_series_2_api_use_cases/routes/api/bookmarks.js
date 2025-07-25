@@ -86,7 +86,7 @@ router.get("/list", async (req, res) => {
  * Deletes all bookmarks for a workbook from Sigma API
  */
 router.delete("/clear-all", async (req, res) => {
-  if (DEBUG) console.log("🗑️ Clear all bookmarks route hit (direct API)");
+  if (DEBUG) console.log("Clear all bookmarks route hit (direct API)");
   
   const { workbookUrlId, userEmail } = req.body;
 
@@ -104,7 +104,7 @@ router.delete("/clear-all", async (req, res) => {
     const workbook = await resolveWorkbookId(workbookUrlId);
     const workbookId = workbook.id;
     
-    if (DEBUG) console.log("✅ Resolved workbook ID:", workbookId);
+    if (DEBUG) console.log("Resolved workbook ID:", workbookId);
     
     // Step 2: Get bearer token for Sigma API
     const token = await getBearerToken();
@@ -112,7 +112,7 @@ router.delete("/clear-all", async (req, res) => {
       throw new Error("Failed to obtain bearer token for Sigma API");
     }
 
-    if (DEBUG) console.log("✅ Bearer token obtained for clear all operation");
+    if (DEBUG) console.log("Bearer token obtained for clear all operation");
 
     // Step 3: Fetch all bookmarks from Sigma API
     const headers = {
@@ -141,10 +141,10 @@ router.delete("/clear-all", async (req, res) => {
 
         if (delRes.ok) {
           deletedCount++;
-          if (DEBUG) console.log(`✅ Deleted Sigma bookmark: ${bookmark.name} (${bookmark.bookmarkId})`);
+          if (DEBUG) console.log(`Deleted Sigma bookmark: ${bookmark.name} (${bookmark.bookmarkId})`);
         } else {
           const errText = await delRes.text();
-          if (DEBUG) console.error(`❌ Failed to delete Sigma bookmark ${bookmark.name}: ${delRes.status} ${errText}`);
+          if (DEBUG) console.error(`Failed to delete Sigma bookmark ${bookmark.name}: ${delRes.status} ${errText}`);
         }
 
         // Throttle API calls to avoid rate limiting
@@ -156,7 +156,7 @@ router.delete("/clear-all", async (req, res) => {
     }
 
     if (DEBUG) {
-      console.log(`✅ Clear all bookmarks completed - deleted ${deletedCount} bookmarks`);
+      console.log(`Clear all bookmarks completed - deleted ${deletedCount} bookmarks`);
     }
 
     res.json({ 
@@ -166,7 +166,7 @@ router.delete("/clear-all", async (req, res) => {
     });
     
   } catch (err) {
-    if (DEBUG) console.error("❌ Clear all bookmarks failed:", err.message);
+    if (DEBUG) console.error("Clear all bookmarks failed:", err.message);
     res.status(500).json({ error: `Failed to clear all bookmarks: ${err.message}` });
   }
 });

@@ -14,6 +14,8 @@
 :root {
   /* Colors */
   --primary-color: #f57c00;
+  --export-primary: #1976d2;
+  --export-primary-hover: #1565c0;
   --secondary-color: #333;
   --background-color: #ffffff;
   --sidebar-bg: #f4f4f4;
@@ -495,6 +497,308 @@ hr {
   border: none;
   border-top: 1px solid var(--border-color);
   margin: var(--spacing-lg) 0;
+}
+
+/* ============================================================================
+   MODAL STYLES
+   ============================================================================ */
+
+/* Export Modal Button */
+#exportModalBtn {
+  position: fixed;
+  top: 45px;
+  right: var(--spacing-md);
+  z-index: 1100;
+  background: var(--export-primary);
+  color: white;
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-lg);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+
+#exportModalBtn:hover {
+  background: var(--export-primary-hover);
+}
+
+#exportModalBtn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Manage Exports Button */
+#manageExportsBtn {
+  position: fixed;
+  top: 45px;
+  right: 170px; /* Position to left of export button */
+  z-index: 1100;
+  background: var(--secondary-color);
+  color: white;
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-lg);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+
+#manageExportsBtn:hover {
+  background: var(--hover-bg);
+}
+
+#manageExportsBtn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Export Modal Overlay */
+#exportModal,
+#manageExportsModal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  justify-content: center;
+  align-items: center;
+}
+
+#exportModal.open,
+#manageExportsModal.open {
+  display: flex;
+}
+
+/* Export Modal Content */
+.modal-content {
+  background: white;
+  border-radius: var(--spacing-sm);
+  padding: var(--spacing-xl);
+  width: 500px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--text-color);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: var(--spacing-xl);
+  cursor: pointer;
+  color: #666;
+  margin-left: auto;
+}
+
+.modal-close:hover {
+  color: var(--text-color);
+}
+
+/* Form Sections */
+.form-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.form-section h3 {
+  margin: 0 0 var(--spacing-md) 0;
+  font-size: var(--font-size-base);
+  color: var(--text-color);
+}
+
+.form-group {
+  margin-bottom: var(--spacing-md);
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: var(--spacing-xs);
+  font-weight: 500;
+  color: var(--secondary-color);
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  box-sizing: border-box;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.form-row {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+/* Modal Actions */
+.modal-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
+  margin-top: var(--spacing-xl);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--border-color);
+}
+
+.btn {
+  padding: 10px var(--spacing-lg);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.btn-primary {
+  background: var(--export-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--export-primary-hover);
+}
+
+.btn-primary:disabled {
+  background: var(--border-light);
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--panel-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: #e0e0e0;
+}
+
+/* Hide modal overlay when closed */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* Exports List Styles */
+.export-item {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+  background: var(--background-color);
+}
+
+.export-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-sm);
+}
+
+.export-item-title {
+  font-weight: bold;
+  color: var(--text-color);
+  margin: 0;
+}
+
+.export-item-schedule {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin: var(--spacing-xs) 0;
+}
+
+.export-item-recipients {
+  font-size: var(--font-size-xs);
+  color: var(--secondary-color);
+  margin-bottom: var(--spacing-md);
+}
+
+.export-item-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.btn-small {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  border-radius: var(--border-radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.btn-edit {
+  background: var(--export-primary);
+  color: white;
+}
+
+.btn-edit:hover {
+  background: var(--export-primary-hover);
+}
+
+.btn-run {
+  background: #28a745;
+  color: white;
+}
+
+.btn-run:hover {
+  background: #218838;
+}
+
+.btn-delete {
+  background: var(--delete-color);
+  color: white;
+}
+
+.btn-delete:hover {
+  background: #8f0016;
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.loading-state {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--text-muted);
 }
 
 /* ============================================================================

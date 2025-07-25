@@ -22,7 +22,7 @@ module.exports = async ({ userEmail, workbookUrlId, exploreKey, name }) => {
   };
 
   if (process.env.DEBUG === "true") {
-    console.log("📋 POST payload:", payload);
+    console.log("POST payload:", payload);
   }
 
   const response = await fetch(`${BASE_URL}/workbooks/${workbookId}/bookmarks`, {

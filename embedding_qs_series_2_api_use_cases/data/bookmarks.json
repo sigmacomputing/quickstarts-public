@@ -1,3 +1,15 @@
 {
-  "bookmarks": []
+  "bookmarks": [
+    {
+      "id": "8f6c08b5-70c2-4aac-b833-87de4d3f1af4",
+      "userEmail": "build.embed.qs@example.com",
+      "workbookUrlId": "r0WXMPpc0YtQCTFR7CdDK",
+      "exploreKey": "bcaec92c-ef0e-40a0-b784-f53841bd384d",
+      "name": "Mobile Phones",
+      "descr": "",
+      "sharedWith": [
+        "team:Embed_Users"
+      ]
+    }
+  ]
 }
