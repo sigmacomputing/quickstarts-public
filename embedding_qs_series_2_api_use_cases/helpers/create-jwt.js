@@ -41,8 +41,8 @@ function generateJwt({ embedUrl, mode, sub, permissions }) {
   }
 
   if (process.env.DEBUG === "true") {
-    console.log("🔐 JWT payload:", payload);
-    console.log("🔐 JWT for:", payload.sub);
+    console.log("JWT payload:", payload);
+    console.log("JWT for:", payload.sub);
   }
 
   return jwt.sign(payload, secret, {

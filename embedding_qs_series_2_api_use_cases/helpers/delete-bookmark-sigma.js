@@ -26,5 +26,5 @@ module.exports = async function deleteBookmarkSigma({
     },
   });
 
-  console.log(`✅ Deleted bookmark ${bookmarkId} from Sigma for ${userEmail}`);
+  console.log(`Deleted bookmark ${bookmarkId} from Sigma for ${userEmail}`);
 };

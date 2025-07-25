@@ -52,7 +52,7 @@ async function deleteAllBookmarks(workbookId, resetLocal = false) {
 
   console.log(`Parsed bookmark entries: ${bookmarks.length}`);
   if (bookmarks.length === 0) {
-    console.log("🎉 No Sigma bookmarks found to delete.");
+    console.log("No Sigma bookmarks found to delete.");
   } else {
     console.log(`Deleting ${bookmarks.length} Sigma bookmarks…`);
     for (const b of bookmarks) {

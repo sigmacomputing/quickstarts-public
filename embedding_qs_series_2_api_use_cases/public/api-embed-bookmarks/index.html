@@ -216,17 +216,17 @@
       select.addEventListener("change", (e) => {
         const selected = e.target.selectedOptions[0];
         currentMode = selected.dataset.mode || "view";
-        if (DEBUG) console.log("🔍 currentMode set to:", currentMode);
+        if (DEBUG) console.log("currentMode set to:", currentMode);
 
         // Show/hide Clear All button based on user permissions
         const clearAllBtn = document.getElementById("clearAllBookmarks");
         if (clearAllBtn) {
           if (currentMode === "build") {
             clearAllBtn.style.display = "inline-block";
-            if (DEBUG) console.log("🔓 Showing Clear All button for Build User");
+            if (DEBUG) console.log("Showing Clear All button for Build User");
           } else {
             clearAllBtn.style.display = "none";
-            if (DEBUG) console.log("🔒 Hiding Clear All button for View User");
+            if (DEBUG) console.log("Hiding Clear All button for View User");
           }
         }
 
@@ -498,7 +498,7 @@
             try {
               const listRes = await fetch(`/api/bookmarks/list?workbookUrlId=${encodeURIComponent(workbookUrlId)}`);
               const { entries: bookmarksToDelete = [] } = await listRes.json();
-              console.log(`📋 About to delete ${bookmarksToDelete.length} bookmarks:`);
+              console.log(`About to delete ${bookmarksToDelete.length} bookmarks:`);
               bookmarksToDelete.forEach((bookmark, index) => {
                 console.log(`  ${index + 1}. ${bookmark.name} (ID: ${bookmark.bookmarkId})`);
               });
@@ -523,8 +523,8 @@
           
           const result = await res.json();
           if (DEBUG) {
-            console.log("✅ Clear all bookmarks completed successfully");
-            console.log(`📊 Total bookmarks deleted: ${result.deletedCount}`);
+            console.log("Clear all bookmarks completed successfully");
+            console.log(`Total bookmarks deleted: ${result.deletedCount}`);
             console.log("Full response:", result);
           }
           
@@ -535,7 +535,7 @@
           loadEmbed(""); // Load original workbook without bookmark
           
         } catch (err) {
-          if (DEBUG) console.error("❌ Failed to clear all bookmarks:", err);
+          if (DEBUG) console.error("Failed to clear all bookmarks:", err);
           alert(`Failed to clear all bookmarks: ${err.message}`);
         }
       });
