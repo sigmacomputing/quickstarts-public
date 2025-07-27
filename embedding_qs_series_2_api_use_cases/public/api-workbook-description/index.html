@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Page metadata and layout styles -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Workbook Description QuickStart</title>
+    <link rel="stylesheet" href="/styles/main.css" />
+    <link rel="icon" href="data:," />
+
+  </head>
+
+  <body>
+    <!-- === Top bar === -->
+    <header class="layout-topbar">
+      <!-- Navigation and title -->
+      <div style="display: flex; align-items: center; gap: 0.5rem">
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+        <div>
+          <span class="header-title" style="font-weight: bold; color: white;">
+            API Workbook Description QuickStart
+          </span>
+          <div id="workbookDescription" style="margin-top: 5px; font-size: 0.9em; color: #ccc; font-style: italic;">
+            Select a workbook to view or set a description
+          </div>
+        </div>
+      </div>
+
+      <!-- Simple Control Panel - Just Workbook Selection -->
+      <div
+        class="control-panel"
+        style="display: flex; flex-wrap: wrap; gap: 24px; margin-top: 10px"
+      >
+        <!-- Workbook Select -->
+        <div class="control-group">
+          <label for="workbookSelect" style="color: white;">Workbook:</label>
+          <select id="workbookSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a workbook
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Toggle info panel and README link -->
+      <div style="white-space: nowrap; margin-top: 10px;">
+        <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
+        <button onclick="window.open('/api-workbook-description/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+      </div>
+    </header>
+
+    <!-- === Main Layout === -->
+    <main class="main">
+      <!-- === Sidebar Info Panel === -->
+      <aside class="sidebar">
+        <h2>Information:</h2>
+        <p>
+          The embedded content should render in the iframe on the right, based
+          on your .env file configuration.
+        </p>
+        <code id="debug-embed-url">N/A</code>
+
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <p>Loading...</p>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+      </aside>
+
+      <!-- === iFrame === -->
+      <div id="embedContainer" class="content"></div>
+    </main>
+
+    <!-- Workbook Description Button -->
+    <button id="descriptionModalBtn" disabled>Workbook Description</button>
+
+    <!-- Workbook Description Modal -->
+    <div id="descriptionModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modalTitle">Workbook Description</h2>
+          <button class="modal-close" type="button">×</button>
+        </div>
+
+        <form id="descriptionForm">
+          <div class="form-section">
+            <div class="form-group">
+              <label for="workbookDescriptionInput">Description</label>
+              <textarea 
+                id="workbookDescriptionInput" 
+                name="description" 
+                rows="6"
+                placeholder="Enter a description for this workbook..."
+                required
+              ></textarea>
+            </div>
+          </div>
+
+          <!-- Modal Actions -->
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="saveBtn">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- === Footer === -->
+    <footer class="layout-footer">Sigma © 2025</footer>
+  </body>
+
+  <script>
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+    let DEBUG = false;
+    let env = {};
+    let currentWorkbookId = null;
+    let currentWorkbook = null;
+    let isSubmittingDescription = false;
+    let currentDescription = null;
+
+    // ============================================================================
+    // ENVIRONMENT & CONFIGURATION
+    // ============================================================================
+    
+    /**
+     * Loads environment configuration from the server
+     * Sets DEBUG flag and populates global env object
+     */
+    async function loadEnv() {
+      try {
+        const res = await fetch("/env.json");
+        env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode enabled via /env.json");
+      } catch (err) {
+        if (DEBUG) console.warn("Failed to load /env.json config:", err.message);
+      }
+    }
+
+    /**
+     * Decodes a JWT token into header and payload components
+     * @param {string} token - JWT token string
+     * @returns {object} Object containing header and payload or error
+     */
+    function decodeJwt(token) {
+      try {
+        const [headerB64, payloadB64] = token.split(".");
+        const decodePart = (str) => {
+          const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+          const padded = base64 + "===".slice((base64.length + 3) % 4);
+          return JSON.parse(atob(padded));
+        };
+        return {
+          header: decodePart(headerB64),
+          payload: decodePart(payloadB64),
+        };
+      } catch (err) {
+        console.warn("JWT decode error:", err);
+        return { error: "Failed to decode JWT." };
+      }
+    }
+
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
+
+    /**
+     * Fetch the list of available workbooks from the API
+     * Filters to only show workbooks accessible to Build users
+     */
+    async function loadWorkbooks() {
+      const select = document.getElementById("workbookSelect");
+      if (!select) return;
+
+      try {
+        const res = await fetch("/api/workbooks");
+        const data = await res.json();
+        const workbooks = data.workbooks || [];
+
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select a workbook</option>`;
+
+        workbooks.forEach((wb) => {
+          const opt = document.createElement("option");
+          opt.value = wb.url.split("/").pop();
+          opt.textContent = wb.name;
+          opt.dataset.workbookid = wb.id;
+          select.appendChild(opt);
+        });
+
+        select.addEventListener("change", async (e) => {
+          const selectedOption = e.target.selectedOptions[0];
+          window.selectedworkbookUrlId = e.target.value;
+          window.selectedworkbookId = selectedOption?.dataset.workbookid || null;
+          currentWorkbookId = window.selectedworkbookUrlId; // Use URL ID, not UUID
+          
+          if (DEBUG) {
+            console.log(`Workbook changed to: ${window.selectedworkbookUrlId} (ID: ${currentWorkbookId})`);
+          }
+          
+          // Load embed for selected workbook
+          await loadEmbed();
+          
+          // Load description for selected workbook
+          await loadWorkbookDescription();
+          
+          // Enable description button
+          updateDescriptionButtonState();
+        });
+      } catch (err) {
+        console.error("Failed to load workbooks:", err);
+      }
+    }
+
+    /**
+     * Load workbook description from the API
+     */
+    async function loadWorkbookDescription() {
+      if (!currentWorkbookId) return;
+
+      try {
+        const res = await fetch(`/api/workbook-descriptions/${currentWorkbookId}`);
+        const data = await res.json();
+        
+        if (DEBUG) {
+          console.log("Loaded workbook description:", data);
+        }
+        
+        currentDescription = data.description;
+        currentWorkbook = data.workbook;
+        
+        // Update the description display
+        updateDescriptionDisplay();
+        
+      } catch (err) {
+        console.error("Failed to load workbook description:", err);
+        currentDescription = null;
+        updateDescriptionDisplay();
+      }
+    }
+
+    /**
+     * Update the description display in the header
+     */
+    function updateDescriptionDisplay() {
+      const descriptionDiv = document.getElementById("workbookDescription");
+      
+      if (currentDescription && currentDescription.description) {
+        descriptionDiv.textContent = currentDescription.description;
+        descriptionDiv.style.fontStyle = "normal";
+        descriptionDiv.style.color = "#fff";
+      } else if (currentWorkbook) {
+        descriptionDiv.textContent = "No description set for this workbook";
+        descriptionDiv.style.fontStyle = "italic";
+        descriptionDiv.style.color = "#ccc";
+      } else {
+        descriptionDiv.textContent = "Select a workbook to view or set a description";
+        descriptionDiv.style.fontStyle = "italic";
+        descriptionDiv.style.color = "#ccc";
+      }
+    }
+
+    // ============================================================================
+    // SIGMA EMBED FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Loads the Sigma embed for the selected workbook using Build user
+     */
+    async function loadEmbed() {
+      const workbookUrlId = window.selectedworkbookUrlId;
+      const embedType = "workbook";
+
+      if (!workbookUrlId) {
+        console.warn("Embed not loaded — no workbook selected.");
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `/api/jwt/api-workbook-description?workbookUrlId=${encodeURIComponent(
+            workbookUrlId
+          )}&embedType=${embedType}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sub: env.BUILD_EMAIL, // Use Build user for this demo
+              hide_folder_navigation: env.HIDE_FOLDER_NAVIGATION,
+              hide_menu: env.HIDE_MENU,
+              menu_position: env.MENU_POSITION,
+              disable_auto_refresh: env.DISABLE_AUTO_REFRESH,
+              disable_mobile_view: env.DISABLE_MOBILE_VIEW,
+              hide_page_controls: env.HIDE_PAGE_CONTROLS,
+              hide_reload_button: env.HIDE_RELOAD_BUTTON,
+              hide_title: env.HIDE_TITLE,
+              hide_tooltip: env.HIDE_TOOLTIP,
+              hide_view_select: env.HIDE_VIEW_SELECT,
+              lng: env.LNG,
+              page_id: env.PAGE_ID,
+              responsive_height: env.RESPONSIVE_HEIGHT,
+              theme: env.THEME,
+              view_id: env.VIEW_ID,
+            }),
+          }
+        );
+
+        const data = await res.json();
+        if (DEBUG) console.log("JWT fetch result:", data);
+
+        const { embedUrl, jwt } = data;
+
+        const container = document.getElementById("embedContainer");
+        if (!container) {
+          console.error("Embed container not found.");
+          return;
+        }
+
+        const iframe = document.createElement("iframe");
+        iframe.src = embedUrl;
+        iframe.width = "100%";
+        iframe.height = "800";
+        iframe.style.border = "none";
+        iframe.setAttribute("allowfullscreen", "true");
+
+        container.innerHTML = ""; // clear previous iframe
+        container.appendChild(iframe);
+
+        // Update sidebar information panel
+        document.getElementById("debug-embed-url").textContent = embedUrl || "N/A";
+        document.getElementById("jwt-display").textContent = jwt;
+
+        // Decode and display JWT information
+        const decoded = decodeJwt(jwt);
+        const decodedBlock = document.getElementById("jwt-decoded");
+        if (decoded.error) {
+          decodedBlock.innerHTML = `<p style="color:red;">${decoded.error}</p>`;
+        } else {
+          decodedBlock.innerHTML = `
+            <h3>Decoded JWT Header:</h3>
+            <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
+            <h3>Decoded JWT Payload:</h3>
+            <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>`;
+        }
+
+        if (DEBUG) console.log("Embed iframe injected:", iframe.src);
+      } catch (err) {
+        console.error("Failed to fetch JWT or load embed", err);
+      }
+    }
+
+    // ============================================================================
+    // DESCRIPTION MODAL FUNCTIONS
+    // ============================================================================
+
+    /**
+     * Updates the description button state based on workbook selection
+     */
+    function updateDescriptionButtonState() {
+      const descriptionBtn = document.getElementById("descriptionModalBtn");
+      const hasWorkbook = currentWorkbookId !== null;
+
+      if (descriptionBtn) {
+        descriptionBtn.disabled = !hasWorkbook;
+        if (DEBUG) {
+          console.log("Description button state:", hasWorkbook ? "ENABLED" : "DISABLED");
+        }
+      }
+    }
+
+    /**
+     * Opens the description modal
+     */
+    function openDescriptionModal() {
+      const modal = document.getElementById("descriptionModal");
+      const modalTitle = document.getElementById("modalTitle");
+      const descriptionInput = document.getElementById("workbookDescriptionInput");
+      const saveBtn = document.getElementById("saveBtn");
+      
+      if (modal) {
+        modal.classList.add("open");
+        document.body.classList.add("modal-open");
+        
+        // Pre-populate with existing description if available
+        if (currentDescription && currentDescription.description) {
+          descriptionInput.value = currentDescription.description;
+          modalTitle.textContent = "Edit Workbook Description";
+          saveBtn.textContent = "Update";
+        } else {
+          descriptionInput.value = "";
+          modalTitle.textContent = "Add Workbook Description";
+          saveBtn.textContent = "Save";
+        }
+        
+        // Focus on the textarea
+        setTimeout(() => descriptionInput.focus(), 100);
+        
+        if (DEBUG) console.log("Description modal opened");
+      }
+    }
+
+    /**
+     * Closes the description modal and resets form
+     */
+    function closeDescriptionModal() {
+      const modal = document.getElementById("descriptionModal");
+      const form = document.getElementById("descriptionForm");
+      
+      if (modal) {
+        modal.classList.remove("open");
+        document.body.classList.remove("modal-open");
+        if (DEBUG) console.log("Description modal closed");
+      }
+      
+      if (form) {
+        form.reset();
+      }
+    }
+
+    /**
+     * Handles description form submission
+     */
+    async function handleDescriptionSubmit(event) {
+      event.preventDefault();
+
+      // Prevent double submission
+      if (isSubmittingDescription) {
+        if (DEBUG) console.log("Description submission already in progress");
+        return;
+      }
+
+      const form = document.getElementById("descriptionForm");
+      const formData = new FormData(form);
+      const description = formData.get("description").trim();
+      
+      if (!description) {
+        alert("Please enter a description");
+        return;
+      }
+
+      if (!currentWorkbook) {
+        alert("No workbook selected");
+        return;
+      }
+
+      // Get member ID from JWT payload (BUILD_EMAIL user)
+      const jwtDisplay = document.getElementById("jwt-display");
+      let memberId = null;
+      
+      if (jwtDisplay && jwtDisplay.textContent !== "Loading JWT...") {
+        try {
+          const decoded = decodeJwt(jwtDisplay.textContent);
+          if (decoded.payload && decoded.payload.sub) {
+            // For this demo, we'll use the email as memberId since we don't have actual member lookup
+            memberId = decoded.payload.sub;
+          }
+        } catch (err) {
+          console.warn("Could not extract member ID from JWT:", err);
+        }
+      }
+      
+      if (!memberId) {
+        memberId = env.BUILD_EMAIL || "build.embed.qs@example.com";
+      }
+
+      if (DEBUG) {
+        console.log("Saving workbook description:", {
+          workbookId: currentWorkbookId,
+          description: description.substring(0, 50) + "...",
+          memberId
+        });
+      }
+
+      // Set submission flag
+      isSubmittingDescription = true;
+      const saveBtn = document.getElementById("saveBtn");
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving...";
+      }
+
+      try {
+        let res;
+        
+        if (currentDescription && currentDescription.description) {
+          // Update existing description
+          res = await fetch(`/api/workbook-descriptions/${currentWorkbookId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              description: description,
+              memberId: memberId
+            }),
+          });
+        } else {
+          // Create new description
+          res = await fetch("/api/workbook-descriptions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              workbookId: currentWorkbookId,
+              description: description,
+              memberId: memberId
+            }),
+          });
+        }
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`Failed to save description: ${res.status} ${errorText}`);
+        }
+
+        const result = await res.json();
+        if (DEBUG) console.log("Description saved:", result);
+
+        alert("Workbook description saved successfully!");
+        
+        // Reload description to get updated data
+        await loadWorkbookDescription();
+        
+        closeDescriptionModal();
+
+      } catch (err) {
+        if (DEBUG) console.error("Error saving description:", err);
+        alert(`Error saving description: ${err.message}`);
+      } finally {
+        // Reset submission state
+        isSubmittingDescription = false;
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = currentDescription ? "Update" : "Save";
+        }
+      }
+    }
+
+    // ============================================================================
+    // EVENT HANDLERS
+    // ============================================================================
+
+    /**
+     * Initialize description modal event listeners
+     */
+    function initializeDescriptionModal() {
+      const descriptionBtn = document.getElementById("descriptionModalBtn");
+      const modal = document.getElementById("descriptionModal");
+      const closeBtn = document.querySelector(".modal-close");
+      const cancelBtn = document.getElementById("cancelBtn");
+      const form = document.getElementById("descriptionForm");
+
+      // Open modal
+      if (descriptionBtn) {
+        descriptionBtn.addEventListener("click", () => {
+          if (!currentWorkbookId) {
+            alert("Please select a workbook first.");
+            return;
+          }
+          openDescriptionModal();
+        });
+      }
+
+      // Close modal handlers
+      if (closeBtn) {
+        closeBtn.addEventListener("click", closeDescriptionModal);
+      }
+
+      if (cancelBtn) {
+        cancelBtn.addEventListener("click", closeDescriptionModal);
+      }
+
+      // Close on overlay click
+      if (modal) {
+        modal.addEventListener("click", (e) => {
+          if (e.target === modal) {
+            closeDescriptionModal();
+          }
+        });
+      }
+
+      // Form submission
+      if (form) {
+        form.addEventListener("submit", handleDescriptionSubmit);
+      }
+
+      // ESC key to close modal
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modal && modal.classList.contains("open")) {
+          closeDescriptionModal();
+        }
+      });
+
+      if (DEBUG) console.log("Description modal initialized");
+    }
+
+    // ============================================================================
+    // APPLICATION INITIALIZATION
+    // ============================================================================
+
+    /**
+     * Global app initialization
+     */
+    async function initialize() {
+      await loadEnv(); // Load environment vars from /env
+      await loadWorkbooks(); // Populate workbook dropdown
+
+      initializeDescriptionModal(); // Setup description modal controls
+      updateDescriptionButtonState(); // Set initial button state
+
+      // Toggle Info Panel functionality
+      const sidebar = document.querySelector(".sidebar");
+      const toggleButton = document.getElementById("collapse-info");
+      
+      if (toggleButton && sidebar) {
+        toggleButton.addEventListener("click", () => {
+          sidebar.classList.toggle("collapsed");
+          if (DEBUG) console.log("Toggle Info Panel clicked - collapsed:", sidebar.classList.contains("collapsed"));
+        });
+        if (DEBUG) console.log("Toggle Info Panel event listener attached");
+      } else {
+        if (DEBUG) console.warn("Toggle Info Panel setup failed - button:", !!toggleButton, "sidebar:", !!sidebar);
+      }
+      
+      if (DEBUG) console.log("Application initialized");
+    }
+
+    // ============================================================================
+    // MAIN EXECUTION
+    // ============================================================================
+
+    // Wait for full DOM load before initializing app logic
+    document.addEventListener("DOMContentLoaded", initialize);
+  </script>
+</html>
