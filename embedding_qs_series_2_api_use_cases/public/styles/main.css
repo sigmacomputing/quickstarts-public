@@ -907,3 +907,212 @@ body.modal-open {
     padding: var(--spacing-md);
   }
 }
+
+/* ============================================================================
+   WORKBOOK DESCRIPTION STYLES
+   ============================================================================ */
+
+/* Description Modal Button */
+#descriptionModalBtn {
+  position: fixed;
+  top: 50px; /* Default position: under title when no description */
+  right: var(--spacing-md);
+  z-index: 1100;
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-lg);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, top 0.2s;
+}
+
+/* Button position when description is shown */
+#descriptionModalBtn.below-description {
+  top: 65px; /* Position closer to description when description exists */
+}
+
+#descriptionModalBtn:hover {
+  background: #1d4ed8;
+}
+
+#descriptionModalBtn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Description Modal Overlay */
+#descriptionModal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  justify-content: center;
+  align-items: center;
+}
+
+#descriptionModal.open {
+  display: flex;
+}
+
+/* Content container positioning */
+.content {
+  position: relative;
+}
+
+/* Description display below title, left-aligned with title */
+#workbookDescription {
+  font-size: var(--font-size-base);
+  margin-left: auto;
+  white-space: nowrap;
+  font-weight: bold;
+  display: none; /* Hidden by default */
+}
+
+#workbookDescription.has-description {
+  display: block; /* Show when there's a description */
+  font-style: italic;
+  color: #000;
+  font-weight: normal;
+}
+
+/* ============================================================================
+   BOOKMARK DATABASE STYLES
+   ============================================================================ */
+
+/* Bookmark Toggle Button */
+#bookmarkToggle {
+  position: fixed;
+  top: 45px;
+  right: var(--spacing-md);
+  z-index: 1100;
+  background: var(--secondary-color);
+  color: white;
+  border: none;
+  padding: var(--spacing-xs) 10px;
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+#bookmarkToggle:hover {
+  background: var(--hover-bg);
+}
+
+#bookmarkToggle:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Bookmark Panel */
+#bookmarkPanel {
+  background-color: var(--panel-bg);
+  padding: var(--spacing-xl);
+  border-left: 1px solid var(--border-light);
+  font-family: var(--font-family);
+}
+
+#bookmarkPanel h2 {
+  margin-top: 0;
+  font-size: var(--font-size-lg);
+}
+
+#bookmarkPanel label {
+  display: block;
+  margin: var(--spacing-md) 0 var(--spacing-xs);
+  font-weight: bold;
+  color: var(--text-color);
+}
+
+#bookmarkPanel input[type="text"],
+#bookmarkPanel textarea {
+  width: 100%;
+  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  box-sizing: border-box;
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-sm);
+}
+
+#bookmarkPanel .radio-group {
+  margin: var(--spacing-sm) 0 var(--spacing-lg);
+}
+
+#bookmarkPanel .checkbox-group {
+  margin-bottom: var(--spacing-lg);
+}
+
+#bookmarkPanel button[type="submit"] {
+  width: 100%;
+  padding: 10px;
+  background-color: #444;
+  color: #fff;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+}
+
+#bookmarkPanel button[type="submit"]:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+#bookmarkPanel .warning {
+  color: var(--warning-color);
+  font-weight: bold;
+  margin-bottom: var(--spacing-md);
+}
+
+/* Slide Panel */
+.slide-panel {
+  position: fixed;
+  top: 0;
+  right: -800px;
+  width: 400px;
+  background-color: white;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
+  transition: right 0.3s ease-in-out;
+  z-index: 1000;
+  padding: var(--spacing-xl);
+  overflow-y: auto;
+  border-left: 1px solid var(--border-light);
+}
+
+.slide-panel.open {
+  right: 0;
+}
+
+.close-btn {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  font-size: var(--font-size-lg);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Hide fixed buttons when bookmark panel is open */
+.slide-panel.open ~ #bookmarkToggle {
+  display: none;
+}
+
+/* Hide Clear All button when panel is open (use class-based approach) */
+body.panel-open #clearAllBookmarks {
+  display: none !important;
+}
+
+/* Hide Clear All button for View Users */
+#clearAllBookmarks.hidden-for-view-user {
+  display: none !important;
+}
