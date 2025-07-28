@@ -4,14 +4,15 @@ This demonstration shows how to add and manage workbook descriptions using a loc
 
 ## Overview
 
-This QuickStart demonstrates how to extend an embedded Sigma workbook with description management functionality using a local lowdb JSON database. Since Sigma's REST API doesn't provide native workbook description support, this implementation uses a local storage solution to provide users with workbook description capabilities directly within the host application.
+This QuickStart demonstrates how to extend an embedded Sigma workbook with description management functionality using a local lowdb JSON database. Since Sigma's REST API doesn't provide native workbook description support, this implementation uses a local storage solution to provide users with workbook description capabilities directly within the host application. This same pattern can be extended to store other custom metadata about workbooks such as usage notes, business context, data lineage information, or any other supplementary information that would help users of the embed understand and effectively use the workbook content.
 
 ## Features
 
 - **Description Modal Interface**: Clean modal dialog for adding and editing workbook descriptions
 - **Local Storage**: Persistent description storage using lowdb JSON database
 - **Workbook Integration**: Select and describe available workbooks with embedded preview
-- **Description Display**: Real-time description display in the page header
+- **Smart Description Display**: Description text appears below the title only when content exists
+- **Dynamic Button Positioning**: "Workbook Description" button intelligently positions itself based on content visibility
 - **User Tracking**: Track creation and modification with member ID attribution
 - **Build User Access**: Restricted to Build users only for enhanced permissions
 
@@ -23,11 +24,14 @@ This QuickStart demonstrates how to extend an embedded Sigma workbook with descr
 3. **Add Description**: 
    - Enter description text in the textarea
    - Submit to save via local API endpoint
-4. **View Description**: Description appears in header below the page title
+4. **View Description**: Description appears below the title (only when content exists)
 
 ### Managing Workbook Descriptions
 - **Edit Descriptions**: Modal automatically loads existing description for editing
-- **Real-time Updates**: Description display updates immediately after saving
+- **Delete Descriptions**: Remove descriptions with confirmation dialog (only available when editing existing descriptions)
+- **Smart Display**: Description text only appears when content exists (no placeholder text)
+- **Dynamic Layout**: Button position adjusts automatically based on content visibility
+- **Real-time Updates**: Description display updates immediately after saving or deleting
 - **User Attribution**: Tracks who created and last updated each description
 - **Persistent Storage**: Descriptions saved to local JSON file for persistence
 
@@ -70,19 +74,23 @@ The local database stores descriptions with the following structure:
 - **Form Validation**: Required field validation and helpful error messages
 - **State Management**: Proper loading states and submission protection
 - **Live Updates**: Description display updates without page refresh
+- **Intelligent UI**: Description text and button positioning adapt based on content availability
+- **Clean Interface**: No placeholder text cluttering the interface when no description exists
 - **Debug Mode**: Comprehensive logging when DEBUG=true in environment
 
 ## API Endpoints
 
-### Description Management
+### Local Description Management Endpoints
+These are custom endpoints implemented in this QuickStart for local description storage:
 - `POST /api/workbook-descriptions` - Create new workbook description
 - `GET /api/workbook-descriptions/:workbookId` - Get description for workbook
 - `PUT /api/workbook-descriptions/:workbookId` - Update existing description
 - `DELETE /api/workbook-descriptions/:workbookId` - Delete description
 
-### Supporting Endpoints
-- `GET /api/workbooks` - Fetch available workbooks
-- `POST /api/jwt/api-workbook-description` - Generate embed JWT tokens
+### Sigma API Integration Endpoints
+These endpoints interact with Sigma's REST API:
+- `GET /api/workbooks` - Fetch available workbooks from Sigma
+- `POST /api/jwt/api-workbook-description` - Generate embed JWT tokens for Sigma embedding
 
 ## Configuration
 
@@ -174,17 +182,3 @@ Enable `DEBUG=true` in your environment to see detailed logging for:
 - **JSON Integrity**: Ensure `wb-descriptions.json` maintains valid JSON structure
 - **Concurrent Access**: lowdb handles concurrent access automatically
 
-## Extending the Implementation
-
-### Additional Features
-Consider extending with:
-- **Description Search**: Add search functionality across all descriptions
-- **Rich Text**: Support for formatted text in descriptions
-- **Categories/Tags**: Organizational features for descriptions
-- **History Tracking**: Detailed change history for descriptions
-
-### API Integration
-Future Sigma API support could enable:
-- **Native Storage**: Migration from local to Sigma-native description storage
-- **Sharing Features**: Description sharing across Sigma users
-- **Permissions**: Integration with Sigma's permission model

@@ -12,20 +12,20 @@
 
   <body>
     <!-- === Top bar === -->
-    <header class="layout-topbar">
+    <header class="layout-topbar" style="position: relative;">
       <!-- Navigation and title -->
       <div style="display: flex; align-items: center; gap: 0.5rem">
         <button class="home-button" onclick="location.href='/'">
           ← Back to Landing Page
         </button>
-        <div>
-          <span class="header-title" style="font-weight: bold; color: white;">
-            API Workbook Description QuickStart
-          </span>
-          <div id="workbookDescription" style="margin-top: 5px; font-size: 0.9em; color: #ccc; font-style: italic;">
-            Select a workbook to view or set a description
-          </div>
-        </div>
+        <span class="header-title" style="font-weight: bold; color: white;">
+          API Workbook Description QuickStart
+        </span>
+      </div>
+
+      <!-- Workbook Description Display -->
+      <div id="workbookDescription">
+        Select a workbook to view or set a description
       </div>
 
       <!-- Simple Control Panel - Just Workbook Selection -->
@@ -108,6 +108,8 @@
 
           <!-- Modal Actions -->
           <div class="modal-actions">
+            <button type="button" class="btn btn-danger" id="deleteBtn" style="display: none;">Delete</button>
+            <div style="flex: 1;"></div>
             <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
             <button type="submit" class="btn btn-primary" id="saveBtn">Save</button>
           </div>
@@ -251,23 +253,23 @@
     }
 
     /**
-     * Update the description display in the header
+     * Update the description display - only show when description exists
      */
     function updateDescriptionDisplay() {
       const descriptionDiv = document.getElementById("workbookDescription");
+      const descriptionBtn = document.getElementById("descriptionModalBtn");
       
       if (currentDescription && currentDescription.description) {
+        // Show description when it exists
         descriptionDiv.textContent = currentDescription.description;
-        descriptionDiv.style.fontStyle = "normal";
-        descriptionDiv.style.color = "#fff";
-      } else if (currentWorkbook) {
-        descriptionDiv.textContent = "No description set for this workbook";
-        descriptionDiv.style.fontStyle = "italic";
-        descriptionDiv.style.color = "#ccc";
+        descriptionDiv.classList.add("has-description");
+        // Position button below description
+        descriptionBtn.classList.add("below-description");
       } else {
-        descriptionDiv.textContent = "Select a workbook to view or set a description";
-        descriptionDiv.style.fontStyle = "italic";
-        descriptionDiv.style.color = "#ccc";
+        // Hide description when no description exists
+        descriptionDiv.classList.remove("has-description");
+        // Position button under title (default position)
+        descriptionBtn.classList.remove("below-description");
       }
     }
 
@@ -387,6 +389,7 @@
       const modalTitle = document.getElementById("modalTitle");
       const descriptionInput = document.getElementById("workbookDescriptionInput");
       const saveBtn = document.getElementById("saveBtn");
+      const deleteBtn = document.getElementById("deleteBtn");
       
       if (modal) {
         modal.classList.add("open");
@@ -397,10 +400,12 @@
           descriptionInput.value = currentDescription.description;
           modalTitle.textContent = "Edit Workbook Description";
           saveBtn.textContent = "Update";
+          deleteBtn.style.display = "inline-block";
         } else {
           descriptionInput.value = "";
           modalTitle.textContent = "Add Workbook Description";
           saveBtn.textContent = "Save";
+          deleteBtn.style.display = "none";
         }
         
         // Focus on the textarea
@@ -416,6 +421,7 @@
     function closeDescriptionModal() {
       const modal = document.getElementById("descriptionModal");
       const form = document.getElementById("descriptionForm");
+      const deleteBtn = document.getElementById("deleteBtn");
       
       if (modal) {
         modal.classList.remove("open");
@@ -425,6 +431,11 @@
       
       if (form) {
         form.reset();
+      }
+      
+      // Reset delete button visibility
+      if (deleteBtn) {
+        deleteBtn.style.display = "none";
       }
     }
 
@@ -544,6 +555,52 @@
       }
     }
 
+    /**
+     * Handles description deletion
+     */
+    async function handleDescriptionDelete() {
+      if (!currentWorkbookId || !currentDescription) {
+        alert("No description to delete");
+        return;
+      }
+
+      const workbookSelect = document.getElementById("workbookSelect");
+      const workbookName = workbookSelect?.selectedOptions[0]?.textContent || "this workbook";
+      
+      if (!confirm(`Are you sure you want to delete the description for "${workbookName}"?`)) {
+        return;
+      }
+
+      if (DEBUG) {
+        console.log("Deleting workbook description for:", currentWorkbookId);
+      }
+
+      try {
+        const res = await fetch(`/api/workbook-descriptions/${currentWorkbookId}`, {
+          method: "DELETE"
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`Failed to delete description: ${res.status} ${errorText}`);
+        }
+
+        if (DEBUG) console.log("Description deleted successfully");
+
+        alert("Workbook description deleted successfully!");
+        
+        // Clear current description and reload
+        currentDescription = null;
+        await loadWorkbookDescription();
+        
+        closeDescriptionModal();
+
+      } catch (err) {
+        if (DEBUG) console.error("Error deleting description:", err);
+        alert(`Error deleting description: ${err.message}`);
+      }
+    }
+
     // ============================================================================
     // EVENT HANDLERS
     // ============================================================================
@@ -556,6 +613,7 @@
       const modal = document.getElementById("descriptionModal");
       const closeBtn = document.querySelector(".modal-close");
       const cancelBtn = document.getElementById("cancelBtn");
+      const deleteBtn = document.getElementById("deleteBtn");
       const form = document.getElementById("descriptionForm");
 
       // Open modal
@@ -576,6 +634,11 @@
 
       if (cancelBtn) {
         cancelBtn.addEventListener("click", closeDescriptionModal);
+      }
+
+      // Delete description handler
+      if (deleteBtn) {
+        deleteBtn.addEventListener("click", handleDescriptionDelete);
       }
 
       // Close on overlay click

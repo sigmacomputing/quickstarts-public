@@ -73,12 +73,19 @@ The system maintains a local `bookmarks.json` file that stores:
 - **Synchronization**: Clear All operation removes from both systems
 - **Filtering**: Local database enables advanced permission filtering
 
-### Key Endpoints
-- `GET /api/bookmarks_db` - Lists bookmarks with filtering
-- `POST /api/bookmarks_db` - Creates bookmarks in both systems
-- `DELETE /api/bookmarks_db/bookmarks/:id` - Deletes specific bookmark
-- `DELETE /api/bookmarks_db/clear-all` - Bulk delete operation
-- `POST /api/jwt/api-embed-bookmarks_db` - JWT generation with bookmark support
+### API Endpoints
+
+#### Local Bookmark Management Endpoints
+These are custom endpoints implemented in this QuickStart for enhanced bookmark functionality:
+- `GET /api/bookmarks_db` - Lists bookmarks with filtering and sharing logic
+- `POST /api/bookmarks_db` - Creates bookmarks in both Sigma API and local database
+- `DELETE /api/bookmarks_db/bookmarks/:id` - Deletes specific bookmark from both systems
+- `DELETE /api/bookmarks_db/clear-all` - Bulk delete operation for all bookmarks
+
+#### Sigma API Integration Endpoints
+These endpoints interact with Sigma's REST API:
+- `POST /api/jwt/api-embed-bookmarks_db` - Generate embed JWT tokens for Sigma embedding
+- Additional Sigma bookmark API calls are made internally through the local endpoints above
 
 ### Advanced Features
 - **State Management**: Comprehensive form reset and panel management
