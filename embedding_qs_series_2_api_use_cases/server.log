@@ -1,0 +1,1083 @@
+
+> sigma_embedding_quickstarts@1.0.0 start
+> nodemon server/server.js
+
+[33m[nodemon] 3.1.10[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): server/**/* helpers/**/* .env[39m
+[33m[nodemon] watching extensions: js,json,env[39m
+[32m[nodemon] starting `node server/server.js`[39m
+Sigma Embed QuickStart server running at http://localhost:3000
+Debug mode is enabled
+Fetching workbooks accessible to embed user via member-based filtering
+Bearer token obtained successfully
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 25 total workbooks
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 0 My Documents workbooks accessible to embed user
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member
+Found 4 files accessible to member for My Documents filtering
+Found 4 non-My-Documents workbooks accessible to embed user out of 25 total workbooks
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 0 My Documents workbooks accessible to embed user
+Creating workbook in build user's My Documents folder: rleTgkyUSzKwLRWNFK5tS
+Creating new workbook: { name: 'new', folderId: undefined }
+Request URL: https://aws-api.sigmacomputing.com/v2/workbooks
+Request body: {"name":"new","folderId":"rleTgkyUSzKwLRWNFK5tS"}
+Reusing cached bearer token
+Workbook created successfully: {
+  workbookId: 'edfda33c-8854-43c1-89f9-5a6cd5055d23',
+  workbookUrlId: '7f55QbPFuCnK2n0P2tSuBl',
+  createdBy: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow',
+  updatedBy: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow',
+  createdAt: '2025-08-01T16:06:42.287Z',
+  updatedAt: '2025-08-01T16:06:42.287Z',
+  name: 'new',
+  url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/7f55QbPFuCnK2n0P2tSuBl',
+  path: 'My Documents',
+  latestVersion: 1,
+  ownerId: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow'
+}
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member
+Found 4 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 0 My Documents workbooks accessible to embed user
+Found 4 non-My-Documents workbooks accessible to embed user out of 25 total workbooks
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member for My Documents filtering
+Found 5 files accessible to member
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 1 My Documents workbooks accessible to embed user
+Found 4 non-My-Documents workbooks accessible to embed user out of 26 total workbooks
+Reusing cached bearer token
+Trying member-based workbook lookup for JWT generation
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found workbook via member lookup: new
+JWT request body: {
+  sub: 'build.embed.qs@example.com',
+  hide_folder_navigation: 'false',
+  hide_menu: 'false',
+  menu_position: 'top',
+  disable_auto_refresh: 'false',
+  disable_mobile_view: 'false',
+  hide_page_controls: 'false',
+  hide_reload_button: 'false',
+  hide_title: 'false',
+  hide_tooltip: '2',
+  hide_view_select: 'false',
+  lng: 'English',
+  page_id: '',
+  responsive_height: 'false',
+  theme: 'dark',
+  view_id: ''
+}
+embedType: workbook
+workbookUrlId: 7f55QbPFuCnK2n0P2tSuBl
+selectedUser (sub): build.embed.qs@example.com
+bookmarkId: undefined
+exploreKey: undefined
+JWT payload: {
+  iss: '8f92dcde4c89a9cc56c8791b65e5862b71b5672ef6cb5a0d605564defa84a3af',
+  sub: 'build.embed.qs@example.com',
+  aud: 'https://sigmacomputing.com/iam',
+  iat: 1754064407,
+  exp: 1754064707,
+  jti: '26ccf8f1-4e44-4179-b226-56f0707a7181',
+  scope: 'embed',
+  embed: {
+    url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/new-7f55QbPFuCnK2n0P2tSuBl?:embed=true&:hide_folder_navigation=false&:hide_menu=false&:menu_position=top',
+    permissions: [ 'build' ]
+  }
+}
+JWT for: build.embed.qs@example.com
+JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjhmOTJkY2RlNGM4OWE5Y2M1NmM4NzkxYjY1ZTU4NjJiNzFiNTY3MmVmNmNiNWEwZDYwNTU2NGRlZmE4NGEzYWYifQ.eyJpc3MiOiI4ZjkyZGNkZTRjODlhOWNjNTZjODc5MWI2NWU1ODYyYjcxYjU2NzJlZjZjYjVhMGQ2MDU1NjRkZWZhODRhM2FmIiwic3ViIjoiYnVpbGQuZW1iZWQucXNAZXhhbXBsZS5jb20iLCJhdWQiOiJodHRwczovL3NpZ21hY29tcHV0aW5nLmNvbS9pYW0iLCJpYXQiOjE3NTQwNjQ0MDcsImV4cCI6MTc1NDA2NDcwNywianRpIjoiMjZjY2Y4ZjEtNGU0NC00MTc5LWIyMjYtNTZmMDcwN2E3MTgxIiwic2NvcGUiOiJlbWJlZCIsImVtYmVkIjp7InVybCI6Imh0dHBzOi8vYXBwLnNpZ21hY29tcHV0aW5nLmNvbS9xdWljay1zdGFydHMtZnVuZGFtZW50YWxzL3dvcmtib29rL25ldy03ZjU1UWJQRnVDbksybjBQMnRTdUJsPzplbWJlZD10cnVlJjpoaWRlX2ZvbGRlcl9uYXZpZ2F0aW9uPWZhbHNlJjpoaWRlX21lbnU9ZmFsc2UmOm1lbnVfcG9zaXRpb249dG9wIiwicGVybWlzc2lvbnMiOlsiYnVpbGQiXX19.Jt9VaNOxHxEjmAwRm_oMJiRe6zBTDmZqUDu9RvX9uEM
+=== Fetching real team workspace folders ===
+Reusing cached bearer token
+Searching through 29 files for team workspace folders
+Looking for workspace folder for team: Embed_Users
+Found 0 potential folders for Embed_Users: []
+Looking for workspace folder for team: All_clients_team
+Found 0 potential folders for All_clients_team: []
+Looking for workspace folder for team: Embed Users
+Found 0 potential folders for Embed Users: []
+Looking for workspace folder for team: All clients team
+Found 0 potential folders for All clients team: []
+No team workspace folders found, user can only copy to My Documents
+=== Final result: 0 real team workspaces ===
+Team workspaces: []
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 26 total workbooks
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 1 My Documents workbooks accessible to embed user
+Copying workbook: {
+  workbookId: 'edfda33c-8854-43c1-89f9-5a6cd5055d23',
+  destinationFolderId: null,
+  name: undefined
+}
+Request URL: https://aws-api.sigmacomputing.com/v2/workbooks/edfda33c-8854-43c1-89f9-5a6cd5055d23/copy
+Request body: {"destinationFolderId":"rleTgkyUSzKwLRWNFK5tS"}
+Reusing cached bearer token
+Error copying workbook: {
+  requestId: '9b05dbcf-7f73-42ef-bbbf-e8c0a4936236',
+  message: 'Expecting string at 0.name but instead got: undefined',
+  code: 'invalid_request'
+}
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 26 total workbooks
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 1 My Documents workbooks accessible to embed user
+Copying workbook: {
+  workbookId: 'edfda33c-8854-43c1-89f9-5a6cd5055d23',
+  destinationFolderId: null,
+  name: 'copy'
+}
+Request URL: https://aws-api.sigmacomputing.com/v2/workbooks/edfda33c-8854-43c1-89f9-5a6cd5055d23/copy
+Request body: {"destinationFolderId":"rleTgkyUSzKwLRWNFK5tS","name":"copy"}
+Reusing cached bearer token
+Workbook copied successfully: {
+  workbookId: '0b5f9dde-4da3-47c8-95b6-41ae373c8738',
+  workbookUrlId: 'lsBYB7zlPQKdPBOpnv0og',
+  createdBy: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow',
+  updatedBy: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow',
+  createdAt: '2025-08-01T16:07:40.025Z',
+  updatedAt: '2025-08-01T16:07:40.025Z',
+  name: 'copy',
+  url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/lsBYB7zlPQKdPBOpnv0og',
+  path: 'My Documents',
+  latestVersion: 1,
+  ownerId: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow'
+}
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 26 total workbooks
+Found 5 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 1 My Documents workbooks accessible to embed user
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 6 files accessible to member
+Found 6 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "copy" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 2 My Documents workbooks accessible to embed user
+Found 4 non-My-Documents workbooks accessible to embed user out of 27 total workbooks
+Reusing cached bearer token
+Trying member-based workbook lookup for JWT generation
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found workbook via member lookup: copy
+JWT request body: {
+  sub: 'build.embed.qs@example.com',
+  hide_folder_navigation: 'false',
+  hide_menu: 'false',
+  menu_position: 'top',
+  disable_auto_refresh: 'false',
+  disable_mobile_view: 'false',
+  hide_page_controls: 'false',
+  hide_reload_button: 'false',
+  hide_title: 'false',
+  hide_tooltip: '2',
+  hide_view_select: 'false',
+  lng: 'English',
+  page_id: '',
+  responsive_height: 'false',
+  theme: 'dark',
+  view_id: ''
+}
+embedType: workbook
+workbookUrlId: lsBYB7zlPQKdPBOpnv0og
+selectedUser (sub): build.embed.qs@example.com
+bookmarkId: undefined
+exploreKey: undefined
+JWT payload: {
+  iss: '8f92dcde4c89a9cc56c8791b65e5862b71b5672ef6cb5a0d605564defa84a3af',
+  sub: 'build.embed.qs@example.com',
+  aud: 'https://sigmacomputing.com/iam',
+  iat: 1754064470,
+  exp: 1754064770,
+  jti: 'bf17ec15-9458-4ed6-8038-df3f472af5d5',
+  scope: 'embed',
+  embed: {
+    url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/copy-lsBYB7zlPQKdPBOpnv0og?:embed=true&:hide_folder_navigation=false&:hide_menu=false&:menu_position=top',
+    permissions: [ 'build' ]
+  }
+}
+JWT for: build.embed.qs@example.com
+JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjhmOTJkY2RlNGM4OWE5Y2M1NmM4NzkxYjY1ZTU4NjJiNzFiNTY3MmVmNmNiNWEwZDYwNTU2NGRlZmE4NGEzYWYifQ.eyJpc3MiOiI4ZjkyZGNkZTRjODlhOWNjNTZjODc5MWI2NWU1ODYyYjcxYjU2NzJlZjZjYjVhMGQ2MDU1NjRkZWZhODRhM2FmIiwic3ViIjoiYnVpbGQuZW1iZWQucXNAZXhhbXBsZS5jb20iLCJhdWQiOiJodHRwczovL3NpZ21hY29tcHV0aW5nLmNvbS9pYW0iLCJpYXQiOjE3NTQwNjQ0NzAsImV4cCI6MTc1NDA2NDc3MCwianRpIjoiYmYxN2VjMTUtOTQ1OC00ZWQ2LTgwMzgtZGYzZjQ3MmFmNWQ1Iiwic2NvcGUiOiJlbWJlZCIsImVtYmVkIjp7InVybCI6Imh0dHBzOi8vYXBwLnNpZ21hY29tcHV0aW5nLmNvbS9xdWljay1zdGFydHMtZnVuZGFtZW50YWxzL3dvcmtib29rL2NvcHktbHNCWUI3emxQUUtkUEJPcG52MG9nPzplbWJlZD10cnVlJjpoaWRlX2ZvbGRlcl9uYXZpZ2F0aW9uPWZhbHNlJjpoaWRlX21lbnU9ZmFsc2UmOm1lbnVfcG9zaXRpb249dG9wIiwicGVybWlzc2lvbnMiOlsiYnVpbGQiXX19.h8Zdb7-asQLIMGdeN4kXxppM3EIqPLfNSB5oGqsR9RM
+=== Fetching real team workspace folders ===
+Reusing cached bearer token
+Searching through 29 files for team workspace folders
+Looking for workspace folder for team: Embed_Users
+Found 0 potential folders for Embed_Users: []
+Looking for workspace folder for team: All_clients_team
+Found 0 potential folders for All_clients_team: []
+Looking for workspace folder for team: Embed Users
+Found 0 potential folders for Embed Users: []
+Looking for workspace folder for team: All clients team
+Found 0 potential folders for All clients team: []
+No team workspace folders found, user can only copy to My Documents
+=== Final result: 0 real team workspaces ===
+Team workspaces: []
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 25 total workbooks
+Found 4 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 0 My Documents workbooks accessible to embed user
+Reusing cached bearer token
+Found workbook via team lookup: Embed_API_QuickStart
+JWT request body: {
+  sub: 'build.embed.qs@example.com',
+  hide_folder_navigation: 'false',
+  hide_menu: 'false',
+  menu_position: 'top',
+  disable_auto_refresh: 'false',
+  disable_mobile_view: 'false',
+  hide_page_controls: 'false',
+  hide_reload_button: 'false',
+  hide_title: 'false',
+  hide_tooltip: '2',
+  hide_view_select: 'false',
+  lng: 'English',
+  page_id: '',
+  responsive_height: 'false',
+  theme: 'dark',
+  view_id: ''
+}
+embedType: workbook
+workbookUrlId: r0WXMPpc0YtQCTFR7CdDK
+selectedUser (sub): build.embed.qs@example.com
+bookmarkId: undefined
+exploreKey: undefined
+JWT payload: {
+  iss: '8f92dcde4c89a9cc56c8791b65e5862b71b5672ef6cb5a0d605564defa84a3af',
+  sub: 'build.embed.qs@example.com',
+  aud: 'https://sigmacomputing.com/iam',
+  iat: 1754064761,
+  exp: 1754065061,
+  jti: '4303c548-6e0f-4327-8044-de4e0fa45e6e',
+  scope: 'embed',
+  embed: {
+    url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/Embed_API_QuickStart-r0WXMPpc0YtQCTFR7CdDK?:embed=true&:hide_folder_navigation=false&:hide_menu=false&:menu_position=top',
+    permissions: [ 'build' ]
+  }
+}
+JWT for: build.embed.qs@example.com
+JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjhmOTJkY2RlNGM4OWE5Y2M1NmM4NzkxYjY1ZTU4NjJiNzFiNTY3MmVmNmNiNWEwZDYwNTU2NGRlZmE4NGEzYWYifQ.eyJpc3MiOiI4ZjkyZGNkZTRjODlhOWNjNTZjODc5MWI2NWU1ODYyYjcxYjU2NzJlZjZjYjVhMGQ2MDU1NjRkZWZhODRhM2FmIiwic3ViIjoiYnVpbGQuZW1iZWQucXNAZXhhbXBsZS5jb20iLCJhdWQiOiJodHRwczovL3NpZ21hY29tcHV0aW5nLmNvbS9pYW0iLCJpYXQiOjE3NTQwNjQ3NjEsImV4cCI6MTc1NDA2NTA2MSwianRpIjoiNDMwM2M1NDgtNmUwZi00MzI3LTgwNDQtZGU0ZTBmYTQ1ZTZlIiwic2NvcGUiOiJlbWJlZCIsImVtYmVkIjp7InVybCI6Imh0dHBzOi8vYXBwLnNpZ21hY29tcHV0aW5nLmNvbS9xdWljay1zdGFydHMtZnVuZGFtZW50YWxzL3dvcmtib29rL0VtYmVkX0FQSV9RdWlja1N0YXJ0LXIwV1hNUHBjMFl0UUNURlI3Q2RESz86ZW1iZWQ9dHJ1ZSY6aGlkZV9mb2xkZXJfbmF2aWdhdGlvbj1mYWxzZSY6aGlkZV9tZW51PWZhbHNlJjptZW51X3Bvc2l0aW9uPXRvcCIsInBlcm1pc3Npb25zIjpbImJ1aWxkIl19fQ.eh-a6nGMMl6f9Qg2k0hY4Y78YJyx_6V5I2IcHlJmNvE
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 25 total workbooks
+Getting folder for workbook: 0e51172a-a4c0-4954-8c8c-9d854dcf4434
+Reusing cached bearer token
+Workbook folder ID: undefined
+Creating workbook in build user's My Documents folder: rleTgkyUSzKwLRWNFK5tS
+Creating new workbook: { name: 'new', folderId: undefined }
+Request URL: https://aws-api.sigmacomputing.com/v2/workbooks
+Request body: {"name":"new","folderId":"rleTgkyUSzKwLRWNFK5tS"}
+Reusing cached bearer token
+Workbook created successfully: {
+  workbookId: 'a36ee6fe-508c-419b-b31b-4f2dc8eea8cc',
+  workbookUrlId: '4YoqLPZgQ7BFEz38hpcWdK',
+  createdBy: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow',
+  updatedBy: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow',
+  createdAt: '2025-08-01T16:12:51.544Z',
+  updatedAt: '2025-08-01T16:12:51.544Z',
+  name: 'new',
+  url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/4YoqLPZgQ7BFEz38hpcWdK',
+  path: 'My Documents',
+  latestVersion: 1,
+  ownerId: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow'
+}
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 0 My Documents workbooks accessible to embed user
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 25 total workbooks
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 26 total workbooks
+Found 5 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 1 My Documents workbooks accessible to embed user
+Reusing cached bearer token
+Trying member-based workbook lookup for JWT generation
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found workbook via member lookup: new
+JWT request body: {
+  sub: 'build.embed.qs@example.com',
+  hide_folder_navigation: 'false',
+  hide_menu: 'false',
+  menu_position: 'top',
+  disable_auto_refresh: 'false',
+  disable_mobile_view: 'false',
+  hide_page_controls: 'false',
+  hide_reload_button: 'false',
+  hide_title: 'false',
+  hide_tooltip: '2',
+  hide_view_select: 'false',
+  lng: 'English',
+  page_id: '',
+  responsive_height: 'false',
+  theme: 'dark',
+  view_id: ''
+}
+embedType: workbook
+workbookUrlId: 4YoqLPZgQ7BFEz38hpcWdK
+selectedUser (sub): build.embed.qs@example.com
+bookmarkId: undefined
+exploreKey: undefined
+JWT payload: {
+  iss: '8f92dcde4c89a9cc56c8791b65e5862b71b5672ef6cb5a0d605564defa84a3af',
+  sub: 'build.embed.qs@example.com',
+  aud: 'https://sigmacomputing.com/iam',
+  iat: 1754064778,
+  exp: 1754065078,
+  jti: 'c9990d9d-1406-497d-a198-59ad5189d3ab',
+  scope: 'embed',
+  embed: {
+    url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/new-4YoqLPZgQ7BFEz38hpcWdK?:embed=true&:hide_folder_navigation=false&:hide_menu=false&:menu_position=top',
+    permissions: [ 'build' ]
+  }
+}
+JWT for: build.embed.qs@example.com
+JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjhmOTJkY2RlNGM4OWE5Y2M1NmM4NzkxYjY1ZTU4NjJiNzFiNTY3MmVmNmNiNWEwZDYwNTU2NGRlZmE4NGEzYWYifQ.eyJpc3MiOiI4ZjkyZGNkZTRjODlhOWNjNTZjODc5MWI2NWU1ODYyYjcxYjU2NzJlZjZjYjVhMGQ2MDU1NjRkZWZhODRhM2FmIiwic3ViIjoiYnVpbGQuZW1iZWQucXNAZXhhbXBsZS5jb20iLCJhdWQiOiJodHRwczovL3NpZ21hY29tcHV0aW5nLmNvbS9pYW0iLCJpYXQiOjE3NTQwNjQ3NzgsImV4cCI6MTc1NDA2NTA3OCwianRpIjoiYzk5OTBkOWQtMTQwNi00OTdkLWExOTgtNTlhZDUxODlkM2FiIiwic2NvcGUiOiJlbWJlZCIsImVtYmVkIjp7InVybCI6Imh0dHBzOi8vYXBwLnNpZ21hY29tcHV0aW5nLmNvbS9xdWljay1zdGFydHMtZnVuZGFtZW50YWxzL3dvcmtib29rL25ldy00WW9xTFBaZ1E3QkZFejM4aHBjV2RLPzplbWJlZD10cnVlJjpoaWRlX2ZvbGRlcl9uYXZpZ2F0aW9uPWZhbHNlJjpoaWRlX21lbnU9ZmFsc2UmOm1lbnVfcG9zaXRpb249dG9wIiwicGVybWlzc2lvbnMiOlsiYnVpbGQiXX19.E62JZRBB6uMLhV5Nk2PlOkqp332NKLN64LVKxYbY0l4
+=== Fetching real team workspace folders ===
+Reusing cached bearer token
+Searching through 29 files for team workspace folders
+Looking for workspace folder for team: Embed_Users
+Found 0 potential folders for Embed_Users: []
+Looking for workspace folder for team: All_clients_team
+Found 0 potential folders for All_clients_team: []
+Looking for workspace folder for team: Embed Users
+Found 0 potential folders for Embed Users: []
+Looking for workspace folder for team: All clients team
+Found 0 potential folders for All clients team: []
+No team workspace folders found, user can only copy to My Documents
+=== Final result: 0 real team workspaces ===
+Team workspaces: []
+=== Fetching real team workspace folders ===
+Reusing cached bearer token
+Searching through 29 files for team workspace folders
+Looking for workspace folder for team: Embed_Users
+Found 0 potential folders for Embed_Users: []
+Looking for workspace folder for team: All_clients_team
+Found 0 potential folders for All_clients_team: []
+Looking for workspace folder for team: Embed Users
+Found 0 potential folders for Embed Users: []
+Looking for workspace folder for team: All clients team
+Found 0 potential folders for All clients team: []
+No team workspace folders found, user can only copy to My Documents
+=== Final result: 0 real team workspaces ===
+Team workspaces: []
+=== Fetching real team workspace folders ===
+Reusing cached bearer token
+Searching through 29 files for team workspace folders
+Looking for workspace folder for team: Embed_Users
+Found 0 potential folders for Embed_Users: []
+Looking for workspace folder for team: All_clients_team
+Found 0 potential folders for All_clients_team: []
+Looking for workspace folder for team: Embed Users
+Found 0 potential folders for Embed Users: []
+Looking for workspace folder for team: All clients team
+Found 0 potential folders for All clients team: []
+No team workspace folders found, user can only copy to My Documents
+=== Final result: 0 real team workspaces ===
+Team workspaces: []
+=== Fetching real team workspace folders ===
+Reusing cached bearer token
+Searching through 29 files for team workspace folders
+Looking for workspace folder for team: Embed_Users
+Found 0 potential folders for Embed_Users: []
+Looking for workspace folder for team: All_clients_team
+Found 0 potential folders for All_clients_team: []
+Looking for workspace folder for team: Embed Users
+Found 0 potential folders for Embed Users: []
+Looking for workspace folder for team: All clients team
+Found 0 potential folders for All clients team: []
+No team workspace folders found, user can only copy to My Documents
+=== Final result: 0 real team workspaces ===
+Team workspaces: []
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 26 total workbooks
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 1 My Documents workbooks accessible to embed user
+Copying workbook: {
+  workbookId: 'a36ee6fe-508c-419b-b31b-4f2dc8eea8cc',
+  destinationFolderId: null,
+  name: undefined
+}
+Request URL: https://aws-api.sigmacomputing.com/v2/workbooks/a36ee6fe-508c-419b-b31b-4f2dc8eea8cc/copy
+Request body: {"destinationFolderId":"rleTgkyUSzKwLRWNFK5tS"}
+Reusing cached bearer token
+Error copying workbook: {
+  requestId: '86e8d472-ee3e-4e4c-92ab-3cdb48338d9c',
+  message: 'Expecting string at 0.name but instead got: undefined',
+  code: 'invalid_request'
+}
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member for My Documents filtering
+Found 4 files accessible to member
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 0 My Documents workbooks accessible to embed user
+Found 4 non-My-Documents workbooks accessible to embed user out of 25 total workbooks
+Reusing cached bearer token
+Found workbook via team lookup: Embed_API_QuickStart (copy)
+JWT request body: {
+  sub: 'build.embed.qs@example.com',
+  hide_folder_navigation: 'false',
+  hide_menu: 'false',
+  menu_position: 'top',
+  disable_auto_refresh: 'false',
+  disable_mobile_view: 'false',
+  hide_page_controls: 'false',
+  hide_reload_button: 'false',
+  hide_title: 'false',
+  hide_tooltip: '2',
+  hide_view_select: 'false',
+  lng: 'English',
+  page_id: '',
+  responsive_height: 'false',
+  theme: 'dark',
+  view_id: ''
+}
+embedType: workbook
+workbookUrlId: 3P4BXirOTzMLeUCGbsTF0I
+selectedUser (sub): build.embed.qs@example.com
+bookmarkId: undefined
+exploreKey: undefined
+JWT payload: {
+  iss: '8f92dcde4c89a9cc56c8791b65e5862b71b5672ef6cb5a0d605564defa84a3af',
+  sub: 'build.embed.qs@example.com',
+  aud: 'https://sigmacomputing.com/iam',
+  iat: 1754064898,
+  exp: 1754065198,
+  jti: '49e4b02f-cbb8-40cf-acde-0eba7fdf13ff',
+  scope: 'embed',
+  embed: {
+    url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/Embed_API_QuickStart_(copy)-3P4BXirOTzMLeUCGbsTF0I?:embed=true&:hide_folder_navigation=false&:hide_menu=false&:menu_position=top',
+    permissions: [ 'build' ]
+  }
+}
+JWT for: build.embed.qs@example.com
+JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjhmOTJkY2RlNGM4OWE5Y2M1NmM4NzkxYjY1ZTU4NjJiNzFiNTY3MmVmNmNiNWEwZDYwNTU2NGRlZmE4NGEzYWYifQ.eyJpc3MiOiI4ZjkyZGNkZTRjODlhOWNjNTZjODc5MWI2NWU1ODYyYjcxYjU2NzJlZjZjYjVhMGQ2MDU1NjRkZWZhODRhM2FmIiwic3ViIjoiYnVpbGQuZW1iZWQucXNAZXhhbXBsZS5jb20iLCJhdWQiOiJodHRwczovL3NpZ21hY29tcHV0aW5nLmNvbS9pYW0iLCJpYXQiOjE3NTQwNjQ4OTgsImV4cCI6MTc1NDA2NTE5OCwianRpIjoiNDllNGIwMmYtY2JiOC00MGNmLWFjZGUtMGViYTdmZGYxM2ZmIiwic2NvcGUiOiJlbWJlZCIsImVtYmVkIjp7InVybCI6Imh0dHBzOi8vYXBwLnNpZ21hY29tcHV0aW5nLmNvbS9xdWljay1zdGFydHMtZnVuZGFtZW50YWxzL3dvcmtib29rL0VtYmVkX0FQSV9RdWlja1N0YXJ0Xyhjb3B5KS0zUDRCWGlyT1R6TUxlVUNHYnNURjBJPzplbWJlZD10cnVlJjpoaWRlX2ZvbGRlcl9uYXZpZ2F0aW9uPWZhbHNlJjpoaWRlX21lbnU9ZmFsc2UmOm1lbnVfcG9zaXRpb249dG9wIiwicGVybWlzc2lvbnMiOlsiYnVpbGQiXX19.G9Nyc6IwUa7SliwDiT1WsynhxR81ZvZuT01Lg84Ffw0
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 25 total workbooks
+Getting folder for workbook: 7da32ce1-5ec5-45e1-8405-0a87fe4a46f8
+Reusing cached bearer token
+Workbook folder ID: undefined
+Creating workbook in build user's My Documents folder: rleTgkyUSzKwLRWNFK5tS
+Creating new workbook: { name: 'new', folderId: undefined }
+Request URL: https://aws-api.sigmacomputing.com/v2/workbooks
+Request body: {"name":"new","folderId":"rleTgkyUSzKwLRWNFK5tS"}
+Reusing cached bearer token
+Workbook created successfully: {
+  workbookId: 'f40683b7-2bf9-41a5-8b3f-9d50b0682dbc',
+  workbookUrlId: '7qt6vkLvxRQL6rigKj74Li',
+  createdBy: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow',
+  updatedBy: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow',
+  createdAt: '2025-08-01T16:15:08.353Z',
+  updatedAt: '2025-08-01T16:15:08.353Z',
+  name: 'new',
+  url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/7qt6vkLvxRQL6rigKj74Li',
+  path: 'My Documents',
+  latestVersion: 1,
+  ownerId: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow'
+}
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member
+Found 4 files accessible to member for My Documents filtering
+Found 4 non-My-Documents workbooks accessible to embed user out of 25 total workbooks
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 0 My Documents workbooks accessible to embed user
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member for My Documents filtering
+Found 4 files accessible to member
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 0 My Documents workbooks accessible to embed user
+Found 4 non-My-Documents workbooks accessible to embed user out of 26 total workbooks
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member for My Documents filtering
+Found 4 files accessible to member
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 0 My Documents workbooks accessible to embed user
+Found 4 non-My-Documents workbooks accessible to embed user out of 25 total workbooks
+Reusing cached bearer token
+Found workbook via team lookup: Embed_API_QuickStart
+JWT request body: {
+  sub: 'build.embed.qs@example.com',
+  hide_folder_navigation: 'false',
+  hide_menu: 'false',
+  menu_position: 'top',
+  disable_auto_refresh: 'false',
+  disable_mobile_view: 'false',
+  hide_page_controls: 'false',
+  hide_reload_button: 'false',
+  hide_title: 'false',
+  hide_tooltip: '2',
+  hide_view_select: 'false',
+  lng: 'English',
+  page_id: '',
+  responsive_height: 'false',
+  theme: 'dark',
+  view_id: ''
+}
+embedType: workbook
+workbookUrlId: r0WXMPpc0YtQCTFR7CdDK
+selectedUser (sub): build.embed.qs@example.com
+bookmarkId: undefined
+exploreKey: undefined
+JWT payload: {
+  iss: '8f92dcde4c89a9cc56c8791b65e5862b71b5672ef6cb5a0d605564defa84a3af',
+  sub: 'build.embed.qs@example.com',
+  aud: 'https://sigmacomputing.com/iam',
+  iat: 1754065078,
+  exp: 1754065378,
+  jti: '874b1535-d865-4f54-aae2-b6d8abfa8f86',
+  scope: 'embed',
+  embed: {
+    url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/Embed_API_QuickStart-r0WXMPpc0YtQCTFR7CdDK?:embed=true&:hide_folder_navigation=false&:hide_menu=false&:menu_position=top',
+    permissions: [ 'build' ]
+  }
+}
+JWT for: build.embed.qs@example.com
+JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjhmOTJkY2RlNGM4OWE5Y2M1NmM4NzkxYjY1ZTU4NjJiNzFiNTY3MmVmNmNiNWEwZDYwNTU2NGRlZmE4NGEzYWYifQ.eyJpc3MiOiI4ZjkyZGNkZTRjODlhOWNjNTZjODc5MWI2NWU1ODYyYjcxYjU2NzJlZjZjYjVhMGQ2MDU1NjRkZWZhODRhM2FmIiwic3ViIjoiYnVpbGQuZW1iZWQucXNAZXhhbXBsZS5jb20iLCJhdWQiOiJodHRwczovL3NpZ21hY29tcHV0aW5nLmNvbS9pYW0iLCJpYXQiOjE3NTQwNjUwNzgsImV4cCI6MTc1NDA2NTM3OCwianRpIjoiODc0YjE1MzUtZDg2NS00ZjU0LWFhZTItYjZkOGFiZmE4Zjg2Iiwic2NvcGUiOiJlbWJlZCIsImVtYmVkIjp7InVybCI6Imh0dHBzOi8vYXBwLnNpZ21hY29tcHV0aW5nLmNvbS9xdWljay1zdGFydHMtZnVuZGFtZW50YWxzL3dvcmtib29rL0VtYmVkX0FQSV9RdWlja1N0YXJ0LXIwV1hNUHBjMFl0UUNURlI3Q2RESz86ZW1iZWQ9dHJ1ZSY6aGlkZV9mb2xkZXJfbmF2aWdhdGlvbj1mYWxzZSY6aGlkZV9tZW51PWZhbHNlJjptZW51X3Bvc2l0aW9uPXRvcCIsInBlcm1pc3Npb25zIjpbImJ1aWxkIl19fQ.EBH8fTFqi2Sg4iYUbm2K-I8ImrGn6ZRjAk5MgLbA6YE
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 4 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 25 total workbooks
+Getting folder for workbook: 0e51172a-a4c0-4954-8c8c-9d854dcf4434
+Reusing cached bearer token
+Workbook folder ID: undefined
+Creating workbook in build user's My Documents folder: rleTgkyUSzKwLRWNFK5tS
+Creating new workbook: { name: 'new', folderId: undefined }
+Request URL: https://aws-api.sigmacomputing.com/v2/workbooks
+Request body: {"name":"new","folderId":"rleTgkyUSzKwLRWNFK5tS"}
+Reusing cached bearer token
+Workbook created successfully: {
+  workbookId: '5fdde36e-4ceb-4eef-938a-b0533fdae191',
+  workbookUrlId: '2UTFObIv4svUdF8RElWBlD',
+  createdBy: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow',
+  updatedBy: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow',
+  createdAt: '2025-08-01T16:18:08.891Z',
+  updatedAt: '2025-08-01T16:18:08.891Z',
+  name: 'new',
+  url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/2UTFObIv4svUdF8RElWBlD',
+  path: 'My Documents',
+  latestVersion: 1,
+  ownerId: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow'
+}
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member
+Found 5 files accessible to member for My Documents filtering
+Found 4 non-My-Documents workbooks accessible to embed user out of 26 total workbooks
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 1 My Documents workbooks accessible to embed user
+Reusing cached bearer token
+Trying member-based workbook lookup for JWT generation
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found workbook via member lookup: new
+JWT request body: {
+  sub: 'build.embed.qs@example.com',
+  hide_folder_navigation: 'false',
+  hide_menu: 'false',
+  menu_position: 'top',
+  disable_auto_refresh: 'false',
+  disable_mobile_view: 'false',
+  hide_page_controls: 'false',
+  hide_reload_button: 'false',
+  hide_title: 'false',
+  hide_tooltip: '2',
+  hide_view_select: 'false',
+  lng: 'English',
+  page_id: '',
+  responsive_height: 'false',
+  theme: 'dark',
+  view_id: ''
+}
+embedType: workbook
+workbookUrlId: 2UTFObIv4svUdF8RElWBlD
+selectedUser (sub): build.embed.qs@example.com
+bookmarkId: undefined
+exploreKey: undefined
+JWT payload: {
+  iss: '8f92dcde4c89a9cc56c8791b65e5862b71b5672ef6cb5a0d605564defa84a3af',
+  sub: 'build.embed.qs@example.com',
+  aud: 'https://sigmacomputing.com/iam',
+  iat: 1754065090,
+  exp: 1754065390,
+  jti: '081bf4a2-d293-4c83-9e22-5b0e379757ce',
+  scope: 'embed',
+  embed: {
+    url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/new-2UTFObIv4svUdF8RElWBlD?:embed=true&:hide_folder_navigation=false&:hide_menu=false&:menu_position=top',
+    permissions: [ 'build' ]
+  }
+}
+JWT for: build.embed.qs@example.com
+JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjhmOTJkY2RlNGM4OWE5Y2M1NmM4NzkxYjY1ZTU4NjJiNzFiNTY3MmVmNmNiNWEwZDYwNTU2NGRlZmE4NGEzYWYifQ.eyJpc3MiOiI4ZjkyZGNkZTRjODlhOWNjNTZjODc5MWI2NWU1ODYyYjcxYjU2NzJlZjZjYjVhMGQ2MDU1NjRkZWZhODRhM2FmIiwic3ViIjoiYnVpbGQuZW1iZWQucXNAZXhhbXBsZS5jb20iLCJhdWQiOiJodHRwczovL3NpZ21hY29tcHV0aW5nLmNvbS9pYW0iLCJpYXQiOjE3NTQwNjUwOTAsImV4cCI6MTc1NDA2NTM5MCwianRpIjoiMDgxYmY0YTItZDI5My00YzgzLTllMjItNWIwZTM3OTc1N2NlIiwic2NvcGUiOiJlbWJlZCIsImVtYmVkIjp7InVybCI6Imh0dHBzOi8vYXBwLnNpZ21hY29tcHV0aW5nLmNvbS9xdWljay1zdGFydHMtZnVuZGFtZW50YWxzL3dvcmtib29rL25ldy0yVVRGT2JJdjRzdlVkRjhSRWxXQmxEPzplbWJlZD10cnVlJjpoaWRlX2ZvbGRlcl9uYXZpZ2F0aW9uPWZhbHNlJjpoaWRlX21lbnU9ZmFsc2UmOm1lbnVfcG9zaXRpb249dG9wIiwicGVybWlzc2lvbnMiOlsiYnVpbGQiXX19.v3wuCZQnKZ0KowQWIXCeRJWyvgOfG8Q-9bcXOR8eB6M
+=== Fetching real team workspace folders ===
+Reusing cached bearer token
+Searching through 29 files for team workspace folders
+Looking for workspace folder for team: Embed_Users
+Found 0 potential folders for Embed_Users: []
+Looking for workspace folder for team: All_clients_team
+Found 0 potential folders for All_clients_team: []
+Looking for workspace folder for team: Embed Users
+Found 0 potential folders for Embed Users: []
+Looking for workspace folder for team: All clients team
+Found 0 potential folders for All clients team: []
+No team workspace folders found, user can only copy to My Documents
+=== Final result: 0 real team workspaces ===
+Team workspaces: []
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 26 total workbooks
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 1 My Documents workbooks accessible to embed user
+Copying workbook: {
+  workbookId: '5fdde36e-4ceb-4eef-938a-b0533fdae191',
+  destinationFolderId: null,
+  name: undefined
+}
+Request URL: https://aws-api.sigmacomputing.com/v2/workbooks/5fdde36e-4ceb-4eef-938a-b0533fdae191/copy
+Request body: {"destinationFolderId":"rleTgkyUSzKwLRWNFK5tS"}
+Reusing cached bearer token
+Error copying workbook: {
+  requestId: '0bf23a7b-20a8-4317-8636-bd2db71dc2b4',
+  message: 'Expecting string at 0.name but instead got: undefined',
+  code: 'invalid_request'
+}
+=== Fetching real team workspace folders ===
+Reusing cached bearer token
+Searching through 29 files for team workspace folders
+Looking for workspace folder for team: Embed_Users
+Found 0 potential folders for Embed_Users: []
+Looking for workspace folder for team: All_clients_team
+Found 0 potential folders for All_clients_team: []
+Looking for workspace folder for team: Embed Users
+Found 0 potential folders for Embed Users: []
+Looking for workspace folder for team: All clients team
+Found 0 potential folders for All clients team: []
+No team workspace folders found, user can only copy to My Documents
+=== Final result: 0 real team workspaces ===
+Team workspaces: []
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 26 total workbooks
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 1 My Documents workbooks accessible to embed user
+Copying workbook: {
+  workbookId: '5fdde36e-4ceb-4eef-938a-b0533fdae191',
+  destinationFolderId: null,
+  name: 'copy'
+}
+Request URL: https://aws-api.sigmacomputing.com/v2/workbooks/5fdde36e-4ceb-4eef-938a-b0533fdae191/copy
+Request body: {"destinationFolderId":"rleTgkyUSzKwLRWNFK5tS","name":"copy"}
+Reusing cached bearer token
+Workbook copied successfully: {
+  workbookId: 'fb321691-0ff0-4b90-b703-2167c0746813',
+  workbookUrlId: '7DZXNeUMh8ghYtON8gs0zV',
+  createdBy: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow',
+  updatedBy: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow',
+  createdAt: '2025-08-01T16:18:44.454Z',
+  updatedAt: '2025-08-01T16:18:44.454Z',
+  name: 'copy',
+  url: 'https://app.sigmacomputing.com/quick-starts-fundamentals/workbook/7DZXNeUMh8ghYtON8gs0zV',
+  path: 'My Documents',
+  latestVersion: 1,
+  ownerId: 'yRn1UFV8ngVWBM1Hgrl51h7MS8uow'
+}
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member
+Found 5 files accessible to member for My Documents filtering
+Found 4 non-My-Documents workbooks accessible to embed user out of 26 total workbooks
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 1 My Documents workbooks accessible to embed user
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 5 files accessible to member for My Documents filtering
+Found 5 files accessible to member
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 1 My Documents workbooks accessible to embed user
+Found 4 non-My-Documents workbooks accessible to embed user out of 26 total workbooks
+Fetching workbooks accessible to embed user via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Fetching embed user's My Documents workbooks via member-based filtering
+Reusing cached bearer token
+Reusing cached bearer token
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found member build.embed.qs@example.com → 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Found memberId for build.embed.qs@example.com: 1A9vCmI48FYpdlUAtWGhULnp7yoGA
+Fetching member files: https://aws-api.sigmacomputing.com/v2/members/1A9vCmI48FYpdlUAtWGhULnp7yoGA/files?typeFilters=workbook&limit=500
+Found 6 files accessible to member
+Found 4 non-My-Documents workbooks accessible to embed user out of 27 total workbooks
+Found 6 files accessible to member for My Documents filtering
+Workbook "Embed_API_QuickStart" - path: "Embed_Users" - isMyDocuments: false
+Workbook "Embed_API_QuickStart (copy)" - path: "Embed_Users" - isMyDocuments: false
+Workbook "new" - path: "My Documents" - isMyDocuments: true
+Workbook "copy" - path: "My Documents" - isMyDocuments: true
+Workbook "Federated_Access_QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Workbook "Parameters and UA QuickStart" - path: "Curated_Master_Dashboards" - isMyDocuments: false
+Found 2 My Documents workbooks accessible to embed user
+=== Fetching real team workspace folders ===
+Reusing cached bearer token
+Searching through 29 files for team workspace folders
+Looking for workspace folder for team: Embed_Users
+Found 0 potential folders for Embed_Users: []
+Looking for workspace folder for team: All_clients_team
+Found 0 potential folders for All_clients_team: []
+Looking for workspace folder for team: Embed Users
+Found 0 potential folders for Embed Users: []
+Looking for workspace folder for team: All clients team
+Found 0 potential folders for All clients team: []
+No team workspace folders found, user can only copy to My Documents
+=== Final result: 0 real team workspaces ===
+Team workspaces: []
+Copying workbook: { workbookId: 'test-id', destinationFolderId: null, name: '' }
+Request URL: https://aws-api.sigmacomputing.com/v2/workbooks/test-id/copy
+Request body: {"destinationFolderId":"rleTgkyUSzKwLRWNFK5tS"}
+Reusing cached bearer token
+Error copying workbook: {
+  requestId: '832205ad-8496-43cf-bbee-c3183453a5ba',
+  message: 'Expecting UUID at workbookId but instead got: "test..."',
+  code: 'invalid_request'
+}
