@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Page metadata and layout styles -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Copy or Create a New Workbook</title>
+    <link rel="stylesheet" href="/styles/main.css" />
+    <link rel="icon" href="data:," />
+  </head>
+
+  <body>
+    <!-- === Topbar === -->
+    <header class="layout-topbar">
+      <!-- Navigation and title -->
+      <div style="display: flex; align-items: center; gap: 0.5rem">
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+        <span class="header-title">API Copy or Create a New Workbook</span>
+      </div>
+
+      <!-- Controls for user and workbook selection -->
+      <div class="control-panel">
+        <div class="control-group">
+          <label for="roleSelect">Current User:</label>
+          <select id="roleSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a user
+            </option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="allWorkbooksSelect">All Accessible Workbooks:</label>
+          <select id="allWorkbooksSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select from all workbooks
+            </option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="myWorkbooksSelect">My Documents Workbooks:</label>
+          <select id="myWorkbooksSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select from My Documents
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Toggle info panel visibility and README link -->
+      <div style="white-space: nowrap;">
+        <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
+        <button onclick="window.open('/api-embed-copy-create-workbook/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+      </div>
+    </header>
+
+    <!-- === Main Layout === -->
+    <div class="main">
+      <!-- === Sidebar Info Panel === -->
+      <aside class="sidebar">
+        <h2>Information:</h2>
+        <p>
+          The embedded content should render in the iframe on the right, based
+          on your .env file configuration.
+        </p>
+        <code id="debug-embed-url">N/A</code>
+
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <div id="jwt-decode-content"><p>Loading...</p></div>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+      </aside>
+
+      <!-- === Right-hand Content Area === -->
+      <main class="content">
+        <!-- Copy Workbook Button -->
+        <button id="copyWorkbookBtn" style="display: none;">Copy Workbook</button>
+        
+        <!-- Create New Workbook Button -->
+        <button id="createWorkbookBtn">Create New Workbook</button>
+        
+        <iframe id="sigma-embed" src=""></iframe>
+      </main>
+    </div>
+
+    <!-- === Copy Workbook Modal === -->
+    <div id="copyWorkbookModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Copy Workbook</h2>
+          <button class="modal-close" onclick="closeCopyModal()">&times;</button>
+        </div>
+        
+        <form id="copyWorkbookForm">
+          <div class="form-group">
+            <label for="copyWorkbookName">New Workbook Name (optional):</label>
+            <input type="text" id="copyWorkbookName" placeholder="Leave blank to use original name with 'Copy'">
+          </div>
+          
+          <div class="form-group">
+            <label>Destination:</label>
+            <div class="radio-group">
+              <label>
+                <input type="radio" name="copyDestination" value="mydocs" checked>
+                My Documents folder (recommended)
+              </label>
+              <label>
+                <input type="radio" name="copyDestination" value="team">
+                Team workspace
+              </label>
+            </div>
+          </div>
+          
+          <div class="form-group" id="copyTeamGroup" style="display: none;">
+            <label for="copyTeamSelect">Select Team Workspace:</label>
+            <select id="copyTeamSelect">
+              <option value="">Loading team workspaces...</option>
+            </select>
+          </div>
+          
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeCopyModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Copy Workbook</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- === Create New Workbook Modal === -->
+    <div id="createWorkbookModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Create New Workbook</h2>
+          <button class="modal-close" onclick="closeCreateModal()">&times;</button>
+        </div>
+        
+        <form id="createWorkbookForm">
+          <div class="form-group">
+            <label for="createWorkbookName">Workbook Name: <span style="color: red;">*</span></label>
+            <input type="text" id="createWorkbookName" required placeholder="Enter workbook name">
+          </div>
+          
+          <div class="form-group">
+            <p style="color: #666; font-size: 14px; margin: 10px 0;">
+              <strong>Save Location:</strong> New workbooks will be created in your My Documents folder. 
+              You can move them to other folders later using Sigma's menu options.
+            </p>
+          </div>
+          
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Create Workbook</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- === Loading Overlay === -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+      <div class="loading-spinner">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading workbook...</div>
+      </div>
+    </div>
+
+    <!-- === Footer === -->
+    <footer class="layout-footer">Sigma &copy; 2025</footer>
+    
+    <style>
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+      }
+      
+      .loading-spinner {
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+      
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #007bff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem auto;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      .loading-text {
+        color: #333;
+        font-size: 16px;
+        font-weight: 500;
+      }
+    </style>
+  </body>
+  <script>
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+    let DEBUG = false;
+    let env = {};
+    let currentMode = "build"; // Always use build user for this project
+    let availableTeamWorkspaces = [];
+    let currentWorkbookFolderId = null;
+
+    // ============================================================================
+    // ENVIRONMENT & CONFIGURATION
+    // ============================================================================
+    
+    /**
+     * Loads environment configuration from the server
+     * Sets DEBUG flag and populates global env object with .env variables
+     */
+    async function loadEnv() {
+      try {
+        const res = await fetch("/env.json");
+        env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode enabled via /env.json");
+      } catch (err) {
+        if (DEBUG) console.warn("Failed to load /env.json config");
+      }
+    }
+
+    // ============================================================================
+    // UI INTERACTIONS
+    // ============================================================================
+    const sidebar = document.querySelector(".sidebar");
+    document.getElementById("collapse-info").addEventListener("click", () => {
+      sidebar.classList.toggle("collapsed");
+    });
+
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Show loading overlay with optional custom message
+     */
+    function showLoading(message = "Loading workbook...") {
+      const overlay = document.getElementById("loadingOverlay");
+      const text = overlay.querySelector(".loading-text");
+      text.textContent = message;
+      overlay.style.display = "flex";
+    }
+    
+    /**
+     * Hide loading overlay
+     */
+    function hideLoading() {
+      const overlay = document.getElementById("loadingOverlay");
+      overlay.style.display = "none";
+    }
+    
+    /**
+     * Decodes a base64url-encoded string (used for JWT components)
+     * @param {string} str - Base64url encoded string
+     * @returns {string} Decoded string
+     */
+    function base64UrlDecode(str) {
+      str = str.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = str.length % 4;
+      if (pad) str += "=".repeat(4 - pad);
+      return atob(str);
+    }
+
+    // ============================================================================
+    // SIGMA EMBED FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Generates JWT token and loads Sigma embed in iframe
+     * Populates sidebar with embed URL and decoded JWT information
+     */
+    async function loadEmbed() {
+      const selectedUser = document.getElementById("roleSelect").value;
+      const workbookUrlId = window.selectedworkbookUrlId;
+      const embedType = "workbook";
+
+      const decodeBlock = document.getElementById("jwt-decode-content");
+
+      decodeBlock.innerHTML = "<p>Loading JWT...</p>";
+      document.getElementById("jwt-display").textContent = "Loading JWT...";
+      document.getElementById("debug-embed-url").textContent = "N/A";
+
+      if (!selectedUser || !workbookUrlId) {
+        if (DEBUG) console.warn("Embed not loaded — missing required fields.");
+        return;
+      }
+
+      const hideFolderNav =
+        currentMode === "build"
+          ? "false"
+          : env.hide_folder_navigation || "true";
+      const hideMenu =
+        currentMode === "build" ? "false" : env.hide_menu || "true";
+      const menuPosition =
+        currentMode === "build" ? "top" : env.menu_position || "none";
+
+      if (DEBUG) {
+        console.log("Embed config:", {
+          currentMode,
+          hideFolderNav,
+          hideMenu,
+          menuPosition,
+        });
+      }
+
+      try {
+        const res = await fetch(
+          `/api/jwt/${embedType}?embedType=${embedType}&workbookUrlId=${encodeURIComponent(
+            workbookUrlId
+          )}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sub: selectedUser,
+              hide_folder_navigation: hideFolderNav,
+              hide_menu: hideMenu,
+              menu_position: menuPosition,
+              disable_auto_refresh: env.DISABLE_AUTO_REFRESH,
+              disable_mobile_view: env.DISABLE_MOBILE_VIEW,
+              hide_page_controls: env.HIDE_PAGE_CONTROLS,
+              hide_reload_button: env.HIDE_RELOAD_BUTTON,
+              hide_title: env.HIDE_TITLE,
+              hide_tooltip: env.HIDE_TOOLTIP,
+              hide_view_select: env.HIDE_VIEW_SELECT,
+              lng: env.LNG,
+              page_id: env.PAGE_ID,
+              responsive_height: env.RESPONSIVE_HEIGHT,
+              theme: env.THEME,
+              view_id: env.VIEW_ID,
+            }),
+          }
+        );
+
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (parseErr) {
+          throw new Error(`Invalid JSON response: ${text.slice(0, 100)}...`);
+        }
+
+        if (!res.ok) {
+          throw new Error(
+            json.error || res.statusText || "Failed to fetch embed"
+          );
+        }
+
+        const { jwt, embedUrl } = json;
+        if (DEBUG) console.log("Embed response:", { jwt, embedUrl });
+
+        document.getElementById("sigma-embed").src = embedUrl;
+        document.getElementById("debug-embed-url").textContent =
+          embedUrl || "N/A";
+        document.getElementById("jwt-display").textContent = jwt;
+
+        if (jwt && jwt.split(".").length === 3) {
+          try {
+            const [headerStr, payloadStr] = jwt.split(".").slice(0, 2);
+            const header = JSON.parse(base64UrlDecode(headerStr));
+            const payload = JSON.parse(base64UrlDecode(payloadStr));
+            decodeBlock.innerHTML = `
+            <h3>Decoded JWT Header:</h3>
+            <pre>${JSON.stringify(header, null, 2)}</pre>
+            <h3>Decoded JWT Payload:</h3>
+            <pre>${JSON.stringify(payload, null, 2)}</pre>`;
+          } catch (decodeErr) {
+            decodeBlock.innerHTML = `<p style="color:red;">JWT decoding failed.</p>`;
+          }
+        } else {
+          decodeBlock.innerHTML = `<p style="color:red;">Missing or invalid JWT format.</p>`;
+        }
+      } catch (err) {
+        if (DEBUG) console.error("loadEmbed() failed:", err.message);
+        decodeBlock.innerHTML = `<p style="color:red;">${err.message}</p>`;
+      }
+    }
+
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Populates the user role dropdown with View and Build users from environment config
+     * Sets up event handler to update currentMode when user selection changes
+     */
+    async function loadUserOptions() {
+      const select = document.getElementById("roleSelect");
+      try {
+        const res = await fetch("/env.json");
+        const env = await res.json();
+
+        select.innerHTML = `
+        <option value="" disabled style="color:gray;font-style:italic">Select a user</option>
+        <option value="${env.BUILD_EMAIL}" data-mode="build" selected>${env.BUILD_EMAIL}</option>`;
+
+        select.addEventListener("change", (e) => {
+          const selected = e.target.selectedOptions[0];
+          currentMode = selected.dataset.mode || "view";
+          if (DEBUG) console.log("Selected mode:", currentMode);
+
+          const workbookSelect = document.getElementById("workbookSelect");
+          const selectedWorkbook = workbookSelect?.value;
+          if (selectedWorkbook) {
+            window.selectedworkbookUrlId = selectedWorkbook;
+            loadEmbed();
+          }
+        });
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load user options:", err);
+      }
+    }
+
+    /**
+     * Fetches all accessible workbooks and populates the "All Workbooks" dropdown
+     */
+    async function loadAllWorkbooks() {
+      const select = document.getElementById("allWorkbooksSelect");
+
+      try {
+        const res = await fetch("/api/workbook-copy-create/all-workbooks");
+        const { workbooks } = await res.json();
+
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select from all workbooks</option>`;
+
+        workbooks.forEach((wb) => {
+          const match = wb.url.match(/workbook\/([a-zA-Z0-9]+)/);
+          const workbookUrlId = match ? match[1] : null;
+          if (!workbookUrlId) return;
+          const opt = document.createElement("option");
+          opt.value = workbookUrlId;
+          opt.textContent = wb.name + (wb.path ? ` (${wb.path})` : "");
+          select.appendChild(opt);
+        });
+
+        select.addEventListener("change", async () => {
+          // Clear the other dropdown when this one is selected
+          document.getElementById("myWorkbooksSelect").value = "";
+          
+          window.selectedworkbookUrlId = select.value;
+          await loadEmbed();
+          
+          // Show copy button when a workbook is selected
+          const copyBtn = document.getElementById("copyWorkbookBtn");
+          if (select.value) {
+            copyBtn.style.display = "inline-block";
+            await loadWorkbookFolder(select.value);
+          } else {
+            copyBtn.style.display = "none";
+          }
+        });
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load all workbooks:", err);
+        select.innerHTML = `<option value="">Error loading all workbooks</option>`;
+      }
+    }
+
+    /**
+     * Fetches My Documents workbooks and populates the "My Documents" dropdown
+     */
+    async function loadMyDocumentsWorkbooks() {
+      const select = document.getElementById("myWorkbooksSelect");
+
+      try {
+        const res = await fetch("/api/workbook-copy-create/my-documents-workbooks");
+        const { workbooks } = await res.json();
+
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select from My Documents</option>`;
+
+        workbooks.forEach((wb) => {
+          const match = wb.url.match(/workbook\/([a-zA-Z0-9]+)/);
+          const workbookUrlId = match ? match[1] : null;
+          if (!workbookUrlId) return;
+          const opt = document.createElement("option");
+          opt.value = workbookUrlId;
+          opt.textContent = wb.name; // No path suffix needed since they're all My Documents
+          select.appendChild(opt);
+        });
+
+        select.addEventListener("change", async () => {
+          // Clear the other dropdown when this one is selected
+          document.getElementById("allWorkbooksSelect").value = "";
+          
+          window.selectedworkbookUrlId = select.value;
+          await loadEmbed();
+          
+          // Show copy button when a workbook is selected
+          const copyBtn = document.getElementById("copyWorkbookBtn");
+          if (select.value) {
+            copyBtn.style.display = "inline-block";
+            await loadWorkbookFolder(select.value);
+          } else {
+            copyBtn.style.display = "none";
+          }
+        });
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load My Documents workbooks:", err);
+        select.innerHTML = `<option value="">Error loading My Documents workbooks</option>`;
+      }
+    }
+
+    // ============================================================================
+    // WORKBOOK COPY & CREATE FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Load available team workspaces for workbook placement
+     */
+    async function loadTeamWorkspaces() {
+      try {
+        const res = await fetch("/api/workbook-copy-create/team-workspaces");
+        const data = await res.json();
+        availableTeamWorkspaces = data.teamWorkspaces || [];
+        if (DEBUG) console.log("Loaded team workspaces:", availableTeamWorkspaces);
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load team workspaces:", err);
+        availableTeamWorkspaces = [];
+      }
+    }
+
+    /**
+     * Get the folder ID for the currently selected workbook
+     */
+    async function loadWorkbookFolder(workbookUrlId) {
+      try {
+        // Convert URL ID to UUID for API call
+        const workbookId = await resolveWorkbookId(workbookUrlId);
+        if (!workbookId) {
+          if (DEBUG) console.error("Could not resolve workbook ID for:", workbookUrlId);
+          currentWorkbookFolderId = null;
+          return;
+        }
+        
+        const res = await fetch(`/api/workbook-copy-create/workbook/${workbookId}/folder`);
+        const data = await res.json();
+        currentWorkbookFolderId = data.folderId;
+        if (DEBUG) console.log("Current workbook folder:", currentWorkbookFolderId);
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load workbook folder:", err);
+        currentWorkbookFolderId = null;
+      }
+    }
+
+    /**
+     * Resolve workbook URL ID to UUID using our dual dropdown endpoints
+     */
+    async function resolveWorkbookId(workbookUrlId) {
+      try {
+        if (!workbookUrlId) {
+          if (DEBUG) console.error("No workbookUrlId provided to resolve");
+          return null;
+        }
+        
+        // First try the all workbooks endpoint
+        try {
+          const res = await fetch("/api/workbook-copy-create/all-workbooks");
+          const { workbooks } = await res.json();
+          let workbook = workbooks.find(wb => {
+            const match = wb.url.match(/workbook\/([a-zA-Z0-9]+)/);
+            return match && match[1] === workbookUrlId;
+          });
+          
+          if (workbook) {
+            return workbook.id;
+          }
+        } catch (err) {
+          if (DEBUG) console.log("All workbooks lookup failed, trying My Documents:", err.message);
+        }
+        
+        // If not found in all workbooks, try My Documents workbooks
+        try {
+          const res = await fetch("/api/workbook-copy-create/my-documents-workbooks");
+          const { workbooks } = await res.json();
+          let workbook = workbooks.find(wb => {
+            const match = wb.url.match(/workbook\/([a-zA-Z0-9]+)/);
+            return match && match[1] === workbookUrlId;
+          });
+          
+          if (workbook) {
+            return workbook.id;
+          }
+        } catch (err) {
+          if (DEBUG) console.log("My Documents workbooks lookup failed:", err.message);
+        }
+        
+        if (DEBUG) console.error("Workbook not found for URL ID:", workbookUrlId);
+        return null;
+      } catch (err) {
+        if (DEBUG) console.error("Failed to resolve workbook ID:", err);
+        return null;
+      }
+    }
+
+    /**
+     * Populate team workspace dropdown with available team workspaces
+     */
+    function populateTeamWorkspaceSelect(selectElement) {
+      if (availableTeamWorkspaces.length === 0) {
+        selectElement.innerHTML = `<option value="" disabled>No team workspaces available</option>`;
+        return;
+      }
+      
+      selectElement.innerHTML = `<option value="">Select a team workspace</option>`;
+      availableTeamWorkspaces.forEach(workspace => {
+        const option = document.createElement("option");
+        option.value = workspace.id;
+        option.textContent = workspace.name;
+        selectElement.appendChild(option);
+      });
+    }
+
+    // ============================================================================
+    // MODAL FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Open copy workbook modal
+     */
+    async function openCopyModal() {
+      const modal = document.getElementById("copyWorkbookModal");
+      await loadTeamWorkspaces();
+      populateTeamWorkspaceSelect(document.getElementById("copyTeamSelect"));
+      
+      // Disable team workspace option if no team workspaces are available
+      const teamRadio = modal.querySelector('input[value="team"]');
+      const teamLabel = teamRadio.parentElement;
+      if (availableTeamWorkspaces.length === 0) {
+        teamRadio.disabled = true;
+        teamLabel.style.color = '#ccc';
+        // Make sure My Documents is selected
+        modal.querySelector('input[value="mydocs"]').checked = true;
+      } else {
+        teamRadio.disabled = false;
+        teamLabel.style.color = '';
+      }
+      
+      modal.classList.add("open");
+      document.body.classList.add("modal-open");
+    }
+
+    /**
+     * Close copy workbook modal
+     */
+    function closeCopyModal() {
+      const modal = document.getElementById("copyWorkbookModal");
+      modal.classList.remove("open");
+      document.body.classList.remove("modal-open");
+      document.getElementById("copyWorkbookForm").reset();
+      document.getElementById("copyTeamGroup").style.display = "none";
+    }
+
+    /**
+     * Open create workbook modal
+     */
+    async function openCreateModal() {
+      const modal = document.getElementById("createWorkbookModal");
+      modal.classList.add("open");
+      document.body.classList.add("modal-open");
+    }
+
+    /**
+     * Close create workbook modal
+     */
+    function closeCreateModal() {
+      const modal = document.getElementById("createWorkbookModal");
+      modal.classList.remove("open");
+      document.body.classList.remove("modal-open");
+      document.getElementById("createWorkbookForm").reset();
+    }
+
+    /**
+     * Copy workbook functionality
+     */
+    async function copyWorkbook(event) {
+      event.preventDefault();
+      
+      // Show loading immediately to prevent double-clicks
+      showLoading("Copying workbook...");
+      
+      const workbookUrlId = window.selectedworkbookUrlId;
+      if (!workbookUrlId) {
+        hideLoading();
+        alert("Please select a workbook to copy");
+        return;
+      }
+
+      const formData = new FormData(event.target);
+      const name = document.getElementById("copyWorkbookName").value.trim();
+      const destination = formData.get("copyDestination");
+      
+      let destinationFolderId = null;
+      if (destination === "team") {
+        destinationFolderId = document.getElementById("copyTeamSelect").value;
+        if (!destinationFolderId) {
+          hideLoading();
+          alert("Please select a team workspace");
+          return;
+        }
+      }
+      // For "mydocs", leave destinationFolderId as null (API default)
+
+      try {
+        const workbookId = await resolveWorkbookId(workbookUrlId);
+        if (!workbookId) {
+          alert("Could not identify the selected workbook. Please try selecting it again.");
+          return;
+        }
+        
+        const res = await fetch("/api/workbook-copy-create/copy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workbookId,
+            destinationFolderId,
+            name: name || undefined
+          })
+        });
+
+        const result = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(result.error || "Failed to copy workbook");
+        }
+
+        if (DEBUG) console.log("Workbook copied:", result);
+        
+        // Refresh both workbook lists and close modal
+        await Promise.all([loadAllWorkbooks(), loadMyDocumentsWorkbooks()]);
+        closeCopyModal();
+        
+        // Don't show alert yet - keep loading widget visible throughout the process
+        
+        try {
+          // Auto-select the new workbook in the My Documents dropdown (since that's where it was copied)
+          const newWorkbookName = result.workbook.name;
+          const myWorkbooksSelect = document.getElementById("myWorkbooksSelect");
+          
+          if (DEBUG) console.log("Looking for copied workbook:", newWorkbookName);
+          if (DEBUG) console.log("Available options:", Array.from(myWorkbooksSelect.options).map(opt => opt.textContent));
+          
+          let newOption = Array.from(myWorkbooksSelect.options).find(opt => 
+            opt.textContent.startsWith(newWorkbookName) || opt.textContent.includes(newWorkbookName)
+          );
+          
+          // Give more time for dropdowns to populate, then try multiple quick retries
+          for (let attempt = 0; attempt < 3; attempt++) {
+            if (newOption) break;
+            
+            if (DEBUG) console.log(`Search attempt ${attempt + 1} for copied workbook:`, newWorkbookName);
+            await new Promise(resolve => setTimeout(resolve, 500)); // Longer wait
+            
+            newOption = Array.from(myWorkbooksSelect.options).find(opt => 
+              opt.textContent.startsWith(newWorkbookName) || opt.textContent.includes(newWorkbookName)
+            );
+          }
+          
+          if (newOption) {
+            if (DEBUG) console.log("Found copied workbook option:", newOption.textContent);
+            // Clear the all workbooks dropdown
+            document.getElementById("allWorkbooksSelect").value = "";
+            
+            myWorkbooksSelect.value = newOption.value;
+            window.selectedworkbookUrlId = newOption.value;
+            
+            // Load the new workbook and wait for it to complete
+            await loadEmbed();
+            document.getElementById("copyWorkbookBtn").style.display = "inline-block";
+            
+            // Only hide loading and show success message after workbook is fully loaded
+            hideLoading();
+            alert("Workbook copied successfully!");
+          } else {
+            if (DEBUG) console.error("Could not find copied workbook in dropdown after multiple attempts:", newWorkbookName);
+            
+            // Try final fallback with full reload before giving up
+            if (DEBUG) console.log("Trying final fallback for copied workbook...");
+            await Promise.all([loadAllWorkbooks(), loadMyDocumentsWorkbooks()]);
+            
+            const retryOption = Array.from(document.getElementById("myWorkbooksSelect").options).find(opt => 
+              opt.textContent.startsWith(newWorkbookName) || opt.textContent.includes(newWorkbookName)
+            );
+            
+            if (retryOption) {
+              if (DEBUG) console.log("Found copied workbook on final retry:", retryOption.textContent);
+              document.getElementById("allWorkbooksSelect").value = "";
+              document.getElementById("myWorkbooksSelect").value = retryOption.value;
+              window.selectedworkbookUrlId = retryOption.value;
+              await loadEmbed();
+              document.getElementById("copyWorkbookBtn").style.display = "inline-block";
+              hideLoading();
+              alert("Workbook copied successfully!");
+            } else {
+              if (DEBUG) console.error("Still could not find copied workbook after final retry:", newWorkbookName);
+              hideLoading();
+              alert("Workbook copied successfully! Please manually select it from the dropdown.");
+            }
+          }
+        } catch (error) {
+          hideLoading();
+          alert("Workbook copied, but there was an issue loading it. Please manually select it from the dropdown.");
+          if (DEBUG) console.error("Error during copy auto-selection:", error);
+        }
+      } catch (err) {
+        hideLoading();
+        if (DEBUG) console.error("Copy failed:", err);
+        alert("Failed to copy workbook: " + err.message);
+      }
+    }
+
+    /**
+     * Create new workbook functionality
+     */
+    async function createWorkbook(event) {
+      event.preventDefault();
+      
+      // Show loading immediately to prevent double-clicks
+      showLoading("Creating workbook...");
+      
+      const name = document.getElementById("createWorkbookName").value.trim();
+      
+      if (!name) {
+        hideLoading();
+        alert("Please enter a workbook name");
+        return;
+      }
+
+      const requestBody = { name };
+      // New workbooks always created in My Documents - no folder selection needed
+
+      try {
+        const res = await fetch("/api/workbook-copy-create/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody)
+        });
+
+        const result = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(result.error || "Failed to create workbook");
+        }
+
+        if (DEBUG) console.log("Workbook created:", result);
+        
+        // Close modal but don't show alert yet - keep loading widget visible throughout the process
+        closeCreateModal();
+        
+        try {
+          // Start loading process immediately after alert
+          if (DEBUG) console.log("Starting auto-selection process for:", name);
+          
+          // Refresh both workbook lists
+          await Promise.all([loadAllWorkbooks(), loadMyDocumentsWorkbooks()]);
+          
+          // Auto-select the new workbook in the My Documents dropdown
+          const myWorkbooksSelect = document.getElementById("myWorkbooksSelect");
+          
+          if (DEBUG) console.log("Available My Documents options:", Array.from(myWorkbooksSelect.options).map(opt => opt.textContent));
+          
+          let newOption = Array.from(myWorkbooksSelect.options).find(opt => 
+            opt.textContent.startsWith(name) || opt.textContent.includes(name)
+          );
+          
+          // Give more time for dropdowns to populate, then try multiple quick retries
+          for (let attempt = 0; attempt < 3; attempt++) {
+            if (newOption) break;
+            
+            if (DEBUG) console.log(`Search attempt ${attempt + 1} for workbook:`, name);
+            await new Promise(resolve => setTimeout(resolve, 500)); // Longer wait
+            
+            newOption = Array.from(myWorkbooksSelect.options).find(opt => 
+              opt.textContent.startsWith(name) || opt.textContent.includes(name)
+            );
+          }
+          
+          if (newOption) {
+            if (DEBUG) console.log("Found new workbook option:", newOption.textContent);
+            // Clear the all workbooks dropdown
+            document.getElementById("allWorkbooksSelect").value = "";
+            
+            myWorkbooksSelect.value = newOption.value;
+            window.selectedworkbookUrlId = newOption.value;
+            
+            // Load the new workbook and wait for it to complete
+            await loadEmbed();
+            document.getElementById("copyWorkbookBtn").style.display = "inline-block";
+            
+            // Only hide loading and show success message after workbook is fully loaded
+            hideLoading();
+            alert("Workbook created successfully!");
+          } else {
+            if (DEBUG) console.error("Could not find new workbook in dropdown after multiple attempts:", name);
+            
+            // Try final fallback with full reload before giving up
+            if (DEBUG) console.log("Trying final fallback for created workbook...");
+            await Promise.all([loadAllWorkbooks(), loadMyDocumentsWorkbooks()]);
+            
+            const retryOption = Array.from(document.getElementById("myWorkbooksSelect").options).find(opt => 
+              opt.textContent.startsWith(name) || opt.textContent.includes(name)
+            );
+            
+            if (retryOption) {
+              if (DEBUG) console.log("Found created workbook on final retry:", retryOption.textContent);
+              document.getElementById("allWorkbooksSelect").value = "";
+              document.getElementById("myWorkbooksSelect").value = retryOption.value;
+              window.selectedworkbookUrlId = retryOption.value;
+              await loadEmbed();
+              document.getElementById("copyWorkbookBtn").style.display = "inline-block";
+              hideLoading();
+              alert("Workbook created successfully!");
+            } else {
+              if (DEBUG) console.error("Still could not find created workbook after final retry:", name);
+              hideLoading();
+              alert("Workbook created successfully! Please manually select it from the dropdown.");
+            }
+          }
+        } catch (error) {
+          hideLoading();
+          alert("Workbook created, but there was an issue loading it. Please manually select it from the dropdown.");
+          if (DEBUG) console.error("Error during auto-selection:", error);
+        }
+      } catch (err) {
+        hideLoading();
+        if (DEBUG) console.error("Create failed:", err);
+        alert("Failed to create workbook: " + err.message);
+      }
+    }
+
+    // ============================================================================
+    // EVENT LISTENERS
+    // ============================================================================
+    
+    // Modal radio button change handlers
+    document.addEventListener("change", (e) => {
+      if (e.target.name === "copyDestination") {
+        const teamGroup = document.getElementById("copyTeamGroup");
+        teamGroup.style.display = e.target.value === "team" ? "block" : "none";
+      }
+    });
+
+    // Button click handlers
+    document.getElementById("copyWorkbookBtn").addEventListener("click", openCopyModal);
+    document.getElementById("createWorkbookBtn").addEventListener("click", openCreateModal);
+    
+    // Form submit handlers
+    document.getElementById("copyWorkbookForm").addEventListener("submit", copyWorkbook);
+    document.getElementById("createWorkbookForm").addEventListener("submit", createWorkbook);
+
+    // Close modals on background click
+    document.getElementById("copyWorkbookModal").addEventListener("click", (e) => {
+      if (e.target === e.currentTarget) closeCopyModal();
+    });
+    document.getElementById("createWorkbookModal").addEventListener("click", (e) => {
+      if (e.target === e.currentTarget) closeCreateModal();
+    });
+
+    // ============================================================================
+    // APPLICATION INITIALIZATION
+    // ============================================================================
+    (async () => {
+      await loadEnv();
+      await loadUserOptions();
+      await Promise.all([loadAllWorkbooks(), loadMyDocumentsWorkbooks()]);
+    })();
+  </script>
+</html>
