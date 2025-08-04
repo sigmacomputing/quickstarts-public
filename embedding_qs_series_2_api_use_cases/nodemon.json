@@ -1,4 +1,4 @@
 {
-  "watch": ["server", "helpers", ".env"],
+  "watch": ["server", "helpers", "routes", ".env"],
   "ext": "js,json,env"
 }
