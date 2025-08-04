@@ -1,4 +1,4 @@
-# API Embed Bookmarks QuickStart
+#  Embed Bookmarks QuickStart
 
 ## Overview
 This QuickStart demonstrates Sigma's bookmark functionality, allowing users to save and switch between different views of the same workbook. Bookmarks capture filters, parameters, and other state information that can be recalled later.
@@ -21,7 +21,7 @@ This QuickStart demonstrates Sigma's bookmark functionality, allowing users to s
 3. **Create Bookmark** (Build Users only): 
    - Interact with the embedded content to generate an `exploreKey`
    - Enter a bookmark name and click "Create Bookmark"
-   - The current state is saved as a bookmark via Sigma's API
+   - The current state is saved as a bookmark via Sigma's 
 4. **Switch Between Views**: Use the "Saved Bookmark" dropdown to switch between bookmarks or return to the "Original Workbook"
 
 ### User Permissions
@@ -36,11 +36,11 @@ The bookmark functionality relies on Sigma's `exploreKey` system:
 
 ## Technical Implementation
 
-### API Integration
-- **Direct Sigma API**: This version uses Sigma's bookmark API directly
-- **Bookmark Creation**: Uses `/api/bookmarks/create-bookmark` endpoint
-- **Bookmark Listing**: Uses `/api/bookmarks/list` endpoint
-- **JWT Generation**: Uses `/api/jwt/api-embed-bookmarks` endpoint
+###  Integration
+- **Direct Sigma **: This version uses Sigma's bookmark  directly
+- **Bookmark Creation**: Uses `//bookmarks/create-bookmark` endpoint
+- **Bookmark Listing**: Uses `//bookmarks/list` endpoint
+- **JWT Generation**: Uses `//jwt/-embed-bookmarks` endpoint
 
 ### Key Components
 - **PostMessage Listener**: Captures `exploreKey` changes from the embedded iframe
@@ -49,16 +49,16 @@ The bookmark functionality relies on Sigma's `exploreKey` system:
 
 ## File Structure
 ```
-api-embed-bookmarks/
+-embed-bookmarks/
 ├── index.html          # Main page with bookmark functionality
 └── README.md           # This documentation
 ```
 
-## API Endpoints Used
-- `GET /api/workbooks` - Fetches available workbooks
-- `GET /api/bookmarks/list` - Lists bookmarks for a workbook
-- `POST /api/bookmarks/create-bookmark` - Creates new bookmarks
-- `POST /api/jwt/api-embed-bookmarks` - Generates JWT tokens with bookmark support
+##  Endpoints Used
+- `GET //workbooks` - Fetches available workbooks
+- `GET //bookmarks/list` - Lists bookmarks for a workbook
+- `POST //bookmarks/create-bookmark` - Creates new bookmarks
+- `POST //jwt/-embed-bookmarks` - Generates JWT tokens with bookmark support
 
 ## Configuration
 Respects all standard Sigma embedding parameters from `.env`:
@@ -67,9 +67,9 @@ Respects all standard Sigma embedding parameters from `.env`:
 - DEBUG mode provides detailed console logging
 
 ## Getting Started
-1. Configure your `.env` file with Sigma API credentials
+1. Configure your `.env` file with Sigma  credentials
 2. Start the server: `npm start`
-3. Navigate to `/api-embed-bookmarks`
+3. Navigate to `/-embed-bookmarks`
 4. Select a Build User to create bookmarks:
    - Choose a workbook and wait for it to load
    - Interact with the content (apply filters, change parameters)
@@ -90,4 +90,4 @@ Enable DEBUG=true for detailed logging of:
 - **State Persistence**: Bookmarks are stored in Sigma and persist across sessions
 - **Workbook Association**: Bookmarks are tied to specific workbooks
 
-This QuickStart provides the foundation for understanding bookmark functionality before exploring the database-enhanced version in `api-embed-bookmarks_db`.
+This QuickStart provides the foundation for understanding bookmark functionality before exploring the database-enhanced version in `-embed-bookmarks_db`.

@@ -124,17 +124,17 @@
             <div class="radio-group">
               <label>
                 <input type="radio" name="copyDestination" value="mydocs" checked>
-                My Documents folder (recommended)
+                My Documents folder only
               </label>
               <label>
                 <input type="radio" name="copyDestination" value="team">
-                Team workspace
+                My Documents + also share with team workspace
               </label>
             </div>
           </div>
           
           <div class="form-group" id="copyTeamGroup" style="display: none;">
-            <label for="copyTeamSelect">Select Team Workspace:</label>
+            <label for="copyTeamSelect">Also share with team workspace:</label>
             <select id="copyTeamSelect">
               <option value="">Loading team workspaces...</option>
             </select>
@@ -456,12 +456,29 @@
     /**
      * Fetches all accessible workbooks and populates the "All Workbooks" dropdown
      */
-    async function loadAllWorkbooks() {
+    async function loadAllWorkbooks(refresh = false) {
       const select = document.getElementById("allWorkbooksSelect");
 
       try {
-        const res = await fetch("/api/workbook-copy-create/all-workbooks");
+        let url = "/api/workbook-copy-create/all-workbooks";
+        
+        // Add timestamp to prevent caching when refresh is requested
+        if (refresh) {
+          url += `?t=${Date.now()}`;
+        }
+        
+        if (DEBUG) console.log(`Loading all workbooks from: ${url}`);
+        
+        const res = await fetch(url, {
+          cache: refresh ? 'no-cache' : 'default',
+          headers: refresh ? {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          } : {}
+        });
         const { workbooks } = await res.json();
+
+        if (DEBUG) console.log(`Loaded ${workbooks.length} all workbooks:`, workbooks.map(wb => wb.name));
 
         select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select from all workbooks</option>`;
 
@@ -475,22 +492,26 @@
           select.appendChild(opt);
         });
 
-        select.addEventListener("change", async () => {
-          // Clear the other dropdown when this one is selected
-          document.getElementById("myWorkbooksSelect").value = "";
-          
-          window.selectedworkbookUrlId = select.value;
-          await loadEmbed();
-          
-          // Show copy button when a workbook is selected
-          const copyBtn = document.getElementById("copyWorkbookBtn");
-          if (select.value) {
-            copyBtn.style.display = "inline-block";
-            await loadWorkbookFolder(select.value);
-          } else {
-            copyBtn.style.display = "none";
-          }
-        });
+        // Only add event listener if it hasn't been added already
+        if (!select.hasAttribute('data-listener-added')) {
+          select.setAttribute('data-listener-added', 'true');
+          select.addEventListener("change", async () => {
+            // Clear the other dropdown when this one is selected
+            document.getElementById("myWorkbooksSelect").value = "";
+            
+            window.selectedworkbookUrlId = select.value;
+            await loadEmbed();
+            
+            // Show copy button when a workbook is selected
+            const copyBtn = document.getElementById("copyWorkbookBtn");
+            if (select.value) {
+              copyBtn.style.display = "inline-block";
+              await loadWorkbookFolder(select.value);
+            } else {
+              copyBtn.style.display = "none";
+            }
+          });
+        }
       } catch (err) {
         if (DEBUG) console.error("Failed to load all workbooks:", err);
         select.innerHTML = `<option value="">Error loading all workbooks</option>`;
@@ -500,12 +521,31 @@
     /**
      * Fetches My Documents workbooks and populates the "My Documents" dropdown
      */
-    async function loadMyDocumentsWorkbooks() {
+    async function loadMyDocumentsWorkbooks(refresh = false) {
       const select = document.getElementById("myWorkbooksSelect");
 
       try {
-        const res = await fetch("/api/workbook-copy-create/my-documents-workbooks");
+        let url = refresh ? 
+          "/api/workbook-copy-create/my-documents-workbooks?refresh=true" : 
+          "/api/workbook-copy-create/my-documents-workbooks";
+        
+        // Add timestamp to prevent caching when refresh is requested
+        if (refresh) {
+          url += `&t=${Date.now()}`;
+        }
+        
+        if (DEBUG) console.log(`Loading My Documents workbooks from: ${url}`);
+        
+        const res = await fetch(url, {
+          cache: refresh ? 'no-cache' : 'default',
+          headers: refresh ? {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          } : {}
+        });
         const { workbooks } = await res.json();
+
+        if (DEBUG) console.log(`Loaded ${workbooks.length} My Documents workbooks:`, workbooks.map(wb => wb.name));
 
         select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select from My Documents</option>`;
 
@@ -519,22 +559,26 @@
           select.appendChild(opt);
         });
 
-        select.addEventListener("change", async () => {
-          // Clear the other dropdown when this one is selected
-          document.getElementById("allWorkbooksSelect").value = "";
-          
-          window.selectedworkbookUrlId = select.value;
-          await loadEmbed();
-          
-          // Show copy button when a workbook is selected
-          const copyBtn = document.getElementById("copyWorkbookBtn");
-          if (select.value) {
-            copyBtn.style.display = "inline-block";
-            await loadWorkbookFolder(select.value);
-          } else {
-            copyBtn.style.display = "none";
-          }
-        });
+        // Only add event listener if it hasn't been added already
+        if (!select.hasAttribute('data-listener-added')) {
+          select.setAttribute('data-listener-added', 'true');
+          select.addEventListener("change", async () => {
+            // Clear the other dropdown when this one is selected
+            document.getElementById("allWorkbooksSelect").value = "";
+            
+            window.selectedworkbookUrlId = select.value;
+            await loadEmbed();
+            
+            // Show copy button when a workbook is selected
+            const copyBtn = document.getElementById("copyWorkbookBtn");
+            if (select.value) {
+              copyBtn.style.display = "inline-block";
+              await loadWorkbookFolder(select.value);
+            } else {
+              copyBtn.style.display = "none";
+            }
+          });
+        }
       } catch (err) {
         if (DEBUG) console.error("Failed to load My Documents workbooks:", err);
         select.innerHTML = `<option value="">Error loading My Documents workbooks</option>`;
@@ -766,9 +810,20 @@
 
         if (DEBUG) console.log("Workbook copied:", result);
         
-        // Refresh both workbook lists and close modal
-        await Promise.all([loadAllWorkbooks(), loadMyDocumentsWorkbooks()]);
+        // Close modal first
         closeCopyModal();
+        
+        // Wait longer for Sigma to process the new workbook, then refresh with cache bypass
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Increased from 1000ms
+        
+        if (DEBUG) console.log("Refreshing workbook lists after copy...");
+        
+        // Refresh both dropdowns multiple times to ensure we get the latest data
+        for (let refreshAttempt = 0; refreshAttempt < 2; refreshAttempt++) {
+          if (DEBUG) console.log(`Refresh attempt ${refreshAttempt + 1}`);
+          await Promise.all([loadAllWorkbooks(true), loadMyDocumentsWorkbooks(true)]);
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
         
         // Don't show alert yet - keep loading widget visible throughout the process
         
@@ -778,22 +833,27 @@
           const myWorkbooksSelect = document.getElementById("myWorkbooksSelect");
           
           if (DEBUG) console.log("Looking for copied workbook:", newWorkbookName);
-          if (DEBUG) console.log("Available options:", Array.from(myWorkbooksSelect.options).map(opt => opt.textContent));
+          if (DEBUG) console.log("Available My Documents options:", Array.from(myWorkbooksSelect.options).map(opt => opt.textContent));
           
           let newOption = Array.from(myWorkbooksSelect.options).find(opt => 
             opt.textContent.startsWith(newWorkbookName) || opt.textContent.includes(newWorkbookName)
           );
           
-          // Give more time for dropdowns to populate, then try multiple quick retries
-          for (let attempt = 0; attempt < 3; attempt++) {
+          // Give more time for dropdowns to populate, then try multiple retries with fresh data
+          for (let attempt = 0; attempt < 5; attempt++) { // Increased from 3 to 5 attempts
             if (newOption) break;
             
             if (DEBUG) console.log(`Search attempt ${attempt + 1} for copied workbook:`, newWorkbookName);
-            await new Promise(resolve => setTimeout(resolve, 500)); // Longer wait
+            
+            // Refresh the dropdown data again before searching
+            await loadMyDocumentsWorkbooks(true);
+            await new Promise(resolve => setTimeout(resolve, 800)); // Increased delay
             
             newOption = Array.from(myWorkbooksSelect.options).find(opt => 
               opt.textContent.startsWith(newWorkbookName) || opt.textContent.includes(newWorkbookName)
             );
+            
+            if (DEBUG) console.log(`After attempt ${attempt + 1}, available options:`, Array.from(myWorkbooksSelect.options).map(opt => opt.textContent));
           }
           
           if (newOption) {
@@ -816,7 +876,7 @@
             
             // Try final fallback with full reload before giving up
             if (DEBUG) console.log("Trying final fallback for copied workbook...");
-            await Promise.all([loadAllWorkbooks(), loadMyDocumentsWorkbooks()]);
+            await Promise.all([loadAllWorkbooks(), loadMyDocumentsWorkbooks(true)]);
             
             const retryOption = Array.from(document.getElementById("myWorkbooksSelect").options).find(opt => 
               opt.textContent.startsWith(newWorkbookName) || opt.textContent.includes(newWorkbookName)
@@ -891,28 +951,43 @@
           // Start loading process immediately after alert
           if (DEBUG) console.log("Starting auto-selection process for:", name);
           
-          // Refresh both workbook lists
-          await Promise.all([loadAllWorkbooks(), loadMyDocumentsWorkbooks()]);
+          // Wait longer for Sigma to process the new workbook, then refresh with cache bypass
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Increased from 1000ms
+          
+          if (DEBUG) console.log("Refreshing workbook lists after create...");
+          
+          // Refresh both dropdowns multiple times to ensure we get the latest data
+          for (let refreshAttempt = 0; refreshAttempt < 2; refreshAttempt++) {
+            if (DEBUG) console.log(`Create refresh attempt ${refreshAttempt + 1}`);
+            await Promise.all([loadAllWorkbooks(true), loadMyDocumentsWorkbooks(true)]);
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
           
           // Auto-select the new workbook in the My Documents dropdown
           const myWorkbooksSelect = document.getElementById("myWorkbooksSelect");
           
+          if (DEBUG) console.log("Looking for created workbook:", name);
           if (DEBUG) console.log("Available My Documents options:", Array.from(myWorkbooksSelect.options).map(opt => opt.textContent));
           
           let newOption = Array.from(myWorkbooksSelect.options).find(opt => 
             opt.textContent.startsWith(name) || opt.textContent.includes(name)
           );
           
-          // Give more time for dropdowns to populate, then try multiple quick retries
-          for (let attempt = 0; attempt < 3; attempt++) {
+          // Give more time for dropdowns to populate, then try multiple retries with fresh data
+          for (let attempt = 0; attempt < 5; attempt++) { // Increased from 3 to 5 attempts
             if (newOption) break;
             
-            if (DEBUG) console.log(`Search attempt ${attempt + 1} for workbook:`, name);
-            await new Promise(resolve => setTimeout(resolve, 500)); // Longer wait
+            if (DEBUG) console.log(`Create search attempt ${attempt + 1} for workbook:`, name);
+            
+            // Refresh the dropdown data again before searching
+            await loadMyDocumentsWorkbooks(true);
+            await new Promise(resolve => setTimeout(resolve, 800)); // Increased delay
             
             newOption = Array.from(myWorkbooksSelect.options).find(opt => 
               opt.textContent.startsWith(name) || opt.textContent.includes(name)
             );
+            
+            if (DEBUG) console.log(`After create attempt ${attempt + 1}, available options:`, Array.from(myWorkbooksSelect.options).map(opt => opt.textContent));
           }
           
           if (newOption) {
@@ -935,7 +1010,7 @@
             
             // Try final fallback with full reload before giving up
             if (DEBUG) console.log("Trying final fallback for created workbook...");
-            await Promise.all([loadAllWorkbooks(), loadMyDocumentsWorkbooks()]);
+            await Promise.all([loadAllWorkbooks(), loadMyDocumentsWorkbooks(true)]);
             
             const retryOption = Array.from(document.getElementById("myWorkbooksSelect").options).find(opt => 
               opt.textContent.startsWith(name) || opt.textContent.includes(name)

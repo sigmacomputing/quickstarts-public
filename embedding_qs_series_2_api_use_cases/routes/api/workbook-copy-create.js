@@ -16,6 +16,66 @@ async function getSigmaHeaders() {
   };
 }
 
+// Helper function to check if a workbook name exists in a specific folder and generate unique name
+async function generateUniqueWorkbookName(baseName, destinationFolderId) {
+  try {
+    const headers = await getSigmaHeaders();
+    
+    // Get all workbooks in the system to check for name conflicts
+    const workbooksResponse = await axios.get(`${process.env.BASE_URL}/workbooks?limit=500`, { headers });
+    const allWorkbooks = workbooksResponse.data.entries || [];
+    
+    // Filter workbooks that are in the same destination folder
+    const workbooksInFolder = allWorkbooks.filter(wb => {
+      // For My Documents folder, check path
+      if (destinationFolderId === "rleTgkyUSzKwLRWNFK5tS") {
+        const path = wb.path || "";
+        return path === "My Documents" || path.includes("My Documents");
+      }
+      // For other folders, check folderId (if available in API response)
+      return wb.folderId === destinationFolderId || wb.parentId === destinationFolderId;
+    });
+    
+    if (DEBUG) {
+      console.log(`Checking for name conflicts in folder ${destinationFolderId}`);
+      console.log(`Found ${workbooksInFolder.length} existing workbooks in target folder`);
+      if (workbooksInFolder.length > 0) {
+        console.log("Existing workbook names:", workbooksInFolder.map(wb => wb.name));
+      }
+    }
+    
+    // Check if the base name already exists
+    const existingNames = workbooksInFolder.map(wb => wb.name.toLowerCase());
+    
+    let finalName = baseName;
+    let counter = 1;
+    
+    // Keep incrementing until we find a unique name
+    while (existingNames.includes(finalName.toLowerCase())) {
+      finalName = `${baseName} (${counter})`;
+      counter++;
+      
+      if (DEBUG) console.log(`Name conflict detected, trying: ${finalName}`);
+      
+      // Safety check to prevent infinite loops
+      if (counter > 100) {
+        finalName = `${baseName} (${Date.now()})`;
+        break;
+      }
+    }
+    
+    if (DEBUG && finalName !== baseName) {
+      console.log(`Generated unique name: ${finalName} (original: ${baseName})`);
+    }
+    
+    return finalName;
+  } catch (error) {
+    if (DEBUG) console.error("Error checking for duplicate names:", error.message);
+    // If we can't check for duplicates, just return the base name
+    return baseName;
+  }
+}
+
 // Helper function to find the build user's My Documents folder ID
 async function getBuildUserMyDocumentsFolderId() {
   try {
@@ -122,60 +182,212 @@ router.get("/my-documents-folder", async (req, res) => {
 // GET /api/workbook-copy-create/team-workspaces - Get team workspaces where the build user is a member
 router.get("/team-workspaces", async (req, res) => {
   try {
-    if (DEBUG) console.log("=== Fetching real team workspace folders ===");
+    if (DEBUG) console.log("=== Fetching teams where build user is a member ===");
 
     const headers = await getSigmaHeaders();
     const embedUserEmail = process.env.BUILD_EMAIL;
     const memberId = await lookupMemberId(embedUserEmail);
     
-    // Get member files to see what folders the build user has access to
-    const memberFilesUrl = `${process.env.BASE_URL}/members/${memberId}/files?typeFilters=folder&limit=500`;
-    if (DEBUG) console.log(`Fetching member folders: ${memberFilesUrl}`);
+    // Step 1: Get all teams and try multiple approaches to detect membership
+    const teamsUrl = `${process.env.BASE_URL}/teams`;
+    if (DEBUG) console.log(`Fetching all teams: ${teamsUrl}`);
     
-    const memberFilesResponse = await axios.get(memberFilesUrl, { headers });
-    const memberFolders = memberFilesResponse.data.entries || [];
+    const teamsResponse = await axios.get(teamsUrl, { headers });
+    const allTeams = teamsResponse.data.entries || [];
     
-    if (DEBUG) console.log(`Build user has access to ${memberFolders.length} folders`);
-    if (DEBUG) {
-      const folderDetails = memberFolders.map(f => ({ 
-        name: f.name, 
-        path: f.path, 
-        id: f.id, 
-        type: f.type,
-        ownerId: f.ownerId
-      }));
-      console.log("Accessible folders:", JSON.stringify(folderDetails, null, 2));
+    if (DEBUG) console.log(`Found ${allTeams.length} total teams in the system`);
+    
+    // Step 2: Try to detect team membership through multiple approaches
+    const userTeams = [];
+    
+    // Approach 1: Check team membership via teams API
+    for (const team of allTeams) {
+      try {
+        const teamMembersUrl = `${process.env.BASE_URL}/teams/${team.teamId}/members`;
+        const teamMembersResponse = await axios.get(teamMembersUrl, { headers });
+        const teamMembers = teamMembersResponse.data.entries || [];
+        
+        const isMember = teamMembers.some(member => member.memberId === memberId);
+        
+        if (isMember) {
+          userTeams.push(team);
+          if (DEBUG) console.log(`✓ Found via teams API: ${team.name} (${team.teamId})`);
+        }
+      } catch (teamError) {
+        if (DEBUG) console.log(`Could not check membership for team ${team.name}: ${teamError.message}`);
+      }
     }
     
-    // Look for team workspace folders (folders that are not "My Documents" and not owned by the build user)
+    // Approach 2: If no teams found via API, infer from member's accessible files
+    if (userTeams.length === 0) {
+      if (DEBUG) console.log("No teams found via teams API, trying to infer from member's accessible files");
+      
+      try {
+        const memberFilesUrl = `${process.env.BASE_URL}/members/${memberId}/files?limit=500`;
+        const memberFilesResponse = await axios.get(memberFilesUrl, { headers });
+        const memberFiles = memberFilesResponse.data.entries || [];
+        
+        // Look at workbook paths to infer team membership
+        const workbooks = memberFiles.filter(f => f.type === 'workbook');
+        const teamPaths = new Set();
+        
+        workbooks.forEach(wb => {
+          if (wb.path && wb.path !== 'My Documents') {
+            teamPaths.add(wb.path);
+          }
+        });
+        
+        if (DEBUG) console.log(`Found workbook paths that suggest team access:`, Array.from(teamPaths));
+        
+        // For each path that looks like a team, try to find the corresponding team
+        for (const path of teamPaths) {
+          const matchingTeam = allTeams.find(team => 
+            team.name.toLowerCase() === path.toLowerCase() ||
+            team.name.toLowerCase().replace(/_/g, ' ') === path.toLowerCase() ||
+            path.toLowerCase().includes(team.name.toLowerCase()) ||
+            team.name.toLowerCase().includes(path.toLowerCase())
+          );
+          
+          if (matchingTeam && !userTeams.find(t => t.teamId === matchingTeam.teamId)) {
+            userTeams.push(matchingTeam);
+            if (DEBUG) console.log(`✓ Inferred team membership from workbook path "${path}": ${matchingTeam.name}`);
+          }
+        }
+      } catch (memberFilesError) {
+        if (DEBUG) console.log(`Error accessing member files: ${memberFilesError.message}`);
+      }
+    }
+    
+    if (DEBUG) console.log(`Build user appears to be member of ${userTeams.length} teams`);
+    
+    // Step 3: For each detected team, try to find their workspace folder
     const teamWorkspaces = [];
     
-    for (const folder of memberFolders) {
-      if (folder.type !== "folder") continue;
-      
-      // Skip "My Documents" folders
-      if (folder.name === "My Documents" || folder.path === "My Documents") continue;
-      
-      // Skip folders owned by the build user (these are personal folders)
-      if (folder.ownerId === memberId) continue;
-      
-      // This is likely a team workspace folder
-      teamWorkspaces.push({
-        id: folder.id,
-        name: folder.name,
-        path: folder.path || folder.name,
-        teamId: folder.id // Use folder ID as team identifier
-      });
-      
-      if (DEBUG) console.log(`Found team workspace folder: ${folder.name} (${folder.id})`);
+    // Get all folders to search for team workspace folders
+    const allFilesResponse = await axios.get(`${process.env.BASE_URL}/files`, { headers });
+    const allFiles = allFilesResponse.data.entries || [];
+    const allFolders = allFiles.filter(file => file.type === "folder");
+    
+    if (DEBUG) console.log(`Searching through ${allFolders.length} folders for team workspace folders`);
+    
+    // Also get member's accessible files to see what folders they can access
+    let memberAccessibleFolders = [];
+    try {
+      const memberFilesUrl = `${process.env.BASE_URL}/members/${memberId}/files?typeFilters=folder&limit=500`;
+      const memberFilesResponse = await axios.get(memberFilesUrl, { headers });
+      memberAccessibleFolders = memberFilesResponse.data.entries || [];
+      if (DEBUG) console.log(`Member has access to ${memberAccessibleFolders.length} folders`);
+    } catch (memberError) {
+      if (DEBUG) console.log(`Could not get member's accessible folders: ${memberError.message}`);
     }
     
-    // If no team folders found, fall back to My Documents only approach
-    if (teamWorkspaces.length === 0) {
-      if (DEBUG) console.log("No team workspace folders found, user can only copy to My Documents");
+    for (const team of userTeams) {
+      if (DEBUG) console.log(`Looking for workspace folder for team "${team.name}"`);
+      
+      // Look for folders that match this team name in both all folders and member's accessible folders
+      const searchSources = [
+        { name: 'system folders', folders: allFolders },
+        { name: 'member accessible folders', folders: memberAccessibleFolders }
+      ];
+      
+      let teamFolder = null;
+      
+      for (const source of searchSources) {
+        const teamFolders = source.folders.filter(folder => {
+          const folderName = folder.name.toLowerCase();
+          const teamName = team.name.toLowerCase();
+          
+          return (
+            folderName === teamName ||
+            folderName.includes(teamName) ||
+            teamName.includes(folderName) ||
+            folder.path?.toLowerCase().includes(teamName) ||
+            // Additional matching for common variations
+            folderName.replace(/_/g, ' ') === teamName.replace(/_/g, ' ') ||
+            folderName.replace(/\s+/g, '_') === teamName.replace(/\s+/g, '_')
+          );
+        });
+        
+        if (DEBUG && teamFolders.length > 0) {
+          console.log(`Found ${teamFolders.length} potential folders in ${source.name}:`, teamFolders.map(f => f.name));
+        }
+        
+        if (teamFolders.length > 0) {
+          teamFolder = teamFolders[0];
+          if (DEBUG) console.log(`Using folder from ${source.name}: ${teamFolder.name} (${teamFolder.id})`);
+          break;
+        }
+      }
+      
+      if (teamFolder) {
+        teamWorkspaces.push({
+          id: teamFolder.id,
+          name: team.name,
+          path: teamFolder.path || teamFolder.name,
+          teamId: team.teamId,
+          teamName: team.name
+        });
+        
+        if (DEBUG) console.log(`✓ Added real workspace for team ${team.name}: ${teamFolder.name} (${teamFolder.id})`);
+      } else {
+        // Try to find workspace folder by looking for workbooks in team-named paths
+        try {
+          const memberFilesUrl = `${process.env.BASE_URL}/members/${memberId}/files?typeFilters=workbook&limit=500`;
+          const memberFilesResponse = await axios.get(memberFilesUrl, { headers });
+          const memberWorkbooks = memberFilesResponse.data.entries || [];
+          
+          // Check if there are workbooks with this team's path
+          const teamWorkbooks = memberWorkbooks.filter(wb => 
+            wb.path && (
+              wb.path.toLowerCase() === team.name.toLowerCase() ||
+              wb.path.toLowerCase().includes(team.name.toLowerCase())
+            )
+          );
+          
+          if (teamWorkbooks.length > 0) {
+            // If user has workbooks in this team path, assume the team workspace exists
+            // even if we can't find the folder directly
+            if (DEBUG) console.log(`Found ${teamWorkbooks.length} workbooks in team path "${team.name}" - assuming team workspace exists`);
+            
+            // For now, we'll use a synthetic folder ID but indicate it's for the team workspace
+            teamWorkspaces.push({
+              id: `team-workspace-${team.teamId}`, // Synthetic ID to indicate team workspace
+              name: team.name,
+              path: team.name,
+              teamId: team.teamId,
+              teamName: team.name,
+              isTeamWorkspace: true // Flag to indicate this is a team workspace
+            });
+            
+            if (DEBUG) console.log(`✓ Added inferred team workspace for ${team.name} based on workbook paths`);
+          } else {
+            // No evidence of team workspace, fall back to My Documents
+            if (DEBUG) console.log(`No evidence of workspace folder for team ${team.name}, using My Documents fallback`);
+            
+            teamWorkspaces.push({
+              id: "rleTgkyUSzKwLRWNFK5tS", // My Documents folder as fallback
+              name: `${team.name} (via My Documents)`,
+              path: team.name,
+              teamId: team.teamId,
+              teamName: team.name
+            });
+          }
+        } catch (workbookError) {
+          if (DEBUG) console.log(`Error checking workbooks for team ${team.name}: ${workbookError.message}`);
+          
+          // Final fallback
+          teamWorkspaces.push({
+            id: "rleTgkyUSzKwLRWNFK5tS",
+            name: `${team.name} (via My Documents)`,
+            path: team.name,
+            teamId: team.teamId,
+            teamName: team.name
+          });
+        }
+      }
     }
     
-    if (DEBUG) console.log(`=== Final result: ${teamWorkspaces.length} real team workspaces ===`);
+    if (DEBUG) console.log(`=== Final result: ${teamWorkspaces.length} team workspaces ===`);
     if (DEBUG) console.log("Team workspaces:", JSON.stringify(teamWorkspaces, null, 2));
 
     res.json({ 
@@ -248,39 +460,102 @@ router.post("/copy", async (req, res) => {
     }
 
     const copyData = {};
+    
+    // Handle destination folder ID
     if (destinationFolderId) {
-      copyData.destinationFolderId = destinationFolderId;
+      // Check if this is a synthetic team workspace ID
+      if (destinationFolderId.startsWith('team-workspace-')) {
+        if (DEBUG) console.log(`Detected synthetic team workspace ID: ${destinationFolderId}`);
+        
+        // Based on testing, team workspaces in Sigma don't work like traditional folders
+        // We'll copy to My Documents and then share with the team to provide similar functionality
+        const teamId = destinationFolderId.replace('team-workspace-', '');
+        
+        if (DEBUG) console.log(`Team workspace copy requested for team: ${teamId}`);
+        if (DEBUG) console.log(`Copying to My Documents and will share with team after copy`);
+        
+        // Copy to My Documents first
+        copyData.destinationFolderId = "rleTgkyUSzKwLRWNFK5tS";
+        
+        // Store team ID for post-copy sharing
+        copyData._teamIdForSharing = teamId;
+        
+      } else {
+        // Regular folder ID
+        copyData.destinationFolderId = destinationFolderId;
+      }
     } else {
       // If no destination folder specified, copy to build user's My Documents folder
       copyData.destinationFolderId = "rleTgkyUSzKwLRWNFK5tS"; // Build user's My Documents folder
     }
     
     // Handle name parameter - generate default if blank/undefined
+    let proposedName;
     if (name && name.trim()) {
-      copyData.name = name.trim();
+      proposedName = name.trim();
     } else {
       // If no name provided, get the original workbook name and add "Copy" suffix
       try {
         const headers = await getSigmaHeaders();
         const workbookResponse = await axios.get(`${process.env.BASE_URL}/workbooks/${workbookId}`, { headers });
         const originalName = workbookResponse.data.name || "Workbook";
-        copyData.name = `${originalName} (copy)`;
-        if (DEBUG) console.log(`Generated default name for copy: ${copyData.name}`);
+        proposedName = `${originalName} (copy)`;
+        if (DEBUG) console.log(`Generated default name for copy: ${proposedName}`);
       } catch (nameError) {
         // Fallback if we can't get original name
-        copyData.name = "Workbook Copy";
-        if (DEBUG) console.log("Using fallback name for copy:", copyData.name);
+        proposedName = "Workbook Copy";
+        if (DEBUG) console.log("Using fallback name for copy:", proposedName);
       }
     }
+    
+    // Check for duplicate names and generate unique name if needed
+    copyData.name = await generateUniqueWorkbookName(proposedName, copyData.destinationFolderId);
+    if (DEBUG && copyData.name !== proposedName) {
+      console.log(`Name changed due to conflict: ${proposedName} -> ${copyData.name}`);
+    }
 
-    if (DEBUG) console.log("Copying workbook:", { workbookId, destinationFolderId, name });
+    if (DEBUG) console.log("Copying workbook (NEW VERSION):", { workbookId, destinationFolderId, name });
     if (DEBUG) console.log("Request URL:", `${process.env.BASE_URL}/workbooks/${workbookId}/copy`);
     if (DEBUG) console.log("Request body:", JSON.stringify(copyData));
+
+    // Store team ID for post-copy sharing before removing it from copyData
+    const teamIdForSharing = copyData._teamIdForSharing;
+    delete copyData._teamIdForSharing; // Remove from copy request
 
     const headers = await getSigmaHeaders();
     const response = await axios.post(`${process.env.BASE_URL}/workbooks/${workbookId}/copy`, copyData, { headers });
     const data = response.data;
     if (DEBUG) console.log("Workbook copied successfully:", data);
+
+    // If this was a team workspace copy, share the workbook with the team
+    if (teamIdForSharing) {
+      if (DEBUG) console.log(`Sharing copied workbook with team: ${teamIdForSharing}`);
+      
+      try {
+        const grantsUrl = `${process.env.BASE_URL}/workbooks/${data.workbookId}/grants`;
+        const grantsData = {
+          grants: [
+            {
+              grantee: {
+                teamId: teamIdForSharing
+              },
+              permission: 'view'
+            }
+          ]
+        };
+        
+        await axios.post(grantsUrl, grantsData, { headers });
+        if (DEBUG) console.log("Successfully shared workbook with team");
+        
+        // Add a note to the response that it was shared with the team
+        data._sharedWithTeam = teamIdForSharing;
+        
+      } catch (shareError) {
+        if (DEBUG) console.error("Failed to share workbook with team:", shareError.response?.data || shareError.message);
+        // Don't fail the entire operation if sharing fails
+        data._shareError = "Failed to automatically share with team workspace";
+      }
+    }
 
     res.json({
       success: true,
@@ -304,15 +579,20 @@ router.post("/create", async (req, res) => {
       return res.status(400).json({ error: "name is required" });
     }
 
-    const createData = { name };
-    // Create workbooks in the build user's My Documents folder
-    if (folderId) {
-      createData.folderId = folderId;
-    } else {
-      // Use the verified build user's My Documents folder ID
-      createData.folderId = "rleTgkyUSzKwLRWNFK5tS"; // Build user's My Documents folder
-      if (DEBUG) console.log(`Creating workbook in build user's My Documents folder: ${createData.folderId}`);
+    // Determine destination folder
+    const destinationFolderId = folderId || "rleTgkyUSzKwLRWNFK5tS"; // Build user's My Documents folder
+    if (DEBUG) console.log(`Creating workbook in build user's My Documents folder: ${destinationFolderId}`);
+    
+    // Check for duplicate names and generate unique name if needed
+    const uniqueName = await generateUniqueWorkbookName(name, destinationFolderId);
+    if (DEBUG && uniqueName !== name) {
+      console.log(`Name changed due to conflict: ${name} -> ${uniqueName}`);
     }
+    
+    const createData = { 
+      name: uniqueName,
+      folderId: destinationFolderId
+    };
 
     if (DEBUG) console.log("Creating new workbook:", { name, folderId });
     if (DEBUG) console.log("Request URL:", `${process.env.BASE_URL}/workbooks`);
@@ -485,6 +765,12 @@ router.get("/my-documents-workbooks", async (req, res) => {
     });
     
     if (DEBUG) console.log(`Found ${myDocumentsWorkbooks.length} My Documents workbooks accessible to embed user`);
+    
+    // Add refresh parameter to force cache bypass if specified
+    const shouldRefresh = req.query.refresh === 'true';
+    if (shouldRefresh && DEBUG) {
+      console.log("Refresh requested - bypassing any potential caches");
+    }
 
     // Return in same format as regular workbooks endpoint
     const formattedWorkbooks = myDocumentsWorkbooks.map((w) => ({
