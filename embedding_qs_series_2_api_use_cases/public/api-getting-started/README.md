@@ -4,11 +4,11 @@
 This is the foundational QuickStart page that demonstrates the basic Sigma embedding workflow using JWT authentication. It provides a simple interface to select users and workbooks, and displays the embedded Sigma content.
 
 ## Features
-- **User Selection**: Switch between View Users and Build Users to see different permission levels
-- **Workbook Selection**: Choose from available workbooks in your Sigma environment
-- **JWT Token Display**: View the generated JWT token and its decoded payload for learning purposes
-- **Information Panel**: Toggle sidebar showing embed URL, JWT token, and decoded JWT payload
-- **Responsive Design**: Clean, mobile-friendly interface
+- User Selection: Switch between View Users and Build Users to see different permission levels
+- Workbook Selection: Choose from available workbooks in your Sigma environment
+- JWT Token Display: View the generated JWT token and its decoded payload for learning purposes
+- Information Panel: Toggle sidebar showing embed URL, JWT token, and decoded JWT payload
+- Responsive Design: Clean, mobile-friendly interface
 
 ## How It Works
 
@@ -19,14 +19,14 @@ This is the foundational QuickStart page that demonstrates the basic Sigma embed
 4. The JWT is used to authenticate and authorize the embedded Sigma content
 
 ### User Types
-- **View Users**: Can view and interact with the embedded content but cannot edit
-- **Build Users**: Have full editing capabilities within the embedded workbook
+- View Users: Can view and interact with the embedded content but cannot edit
+- Build Users: Have full editing capabilities within the embedded workbook
 
 ## Technical Implementation
-- **JWT Generation**: Uses `/api/jwt/api-getting-started` endpoint
-- **Workbook Data**: Fetches available workbooks from `/api/workbooks`
-- **Environment Config**: Loads configuration from `/env.json`
-- **Debug Mode**: Enable DEBUG=true in .env file for detailed console logging
+- JWT Generation: Uses `/api/jwt/api-getting-started` endpoint
+- Workbook Data: Fetches available workbooks from `/api/workbooks`
+- Environment Config: Loads configuration from `/env.json`
+- Debug Mode: Enable DEBUG=true in .env file for detailed console logging
 
 ## File Structure
 ```
