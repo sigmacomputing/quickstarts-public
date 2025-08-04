@@ -1,0 +1,106 @@
+# API Copy or Create Workbook QuickStart
+
+## Overview
+This QuickStart demonstrates how to use Sigma's REST API to copy existing workbooks and create new empty workbooks with duplicate detection, workbook placement, and team workspace integration. It provides a sample interface for workbook management operations with error handling and user experience optimizations.
+
+## Features
+
+### Core Functionality
+- Build User Permissions: Uses Build user permissions for full workbook management capabilities
+- Dual Workbook Selection: Choose from "All Accessible Workbooks" or "My Documents" drop downs
+- Real-time Workbook Preview: Live preview of selected workbooks in embedded iframe
+- Workbook Creation: Generate new empty workbooks with guided workflow
+- Copy Operations: Duplicate workbooks with intelligent naming and placement
+
+### Advanced Copy Features
+- Intelligent Duplicate Detection: Automatically prevents naming conflicts with incremental numbering
+  - First copy: "Workbook Name (copy)"
+  - Second copy: "Workbook Name (copy) (copy)"
+  - Third copy: "Workbook Name (copy) (copy) (copy)", etc.
+- Flexible Destination Options:
+  - My Documents folder (recommended default)
+  - Team sharing option (based on build user's team memberships)
+- Workbook Availability: Copied workbooks appear without page refresh
+- Auto-Selection & Loading: New workbook is automatically selected and loaded
+
+### Team Workspace Integration
+- Dynamic Team Detection: Automatically discovers teams where build user is a member
+- Workspace Folder Mapping: Finds corresponding workspace folders for each team
+- Fallback Handling: Graceful fallback to My Documents when team folders unavailable
+
+### Create New Workbook Features
+- Required Naming: User must specify workbook name with validation
+- Duplicate Prevention: Same intelligent naming system as copy operations
+- My Documents Placement: Always saves to user's My Documents folder for consistency
+- Workbook Availability: Created workbook appears and loads automatically
+- Clean Starting Point: Provides empty template for new analysis
+
+### User Interface Enhancements
+- Fixed Action Buttons: 
+  - "Create New Workbook" (always visible, red button)
+  - "Copy Workbook" (visible when workbook selected, green button)
+- Modal Dialogs: Clean, responsive overlay-style modals
+- Improved Radio Button Alignment: Properly aligned radio buttons and labels
+- Loading Feedback: Visual loading indicators during operations
+- Form Validation: Immediate feedback on form inputs
+- Error Handling: User-friendly error messages with recovery guidance in the terminal console
+
+### Categorized Workbook Lists
+- All Accessible Workbooks: Shows workbooks from shared folders and team spaces
+- My Documents Workbooks: Shows only workbooks in user's personal folder
+- Filtering: Prevents workbooks from appearing in both lists incorrectly
+- Auto-Refresh: Both lists update automatically after copy/create operations
+
+## Technical Implementation
+
+### API Architecture
+- RESTful Design: Clean separation of copy, create, and team detection operations
+- Error Handling: Multiple fallback strategies and user feedback
+- Workbook Resolution: Automatic conversion between URL IDs and UUIDs
+- Performance Optimization: Caching and batch operations where possible
+
+### API Endpoints Used
+
+#### Custom Workbook Management Endpoints
+- `GET /api/workbook-copy-create/all-workbooks` - All accessible workbooks (excluding My Documents)
+- `GET /api/workbook-copy-create/my-documents-workbooks` - My Documents workbooks only
+- `GET /api/workbook-copy-create/team-workspaces` - Available team workspace folders
+- `POST /api/workbook-copy-create/copy` - Copy workbook with duplicate prevention
+- `POST /api/workbook-copy-create/create` - Create new workbook with duplicate prevention
+- `GET /api/workbook-copy-create/workbook/:workbookId/folder` - Get workbook's current folder
+
+#### Sigma API Integration
+- `/v2/workbooks/{workbookId}/copy` - Sigma's workbook duplication endpoint
+- `/v2/workbooks` POST - Sigma's workbook creation endpoint
+- `/v2/teams` GET - Team enumeration for workspace detection
+- `/v2/teams/{teamId}/members` GET - Team membership verification
+- `/v2/members/{memberId}/files` GET - Member-accessible files for filtering
+- `/v2/files` GET - File system exploration for folder discovery
+
+### Debug Mode
+Enable `DEBUG=true` to see detailed logging for:
+- Team membership and workspace folder discovery
+- Duplicate name detection and resolution
+- Workbook copy/create API calls and responses
+- Dropdown refresh and auto-selection processes
+- Error details and fallback strategy execution
+
+## File Structure
+api-embed-copy-create-workbook/
+├── index.html          # Main interface with enhanced copy/create functionality
+├── README.md           # This comprehensive documentation
+└── [server files]
+    ├── routes/api/workbook-copy-create.js  # Backend API endpoints
+    ├── helpers/provision.js               # Team membership utilities
+    └── public/styles/main.css             # Enhanced modal styling
+
+### Production Considerations
+- Performance Monitoring: Track API response times and error rates
+- User Analytics: Monitor copy/create usage patterns
+- Security Auditing: Log workbook management operations
+- Scalability: Consider caching strategies for large organizations
+
+
+
+
+

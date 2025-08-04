@@ -6,50 +6,50 @@ This advanced QuickStart extends basic bookmark functionality with local databas
 ## Features
 
 ### Core Bookmark Functionality
-- **User Selection**: Switch between View Users and Build Users with different permission levels
-- **Workbook Selection**: Choose from available workbooks
-- **Bookmark Management**: Create, view, delete, and switch between bookmarks
-- **Clear All Bookmarks**: Bulk delete all bookmarks with confirmation dialog (Build Users only)
-- **Auto-State Management**: Automatic panel closure and form reset when switching to View Users
+- User Selection: Switch between View Users and Build Users with different permission levels
+- Workbook Selection: Choose from available workbooks
+- Bookmark Management: Create, view, delete, and switch between bookmarks
+- Clear All Bookmarks: Bulk delete all bookmarks with confirmation dialog (Build Users only)
+- Auto-State Management: Automatic panel closure and form reset when switching to View Users
 
 ### Advanced Features
-- **Local Database Storage**: Bookmarks stored in local `bookmarks.json` with additional metadata
-- **Sharing Controls**: 
+- Local Database Storage: Bookmarks stored in local `bookmarks.json` with additional metadata
+- Sharing Controls: 
   - Share bookmarks with specific users or teams
   - "Embed_Users" team sharing for organization-wide access
   - Private bookmarks (creator only)
-- **Permission-Based Filtering**: View Users only see bookmarks shared with them
-- **Bookmark Panel**: Comprehensive sidebar for creating and managing bookmarks
-- **Real-time Updates**: Automatic refresh of bookmark lists after operations
+- Permission-Based Filtering: View Users only see bookmarks shared with them
+- Bookmark Panel: Comprehensive sidebar for creating and managing bookmarks
+- Real-time Updates: Automatic refresh of bookmark lists after operations
 
 ### User Interface
-- **Toggle Info Panel**: Collapsible sidebar with JWT and debug information
-- **Bookmark Management Panel**: Slide-out panel for creating, editing, and deleting bookmarks
-- **Permission-Based UI**: Management buttons only visible to Build Users
-- **Smart State Management**: Form automatically resets when switching between Original Workbook and bookmarks
-- **Responsive Design**: Mobile-friendly interface with proper button positioning and panel behavior
+- Toggle Info Panel: Collapsible sidebar with JWT and debug information
+- Bookmark Management Panel: Slide-out panel for creating, editing, and deleting bookmarks
+- Permission-Based UI: Management buttons only visible to Build Users
+- Smart State Management: Form automatically resets when switching between Original Workbook and bookmarks
+- Responsive Design: Mobile-friendly interface with proper button positioning and panel behavior
 
 ## How It Works
 
 ### Database-Enhanced Workflow
-1. **User & Workbook Selection**: Choose user type and workbook
-2. **Bookmark Creation** (Build Users only):
+1. User & Workbook Selection: Choose user type and workbook
+2. Bookmark Creation (Build Users only):
    - Click "Manage Bookmarks" button to open the bookmark panel
    - Interact with embedded content to generate `exploreKey`
    - Fill out bookmark details:
      - Name and description
      - Sharing options (Private, specific users, or Embed_Users team)
    - Submit to save both in Sigma API and local database
-3. **Bookmark Access**: 
+3. Bookmark Access: 
    - View Users see only bookmarks shared with them
    - Build Users see all bookmarks they created
-4. **Bookmark Management**: Delete individual bookmarks or clear all bookmarks
+4. Bookmark Management: Delete individual bookmarks or clear all bookmarks
 
 ### Sharing System
-- **Private**: Only the creator can see the bookmark
-- **User-Specific**: Share with individual email addresses
-- **Team Sharing**: Share with "Embed_Users" team for organization access
-- **Permission Filtering**: Automatic filtering based on user permissions
+- Private: Only the creator can see the bookmark
+- User-Specific: Share with individual email addresses
+- Team Sharing: Share with "Embed_Users" team for organization access
+- Permission Filtering: Automatic filtering based on user permissions
 
 ### Local Database Integration
 The system maintains a local `bookmarks.json` file that stores:
@@ -69,9 +69,9 @@ The system maintains a local `bookmarks.json` file that stores:
 ## Technical Implementation
 
 ### API Architecture
-- **Dual Storage**: Bookmarks saved to both Sigma API and local database
-- **Synchronization**: Clear All operation removes from both systems
-- **Filtering**: Local database enables advanced permission filtering
+- Dual Storage: Bookmarks saved to both Sigma API and local database
+- Synchronization: Clear All operation removes from both systems
+- Filtering: Local database enables advanced permission filtering
 
 ### API Endpoints
 
@@ -88,12 +88,12 @@ These endpoints interact with Sigma's REST API:
 - Additional Sigma bookmark API calls are made internally through the local endpoints above
 
 ### Advanced Features
-- **State Management**: Comprehensive form reset and panel management
-- **User Role Enforcement**: Automatic UI changes and panel closure when switching between user types
-- **Error Handling**: Graceful handling of API failures with user feedback  
-- **Debug Logging**: Extensive DEBUG mode logging for troubleshooting and state tracking
-- **Throttling**: API rate limiting for bulk operations
-- **Button Overlap Prevention**: Smart CSS and state management prevents UI conflicts
+- State Management: Comprehensive form reset and panel management
+- User Role Enforcement: Automatic UI changes and panel closure when switching between user types
+- Error Handling: Graceful handling of API failures with user feedback  
+- Debug Logging: Extensive DEBUG mode logging for troubleshooting and state tracking
+- Throttling: API rate limiting for bulk operations
+- Button Overlap Prevention: Smart CSS and state management prevents UI conflicts
 
 ## File Structure
 ```
@@ -146,14 +146,14 @@ Enable `DEBUG=true` to see:
 ## Important Notes
 
 ### Permission System
-- **View Users**: Only see bookmarks explicitly shared with them or "team:Embed_Users"
-- **Build Users**: See all bookmarks (this can be customized)
-- **Creator Access**: Users always see bookmarks they created
+- View Users: Only see bookmarks explicitly shared with them or "team:Embed_Users"
+- Build Users: See all bookmarks (this can be customized)
+- Creator Access: Users always see bookmarks they created
 
 ### Data Persistence  
-- **Sigma API**: Primary bookmark storage with Sigma's native functionality
-- **Local Database**: Additional metadata for sharing and filtering
-- **Synchronization**: Both systems updated during create/delete operations
+- Sigma API: Primary bookmark storage with Sigma's native functionality
+- Local Database: Additional metadata for sharing and filtering
+- Synchronization: Both systems updated during create/delete operations
 
 ### Error Handling
 - Graceful fallbacks if local database is unavailable

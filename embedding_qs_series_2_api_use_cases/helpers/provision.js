@@ -26,8 +26,6 @@ async function getTeamIdByName(teamName) {
     console.log(`Found team "${teamName}" → ${team.teamId}`);
     teamIdCache[teamName] = team.teamId;
     return team.teamId;
-
-    return team.id;
   } catch (err) {
     console.error(`getTeamIdByName failed for ${teamName}`);
     if (err.response) {
