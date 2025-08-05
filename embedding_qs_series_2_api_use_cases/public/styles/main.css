@@ -861,6 +861,79 @@ body.modal-open {
 }
 
 /* ============================================================================
+   CENTRALIZED LOADING INDICATORS
+   ============================================================================ */
+
+/* Loading Overlay for Embeds */
+.embed-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  border-radius: var(--border-radius);
+}
+
+/* Loading Spinner Container */
+.loading-spinner {
+  background: white;
+  padding: 2rem;
+  border-radius: var(--spacing-sm);
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e0e0e0;
+}
+
+/* Animated Spinner */
+.loading-spinner .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-light);
+  border-top: 4px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem auto;
+}
+
+/* Loading Text */
+.loading-spinner .loading-text {
+  color: var(--secondary-color);
+  font-size: 16px;
+  font-weight: 500;
+  font-family: var(--font-family);
+}
+
+/* Iframe Translucency During Loading */
+iframe.loading {
+  opacity: 0.85;
+  transition: opacity 0.3s ease;
+}
+
+iframe:not(.loading) {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+/* Full-screen Loading Overlay (for modals, etc.) */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+/* ============================================================================
    RESPONSIVE DESIGN
    ============================================================================ */
 @media (max-width: 768px) {
