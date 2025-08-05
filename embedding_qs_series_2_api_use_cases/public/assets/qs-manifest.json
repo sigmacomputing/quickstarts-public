@@ -5,5 +5,6 @@
   { "slug": "api-embed-bookmarks_db", "label": "Bookmark Sharing with Local DB" },
   { "slug": "api-embed-export-modal", "label": "Exports" },
   { "slug": "api-workbook-description", "label": "Set Workbook Description" },
-  { "slug": "api-embed-copy-create-workbook", "label": "Copy or Create a New Workbook" }
+  { "slug": "api-embed-copy-create-workbook", "label": "Copy or Create a New Workbook" },
+  { "slug": "api-embed-custom-loader", "label": "Loading Indicators" }
 ]
