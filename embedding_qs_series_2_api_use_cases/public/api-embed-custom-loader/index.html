@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Page metadata and layout styles -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Loading Indicators QuickStart</title>
+    <link rel="stylesheet" href="/styles/main.css" />
+    <link rel="icon" href="data:," />
+  </head>
+
+  <body>
+    <!-- === Topbar === -->
+    <header class="layout-topbar">
+      <!-- Navigation and title -->
+      <div style="display: flex; align-items: center; gap: 0.5rem">
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+        <span class="header-title">API Loading Indicators QuickStart</span>
+      </div>
+
+      <!-- Controls for user and workbook selection -->
+      <div class="control-panel">
+        <div class="control-group">
+          <label for="roleSelect">Current User:</label>
+          <select id="roleSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a user
+            </option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="workbookSelect">Workbook:</label>
+          <select id="workbookSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a workbook
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Toggle info panel visibility and README link -->
+      <div style="white-space: nowrap;">
+        <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
+        <button onclick="window.open('/api-embed-custom-loader/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+      </div>
+    </header>
+
+    <!-- === Main Layout === -->
+    <div class="main">
+      <!-- === Sidebar Info Panel === -->
+      <aside class="sidebar">
+        <h2>Information:</h2>
+        <p>
+          The embedded content should render in the iframe on the right, based
+          on your .env file configuration.
+        </p>
+        <code id="debug-embed-url">N/A</code>
+
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <div id="jwt-decode-content"><p>Loading...</p></div>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+      </aside>
+
+      <!-- === Right-hand Content Area === -->
+      <main class="content">
+        <!-- Loading Overlay for Iframe -->
+        <div id="embedLoadingOverlay" class="embed-loading-overlay" style="display: none;">
+          <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading workbook...</div>
+          </div>
+        </div>
+        
+        <iframe id="sigma-embed" src=""></iframe>
+      </main>
+    </div>
+
+    <!-- === Footer === -->
+    <footer class="layout-footer">Sigma &copy; 2025</footer>
+    
+    <style>
+      /* Make content area relative for positioning the loading overlay */
+      .content {
+        position: relative;
+      }
+    </style>
+  </body>
+  <script>
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+    let DEBUG = false;
+    let env = {};
+    let currentMode = "view";
+    let loadingTimeout = null;
+    let isEmbedLoading = false;
+
+    // ============================================================================
+    // ENVIRONMENT & CONFIGURATION
+    // ============================================================================
+    
+    /**
+     * Loads environment configuration from the server
+     * Sets DEBUG flag and populates global env object with .env variables
+     */
+    async function loadEnv() {
+      try {
+        const res = await fetch("/env.json");
+        env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode enabled via /env.json");
+      } catch (err) {
+        if (DEBUG) console.warn("Failed to load /env.json config");
+      }
+    }
+
+    // ============================================================================
+    // UI INTERACTIONS
+    // ============================================================================
+    const sidebar = document.querySelector(".sidebar");
+    document.getElementById("collapse-info").addEventListener("click", () => {
+      sidebar.classList.toggle("collapsed");
+    });
+
+    // ============================================================================
+    // SIGMA EMBED EVENT HANDLING
+    // ============================================================================
+    
+    /**
+     * Listen for postMessage events from Sigma embed
+     * Specifically waiting for workbook:dataLoaded event to hide custom loader
+     */
+    window.addEventListener("message", (event) => {
+      // Verify the message is from Sigma embed
+      if (event.origin !== env.EMBED_URL_BASE && !event.origin.includes('sigmacomputing.com')) {
+        return;
+      }
+      
+      if (DEBUG) console.log("Received postMessage from Sigma:", event.data);
+      
+      // Check for workbook:dataLoaded event (handle both possible case variations)
+      if (event.data && (event.data.type === "workbook:dataLoaded" || event.data.type === "workbook:dataloaded")) {
+        if (DEBUG) console.log("Workbook data loaded event received:", event.data.type);
+        hideEmbedLoader();
+      }
+    });
+
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Shows the custom loading overlay
+     */
+    function showEmbedLoader() {
+      const overlay = document.getElementById("embedLoadingOverlay");
+      const iframe = document.getElementById("sigma-embed");
+      
+      overlay.style.display = "flex";
+      iframe.classList.add("loading");
+      isEmbedLoading = true;
+      
+      if (DEBUG) console.log("Custom embed loader shown");
+      
+      // Set 30-second timeout
+      if (loadingTimeout) clearTimeout(loadingTimeout);
+      loadingTimeout = setTimeout(() => {
+        if (isEmbedLoading) {
+          hideEmbedLoader();
+          showLoadingError();
+        }
+      }, 30000); // 30 seconds
+    }
+    
+    /**
+     * Hides the custom loading overlay
+     */
+    function hideEmbedLoader() {
+      const overlay = document.getElementById("embedLoadingOverlay");
+      const iframe = document.getElementById("sigma-embed");
+      
+      overlay.style.display = "none";
+      iframe.classList.remove("loading");
+      isEmbedLoading = false;
+      
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+        loadingTimeout = null;
+      }
+      
+      if (DEBUG) console.log("Custom embed loader hidden");
+    }
+    
+    /**
+     * Shows error message when loading timeout occurs
+     */
+    function showLoadingError() {
+      alert("There was a problem loading the requested content.\n\nPlease refresh the page and try again.");
+      if (DEBUG) console.error("Embed loading timeout after 30 seconds");
+    }
+    
+    /**
+     * Decodes a base64url-encoded string (used for JWT components)
+     * @param {string} str - Base64url encoded string
+     * @returns {string} Decoded string
+     */
+    function base64UrlDecode(str) {
+      str = str.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = str.length % 4;
+      if (pad) str += "=".repeat(4 - pad);
+      return atob(str);
+    }
+
+    // ============================================================================
+    // SIGMA EMBED FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Generates JWT token and loads Sigma embed in iframe
+     * Populates sidebar with embed URL and decoded JWT information
+     */
+    async function loadEmbed() {
+      const selectedUser = document.getElementById("roleSelect").value;
+      const workbookUrlId = window.selectedworkbookUrlId;
+      const embedType = "workbook";
+
+      const decodeBlock = document.getElementById("jwt-decode-content");
+
+      decodeBlock.innerHTML = "<p>Loading JWT...</p>";
+      document.getElementById("jwt-display").textContent = "Loading JWT...";
+      document.getElementById("debug-embed-url").textContent = "N/A";
+
+      if (!selectedUser || !workbookUrlId) {
+        if (DEBUG) console.warn("Embed not loaded — missing required fields.");
+        return;
+      }
+
+      // Show custom loader immediately when starting to load embed
+      showEmbedLoader();
+
+      const hideFolderNav =
+        currentMode === "build"
+          ? "false"
+          : env.hide_folder_navigation || "true";
+      const hideMenu =
+        currentMode === "build" ? "false" : env.hide_menu || "true";
+      const menuPosition =
+        currentMode === "build" ? "top" : env.menu_position || "none";
+
+      if (DEBUG) {
+        console.log("Embed config:", {
+          currentMode,
+          hideFolderNav,
+          hideMenu,
+          menuPosition,
+        });
+      }
+
+      try {
+        const res = await fetch(
+          `/api/jwt/${embedType}?embedType=${embedType}&workbookUrlId=${encodeURIComponent(
+            workbookUrlId
+          )}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sub: selectedUser,
+              hide_folder_navigation: hideFolderNav,
+              hide_menu: hideMenu,
+              menu_position: menuPosition,
+              disable_auto_refresh: env.DISABLE_AUTO_REFRESH,
+              disable_mobile_view: env.DISABLE_MOBILE_VIEW,
+              hide_page_controls: env.HIDE_PAGE_CONTROLS,
+              hide_reload_button: env.HIDE_RELOAD_BUTTON,
+              hide_title: env.HIDE_TITLE,
+              hide_tooltip: env.HIDE_TOOLTIP,
+              hide_view_select: env.HIDE_VIEW_SELECT,
+              lng: env.LNG,
+              page_id: env.PAGE_ID,
+              responsive_height: env.RESPONSIVE_HEIGHT,
+              theme: env.THEME,
+              view_id: env.VIEW_ID,
+            }),
+          }
+        );
+
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (parseErr) {
+          throw new Error(`Invalid JSON response: ${text.slice(0, 100)}...`);
+        }
+
+        if (!res.ok) {
+          throw new Error(
+            json.error || res.statusText || "Failed to fetch embed"
+          );
+        }
+
+        const { jwt, embedUrl } = json;
+        if (DEBUG) console.log("Embed response:", { jwt, embedUrl });
+
+        document.getElementById("sigma-embed").src = embedUrl;
+        document.getElementById("debug-embed-url").textContent =
+          embedUrl || "N/A";
+        document.getElementById("jwt-display").textContent = jwt;
+
+        if (jwt && jwt.split(".").length === 3) {
+          try {
+            const [headerStr, payloadStr] = jwt.split(".").slice(0, 2);
+            const header = JSON.parse(base64UrlDecode(headerStr));
+            const payload = JSON.parse(base64UrlDecode(payloadStr));
+            decodeBlock.innerHTML = `
+            <h3>Decoded JWT Header:</h3>
+            <pre>${JSON.stringify(header, null, 2)}</pre>
+            <h3>Decoded JWT Payload:</h3>
+            <pre>${JSON.stringify(payload, null, 2)}</pre>`;
+          } catch (decodeErr) {
+            decodeBlock.innerHTML = `<p style="color:red;">JWT decoding failed.</p>`;
+          }
+        } else {
+          decodeBlock.innerHTML = `<p style="color:red;">Missing or invalid JWT format.</p>`;
+        }
+      } catch (err) {
+        if (DEBUG) console.error("loadEmbed() failed:", err.message);
+        decodeBlock.innerHTML = `<p style="color:red;">${err.message}</p>`;
+        
+        // Hide loader if embed loading fails
+        hideEmbedLoader();
+      }
+    }
+
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Populates the user role dropdown with View and Build users from environment config
+     * Sets up event handler to update currentMode when user selection changes
+     */
+    async function loadUserOptions() {
+      const select = document.getElementById("roleSelect");
+      try {
+        const res = await fetch("/env.json");
+        const env = await res.json();
+
+        select.innerHTML = `
+        <option value="" disabled selected style="color:gray;font-style:italic">Select a user</option>
+        <option value="${env.VIEW_EMAIL}" data-mode="view">${env.VIEW_EMAIL}</option>
+        <option value="${env.BUILD_EMAIL}" data-mode="build">${env.BUILD_EMAIL}</option>`;
+
+        select.addEventListener("change", (e) => {
+          const selected = e.target.selectedOptions[0];
+          currentMode = selected.dataset.mode || "view";
+          if (DEBUG) console.log("Selected mode:", currentMode);
+
+          const workbookSelect = document.getElementById("workbookSelect");
+          const selectedWorkbook = workbookSelect?.value;
+          if (selectedWorkbook) {
+            window.selectedworkbookUrlId = selectedWorkbook;
+            if (DEBUG) console.log("User changed, reloading embed for workbook:", selectedWorkbook);
+            loadEmbed();
+          }
+        });
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load user options:", err);
+      }
+    }
+
+    /**
+     * Fetches available workbooks from Sigma API and populates dropdown
+     * Sets up event handler to trigger embed loading when workbook is selected
+     */
+    async function loadWorkbooks() {
+      const select = document.getElementById("workbookSelect");
+
+      try {
+        const res = await fetch("/api/workbooks");
+        const { workbooks } = await res.json();
+
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select a workbook</option>`;
+
+        workbooks.forEach((wb) => {
+          const match = wb.url.match(/workbook\/([a-zA-Z0-9]+)/);
+          const workbookUrlId = match ? match[1] : null;
+          if (!workbookUrlId) return;
+          const opt = document.createElement("option");
+          opt.value = workbookUrlId;
+          opt.textContent = wb.name;
+          select.appendChild(opt);
+        });
+
+        select.addEventListener("change", () => {
+          window.selectedworkbookUrlId = select.value;
+          if (DEBUG) console.log("Workbook selected:", select.value);
+          loadEmbed();
+        });
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load workbooks:", err);
+        select.innerHTML = `<option value="">Error loading workbooks</option>`;
+      }
+    }
+
+    // ============================================================================
+    // APPLICATION INITIALIZATION
+    // ============================================================================
+    (async () => {
+      await loadEnv();
+      await loadUserOptions();
+      await loadWorkbooks();
+    })();
+  </script>
+</html>
