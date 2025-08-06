@@ -60,9 +60,21 @@ The page respects all embedding configuration options from your `.env` file:
 - `#sigma-embed.loading` - Translucency effect (opacity: 0.3) during loading
 
 ### JavaScript Functions
-- `showEmbedLoader()` - Displays overlay, adds loading class, starts timeout
-- `hideEmbedLoader()` - Hides overlay, removes loading class, clears timeout
-- `showLoadingError()` - Shows timeout error message to user
+// UTILITY FUNCTIONS (lines 167–218)
+- showEmbedLoader() – Displays the custom loading overlay
+- hideEmbedLoader() – Hides the loading overlay
+- showLoadingError() – Displays an error message after timeout
+- base64UrlDecode() – Decodes JWTs (not related to loading)
+
+// SIGMA EMBED EVENT HANDLING (lines 144–164)
+- window.addEventListener("message", ...) – Listens for workbook:dataLoaded and calls hideEmbedLoader() when the event is received
+
+// SIGMA EMBED FUNCTIONS (line 257+)
+- loadEmbed() – Initiates the embed load and triggers showEmbedLoader()
+- Utility functions are grouped together
+- Event handling is centralized
+- Embed logic is isolated in its own section
+- The 30-second timeout is implemented in showEmbedLoader() (lines 184-190) using setTimeout() and is a key safety feature that ensures users get feedback if the Sigma embed fails to load or doesn't send the expected workbook:dataLoaded event within 30 seconds.
 
 ### Event Handling
 - Listens for `window.addEventListener("message")` events

@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Page metadata and layout styles -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Custom Filters QuickStart</title>
+    <link rel="stylesheet" href="/styles/main.css" />
+    <link rel="icon" href="data:," />
+    
+    <!-- jQuery and Date Range Picker -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+  </head>
+
+  <body>
+    <!-- === Topbar === -->
+    <header class="layout-topbar">
+      <!-- Navigation and title -->
+      <div style="display: flex; align-items: center; gap: 0.5rem">
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+        <span class="header-title">API Custom Filters QuickStart</span>
+      </div>
+
+      <!-- Controls for user and workbook selection -->
+      <div class="control-panel">
+        <div class="control-group">
+          <label for="roleSelect">Current User:</label>
+          <select id="roleSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a user
+            </option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="workbookSelect">Workbook:</label>
+          <select id="workbookSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a workbook
+            </option>
+          </select>
+        </div>
+        
+        <div class="control-group">
+          <label for="storeRegionSelect">Store Region: <span style="color: #666; font-style: italic;">(required)</span></label>
+          <div class="custom-multiselect" id="storeRegionSelect">
+            <div class="multiselect-display" style="color: gray; font-style: italic;">
+              pending selection...
+            </div>
+            <div class="multiselect-dropdown">
+              <!-- Options will be populated here -->
+            </div>
+          </div>
+        </div>
+         
+        <div class="control-group">
+          <label for="dateRangeFilter">Date Range:</label>
+          <div class="date-range-container">
+            <input type="text" id="dateRangePicker" class="date-range-input" placeholder="Select date range..." readonly>
+            <button type="button" id="clearDateRange" class="clear-date-btn" title="Clear date range">×</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toggle info panel visibility and README link -->
+      <div style="white-space: nowrap;">
+        <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
+        <button onclick="window.open('/api-embed-filters/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+      </div>
+    </header>
+
+    <!-- === Main Layout === -->
+    <div class="main">
+      <!-- === Sidebar Info Panel === -->
+      <aside class="sidebar">
+        <h2>Information:</h2>
+        <p>
+          The embedded content should render in the iframe on the right, based
+          on your .env file configuration.
+        </p>
+        <code id="debug-embed-url">N/A</code>
+
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <div id="jwt-decode-content"><p>Loading...</p></div>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+        
+      </aside>
+
+      <!-- === Right-hand Content Area === -->
+      <main class="content">
+        <!-- Loading Overlay for Initial Embed Loading -->
+        <div id="embedLoadingOverlay" class="embed-loading-overlay" style="display: none;">
+          <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading workbook...</div>
+          </div>
+        </div>
+        
+        <!-- Loading Overlay for Filter Updates -->
+        <div id="filterLoadingOverlay" class="embed-loading-overlay" style="display: none;">
+          <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div class="loading-text">Updating filter...</div>
+          </div>
+        </div>
+        
+        <iframe id="sigma-embed" src=""></iframe>
+      </main>
+    </div>
+
+    <!-- === Footer === -->
+    <footer class="layout-footer">Sigma &copy; 2025</footer>
+    
+    <style>
+      /* Make content area relative for positioning the loading overlay */
+      .content {
+        position: relative;
+      }
+      
+      /* Custom Multiselect Styles */
+      .custom-multiselect {
+        position: relative;
+        min-width: 200px;
+      }
+      
+      .multiselect-display {
+        padding: 4px 24px 4px 8px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        background: white;
+        cursor: pointer;
+        font-size: 13px;
+        min-height: 18px;
+        display: block;
+        position: relative;
+        line-height: 1.4;
+        color: black;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      
+      .multiselect-display:after {
+        content: "▼";
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        color: #666;
+        pointer-events: none;
+      }
+      
+      .multiselect-display.open:after {
+        content: "▲";
+      }
+      
+      .multiselect-display.disabled {
+        background: #f5f5f5;
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+      
+      .multiselect-dropdown {
+        position: fixed;
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        min-width: 200px;
+        display: none;
+        overflow: hidden;
+      }
+      
+      .multiselect-option {
+        padding: 8px 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      
+      .multiselect-option:hover {
+        background: #f5f5f5;
+      }
+      
+      .multiselect-option:last-child {
+        border-bottom: none;
+      }
+      
+      .multiselect-option input[type="checkbox"] {
+        margin: 0;
+        cursor: pointer;
+      }
+      
+      .multiselect-option label {
+        color: black;
+        cursor: pointer;
+        flex: 1;
+      }
+      
+      .multiselect-option.all-option {
+        font-weight: bold;
+        border-bottom: 2px solid #ddd;
+      }
+      
+      /* Date Range Control Styles */
+      .date-range-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      
+      .date-range-input {
+        padding: 4px 8px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 13px;
+        min-width: 200px;
+        cursor: pointer;
+        background: white;
+      }
+      
+      .date-range-input:focus {
+        outline: none;
+        border-color: #f57c00;
+        box-shadow: 0 0 0 2px rgba(245, 124, 0, 0.2);
+      }
+      
+      .date-range-input::placeholder {
+        color: #999;
+        font-style: italic;
+      }
+      
+      .clear-date-btn {
+        background: #f5f5f5;
+        border: 1px solid #ccc;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        font-size: 14px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+        transition: all 0.2s ease;
+      }
+      
+      .clear-date-btn:hover {
+        background: #e0e0e0;
+        color: #333;
+      }
+      
+      .clear-date-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    </style>
+  </body>
+  <script>
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+    let DEBUG = false;
+    let env = {};
+    let currentMode = "view";
+    let isFilterLoading = false;
+    let filterTimeout = null;
+    let embedVariables = {};
+    let isEmbedLoading = false;
+    let embedLoadingTimeout = null;
+    let lastSentValue = null; // Track last sent value to prevent duplicates
+    let lastSentDateRange = null; // Track last sent date range to prevent duplicates
+
+    // ============================================================================
+    // ENVIRONMENT & CONFIGURATION
+    // ============================================================================
+    
+    /**
+     * Loads environment configuration from the server
+     * Sets DEBUG flag and populates global env object with .env variables
+     */
+    async function loadEnv() {
+      try {
+        const res = await fetch("/env.json");
+        env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode enabled via /env.json");
+      } catch (err) {
+        if (DEBUG) console.warn("Failed to load /env.json config");
+      }
+    }
+
+    // ============================================================================
+    // UI INTERACTIONS
+    // ============================================================================
+    const sidebar = document.querySelector(".sidebar");
+    document.getElementById("collapse-info").addEventListener("click", () => {
+      sidebar.classList.toggle("collapsed");
+    });
+
+    // ============================================================================
+    // SIGMA EMBED EVENT HANDLING
+    // ============================================================================
+    
+    /**
+     * Listen for postMessage events from Sigma embed
+     * Handle variable events for filter synchronization
+     */
+    window.addEventListener("message", (event) => {
+      // Verify the message is from Sigma embed
+      if (event.origin !== env.EMBED_URL_BASE && !event.origin.includes('sigmacomputing.com')) {
+        return;
+      }
+      
+      if (DEBUG) console.log("PostMessage received:", event.data.type);
+      
+      // Handle workbook variables current event (response to variables:list request)
+      if (event.data && event.data.type === "workbook:variables:current") {
+        if (DEBUG) console.log("Variables received:", Object.keys(event.data.variables || {}));
+        handleVariablesList(event.data.variables);
+      }
+      
+      // Handle workbook variables onChange event (interim event during filter updates)
+      if (event.data && event.data.type === "workbook:variables:onchange") {
+        if (DEBUG) console.log("Variables onChange event:", event.data);
+        
+        // Check if this event contains updated variable values
+        if (event.data.workbook && event.data.workbook.variables) {
+          if (DEBUG) console.log("Updated variables in onChange:", event.data.workbook.variables);
+          if (event.data.workbook.variables['Date-Filter'] !== undefined) {
+            if (DEBUG) console.log("Date-Filter value in onChange:", event.data.workbook.variables['Date-Filter']);
+          }
+        }
+        
+        // If we're waiting for filter loading to complete, add a fallback timeout
+        // since some workbooks may not send dataloaded after filter changes
+        if (isFilterLoading) {
+          if (DEBUG) console.log("Setting fallback timeout for filter loader");
+          setTimeout(() => {
+            if (isFilterLoading) {
+              if (DEBUG) console.log("Fallback: hiding filter loader after onChange event");
+              hideFilterLoader();
+            }
+          }, 1500); // 1.5 second fallback delay
+        }
+      }
+      
+      // Handle workbook variables update confirmation (but don't hide loader yet)
+      if (event.data && event.data.type === "workbook:variables:updated") {
+        if (DEBUG) console.log("Variables updated confirmation:", event.data);
+        // Don't hide loader here - wait for dataloaded event
+      }
+      
+      // Handle workbook data loaded event (both initial load and after filter changes)
+      if (event.data && (event.data.type === "workbook:dataLoaded" || event.data.type === "workbook:dataloaded")) {
+        if (DEBUG) console.log("Workbook data loaded event received");
+        
+        // If this is initial embed loading, hide embed loader and request variables
+        if (isEmbedLoading) {
+          if (DEBUG) console.log("Initial load complete, requesting variables");
+          hideEmbedLoader();
+          requestVariablesList();
+        }
+        
+        // If this is after a filter change, hide the filter loader
+        if (isFilterLoading) {
+          if (DEBUG) console.log("Filter data loaded, hiding filter loader");
+          hideFilterLoader();
+        }
+      }
+    });
+
+    // ============================================================================
+    // EMBED LOADING FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Shows the embed loading overlay
+     */
+    function showEmbedLoader() {
+      const overlay = document.getElementById("embedLoadingOverlay");
+      const iframe = document.getElementById("sigma-embed");
+      
+      overlay.style.display = "flex";
+      iframe.classList.add("loading");
+      isEmbedLoading = true;
+      
+      if (DEBUG) console.log("Embed loader shown");
+      
+      // Set 30-second timeout for embed loading
+      if (embedLoadingTimeout) clearTimeout(embedLoadingTimeout);
+      embedLoadingTimeout = setTimeout(() => {
+        if (isEmbedLoading) {
+          hideEmbedLoader();
+          showEmbedLoadingError();
+        }
+      }, 30000); // 30 seconds
+    }
+    
+    /**
+     * Hides the embed loading overlay
+     */
+    function hideEmbedLoader() {
+      const overlay = document.getElementById("embedLoadingOverlay");
+      const iframe = document.getElementById("sigma-embed");
+      
+      overlay.style.display = "none";
+      iframe.classList.remove("loading");
+      isEmbedLoading = false;
+      
+      if (embedLoadingTimeout) {
+        clearTimeout(embedLoadingTimeout);
+        embedLoadingTimeout = null;
+      }
+      
+      if (DEBUG) console.log("Embed loader hidden");
+    }
+    
+    /**
+     * Shows error message when embed loading timeout occurs
+     */
+    function showEmbedLoadingError() {
+      alert("There was a problem loading the requested content.\n\nPlease refresh the page and try again.");
+      if (DEBUG) console.error("Embed loading timeout after 30 seconds");
+    }
+
+    // ============================================================================
+    // FILTER UTILITY FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Shows the filter loading overlay
+     */
+    function showFilterLoader() {
+      const overlay = document.getElementById("filterLoadingOverlay");
+      const iframe = document.getElementById("sigma-embed");
+      
+      overlay.style.display = "flex";
+      iframe.classList.add("loading");
+      isFilterLoading = true;
+      
+      if (DEBUG) console.log("Filter loader shown");
+      
+      // Set 30-second timeout for filter operations (date filters can be slow)
+      if (filterTimeout) clearTimeout(filterTimeout);
+      filterTimeout = setTimeout(() => {
+        if (isFilterLoading) {
+          hideFilterLoader();
+          if (DEBUG) console.warn("Filter update timeout after 30 seconds");
+        }
+      }, 30000); // 30 seconds
+    }
+    
+    /**
+     * Hides the filter loading overlay
+     */
+    function hideFilterLoader() {
+      const overlay = document.getElementById("filterLoadingOverlay");
+      const iframe = document.getElementById("sigma-embed");
+      
+      overlay.style.display = "none";
+      iframe.classList.remove("loading");
+      isFilterLoading = false;
+      
+      if (filterTimeout) {
+        clearTimeout(filterTimeout);
+        filterTimeout = null;
+      }
+      
+      if (DEBUG) {
+        console.log("Filter loader hidden");
+        if (window.dateFilterStartTime) {
+          const endTime = Date.now();
+          const duration = endTime - window.dateFilterStartTime;
+          console.log(`Date filter completed in: ${duration}ms`);
+          window.dateFilterStartTime = null;
+        }
+      }
+    }
+    
+    /**
+     * Requests the list of variables from Sigma embed
+     */
+    function requestVariablesList() {
+      const iframe = document.getElementById("sigma-embed");
+      
+      if (iframe && iframe.contentWindow && iframe.src) {
+        const message = { type: "workbook:variables:list" };
+        
+        try {
+          iframe.contentWindow.postMessage(message, env.EMBED_URL_BASE || '*');
+          if (DEBUG) console.log("Variables request sent");
+        } catch (error) {
+          if (DEBUG) console.error("Error sending variables request:", error);
+          // Retry with wildcard origin
+          try {
+            iframe.contentWindow.postMessage(message, '*');
+          } catch (retryError) {
+            if (DEBUG) console.error("Retry failed:", retryError);
+          }
+        }
+      }
+    }
+    
+    /**
+     * Sends control update to Sigma embed
+     * @param {string} controlId - ID of the control to update
+     * @param {any} value - New value for the control
+     */
+    function updateSigmaVariable(controlId, value) {
+      const iframe = document.getElementById("sigma-embed");
+      if (iframe && iframe.contentWindow) {
+        // Prevent duplicate updates with the same value
+        if (lastSentValue === value) {
+          if (DEBUG) console.log(`Skipping duplicate update: ${controlId} = ${value}`);
+          return;
+        }
+        
+        showFilterLoader();
+        lastSentValue = value; // Track the sent value
+        
+        const message = {
+          type: "workbook:variables:update",
+          variables: {
+            [controlId]: value
+          }
+        };
+        
+        if (DEBUG) console.log(`Sending update: ${controlId} = ${value}`);
+        iframe.contentWindow.postMessage(message, env.EMBED_URL_BASE || '*');
+      }
+    }
+    
+    /**
+     * Handles the variables/controls list received from Sigma
+     * Populates the Store Region filter with available values from the Store-Region control
+     */
+    function handleVariablesList(variables) {
+      embedVariables = variables || {};
+      
+      if (!variables || Object.keys(embedVariables).length === 0) {
+        if (DEBUG) console.warn("No controls received");
+        showNoRegionVariableMessage();
+        return;
+      }
+      
+      // Debug: Log all variables to see Date-Filter structure
+      if (DEBUG) {
+        console.log("All variables received:");
+        Object.keys(variables).forEach(varName => {
+          console.log(`  ${varName}:`, variables[varName]);
+        });
+      }
+      
+      // Look for Store-Region control
+      const storeRegionVar = findStoreRegionVariable(embedVariables);
+      
+      if (storeRegionVar) {
+        if (DEBUG) console.log("Found Store-Region control:", storeRegionVar.name);
+        populateStoreRegionFilter(storeRegionVar);
+      } else {
+        if (DEBUG) console.warn("Store-Region control not found");
+        showNoRegionVariableMessage();
+      }
+      
+      // Check Date-Filter variable structure
+      if (variables['Date-Filter'] !== undefined) {
+        if (DEBUG) console.log("Date-Filter current value:", variables['Date-Filter']);
+        if (DEBUG) console.log("Date-Filter structure:", typeof variables['Date-Filter'], variables['Date-Filter']);
+      }
+    }
+    
+    /**
+     * Finds the Store Region control in the variables/controls object
+     * @param {Object} variables - Variables/controls object from Sigma
+     * @returns {Object|null} Store Region control object or null
+     */
+    function findStoreRegionVariable(variables) {
+      // Look for the specific control ID "Store-Region"
+      if (variables['Store-Region'] !== undefined) {
+        // If it's just a string (current value), create structure with known region values
+        if (typeof variables['Store-Region'] === 'string') {
+          const regions = ['East', 'Midwest', 'South', 'Southwest', 'West'];
+          const currentValue = variables['Store-Region'];
+          
+          return { 
+            name: 'Store-Region', 
+            data: {
+              availableValues: regions,
+              currentValue: currentValue
+            }
+          };
+        }
+        
+        return { name: 'Store-Region', data: variables['Store-Region'] };
+      }
+      
+      return null;
+    }
+    
+    /**
+     * Populates the Store Region filter with custom multiselect interface
+     * @param {Object} regionVar - Store Region control object
+     */
+    function populateStoreRegionFilter(regionVar) {
+      if (DEBUG) console.log("populateStoreRegionFilter called with:", regionVar);
+      
+      const container = document.getElementById("storeRegionSelect");
+      const display = container.querySelector(".multiselect-display");
+      const dropdown = container.querySelector(".multiselect-dropdown");
+      
+      if (!container || !display || !dropdown) {
+        if (DEBUG) console.error("Missing container elements:", { container, display, dropdown });
+        return;
+      }
+      
+      const { name: varName, data: varData } = regionVar;
+      
+      let availableValues = [];
+      let currentValue = null;
+      
+      // Try different structures for available values
+      if (varData.availableValues && Array.isArray(varData.availableValues)) {
+        availableValues = varData.availableValues;
+        currentValue = varData.currentValue || varData.value;
+        if (DEBUG) console.log("Using availableValues array:", availableValues);
+      } else if (varData.values && Array.isArray(varData.values)) {
+        availableValues = varData.values;
+        currentValue = varData.current || varData.currentValue || varData.value;
+        if (DEBUG) console.log("Using values array:", availableValues);
+      } else if (varData.options && Array.isArray(varData.options)) {
+        availableValues = varData.options;
+        currentValue = varData.selected || varData.currentValue || varData.value;
+        if (DEBUG) console.log("Using options array:", availableValues);
+      } else if (Array.isArray(varData)) {
+        availableValues = varData;
+        if (DEBUG) console.log("Using direct array:", availableValues);
+      } else {
+        if (DEBUG) console.warn("Could not find available values in control data:", varData);
+        showNoRegionVariableMessage();
+        return;
+      }
+      
+      if (!availableValues || availableValues.length === 0) {
+        if (DEBUG) console.warn("No available values found in variable data");
+        showNoRegionVariableMessage();
+        return;
+      }
+      
+      // Parse current selection
+      let selectedValues = [];
+      if (currentValue) {
+        selectedValues = currentValue.includes(',') ? currentValue.split(',') : [currentValue];
+      }
+      
+      // Create dropdown options
+      dropdown.innerHTML = '';
+      
+      // Add "All Regions" option
+      const allOption = document.createElement('div');
+      allOption.className = 'multiselect-option all-option';
+      allOption.innerHTML = `
+        <input type="checkbox" id="region-all" ${selectedValues.length === 0 || selectedValues.length === availableValues.length ? 'checked' : ''}>
+        <label for="region-all">All Regions</label>
+      `;
+      dropdown.appendChild(allOption);
+      
+      // Add individual region options (sorted alphabetically)
+      availableValues.sort().forEach((value, index) => {
+        const option = document.createElement('div');
+        option.className = 'multiselect-option';
+        const isChecked = selectedValues.includes(value);
+        option.innerHTML = `
+          <input type="checkbox" id="region-${index}" value="${value}" ${isChecked ? 'checked' : ''}>
+          <label for="region-${index}">${value}</label>
+        `;
+        dropdown.appendChild(option);
+      });
+      
+      // Update display text
+      function updateDisplayText() {
+        const checkedBoxes = dropdown.querySelectorAll('input[type="checkbox"]:checked:not(#region-all)');
+        const allBox = dropdown.querySelector('#region-all');
+        const displayElement = container.querySelector('.multiselect-display');
+        
+        if (DEBUG) console.log("updateDisplayText - checkedBoxes:", checkedBoxes.length, "allBox checked:", allBox?.checked);
+        
+        if (allBox && allBox.checked && checkedBoxes.length === availableValues.length) {
+          displayElement.textContent = 'All Regions';
+        } else if (allBox && allBox.checked && checkedBoxes.length === 0) {
+          displayElement.textContent = 'All Regions';
+        } else if (checkedBoxes.length === 1) {
+          displayElement.textContent = checkedBoxes[0].value;
+        } else if (checkedBoxes.length > 1) {
+          // Show comma-delimited list of selected regions
+          const selectedValues = Array.from(checkedBoxes).map(box => box.value);
+          displayElement.textContent = selectedValues.join(', ');
+        } else {
+          displayElement.textContent = 'All Regions'; // Fallback to All Regions
+        }
+        
+        if (DEBUG) console.log("Display text set to:", displayElement.textContent);
+      }
+      
+      // Add event listeners
+      display.classList.remove('disabled');
+      display.style.color = '';
+      display.style.fontStyle = '';
+      
+      // Remove any existing event listeners to prevent duplicates
+      const newDisplay = display.cloneNode(true);
+      display.parentNode.replaceChild(newDisplay, display);
+      const display2 = newDisplay; // Update reference
+      
+      // Toggle dropdown
+      display2.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (DEBUG) console.log("Display clicked, current disabled state:", display2.classList.contains('disabled'));
+        
+        if (display2.classList.contains('disabled')) {
+          if (DEBUG) console.log("Display is disabled, ignoring click");
+          return;
+        }
+        
+        const isOpen = dropdown.style.display === 'block';
+        
+        if (!isOpen) {
+          // Position the dropdown below the display element
+          const rect = display2.getBoundingClientRect();
+          dropdown.style.top = (rect.bottom) + 'px';
+          dropdown.style.left = rect.left + 'px';
+          dropdown.style.width = rect.width + 'px';
+        }
+        
+        dropdown.style.display = isOpen ? 'none' : 'block';
+        display2.classList.toggle('open', !isOpen);
+        if (DEBUG) {
+          console.log("Dropdown toggled, now:", isOpen ? 'closed' : 'open');
+          console.log("Dropdown innerHTML length:", dropdown.innerHTML.length);
+          console.log("Dropdown display style:", dropdown.style.display);
+          console.log("Dropdown computed style display:", window.getComputedStyle(dropdown).display);
+          if (!isOpen) {
+            console.log("Dropdown positioned at:", dropdown.style.top, dropdown.style.left);
+          }
+        }
+      });
+      
+      // Handle checkbox changes
+      dropdown.addEventListener('change', (e) => {
+        if (e.target.type === 'checkbox') {
+          const allBox = dropdown.querySelector('#region-all');
+          const individualBoxes = dropdown.querySelectorAll('input[type="checkbox"]:not(#region-all)');
+          
+          if (e.target.id === 'region-all') {
+            // All checkbox changed
+            if (e.target.checked) {
+              individualBoxes.forEach(box => box.checked = e.target.checked);
+            } else {
+              // Prevent unchecking "All Regions" if no individual regions are selected
+              const checkedIndividualCount = Array.from(individualBoxes).filter(box => box.checked).length;
+              if (checkedIndividualCount === 0) {
+                e.target.checked = true; // Keep it checked
+                if (DEBUG) console.log("Cannot uncheck All Regions - at least one selection required");
+                // Still need to update display and send confirmation to Sigma
+                updateDisplayText();
+                const allRegionsValue = availableValues.join(",");
+                if (DEBUG) console.log(`Confirming All Regions selection - sending: ${allRegionsValue}`);
+                updateSigmaVariable(varName, allRegionsValue);
+                return;
+              }
+              individualBoxes.forEach(box => box.checked = false);
+            }
+          } else {
+            // Individual checkbox changed
+            const checkedCount = Array.from(individualBoxes).filter(box => box.checked).length;
+            allBox.checked = checkedCount === individualBoxes.length;
+            
+            // If no individual boxes are checked, automatically check "All Regions"
+            if (checkedCount === 0) {
+              allBox.checked = true;
+              if (DEBUG) console.log("No regions selected, automatically selecting All Regions");
+            }
+          }
+          
+          updateDisplayText();
+          
+          // Send update to Sigma - get fresh counts after potential auto-selection
+          const finalCheckedBoxes = Array.from(individualBoxes).filter(box => box.checked);
+          
+          if (finalCheckedBoxes.length === 0 || allBox.checked) {
+            // All regions selected (either explicitly or auto-selected)
+            const allRegionsValue = availableValues.join(",");
+            if (DEBUG) console.log(`All Regions selected - sending: ${allRegionsValue}`);
+            updateSigmaVariable(varName, allRegionsValue);
+          } else {
+            // Specific regions selected
+            const valueToSend = finalCheckedBoxes.map(box => box.value).join(",");
+            if (DEBUG) console.log(`Updating Store-Region to: ${valueToSend}`);
+            updateSigmaVariable(varName, valueToSend);
+          }
+        }
+      });
+      
+      // Close dropdown when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) {
+          dropdown.style.display = 'none';
+          display2.classList.remove('open');
+        }
+      });
+      
+      // Initial display update
+      updateDisplayText();
+      
+      if (DEBUG) {
+        console.log("Store Region filter is now active and should be selectable");
+        console.log("Final display text:", display.textContent);
+        console.log("Display classes:", display.className);
+        console.log("Dropdown options count:", dropdown.children.length);
+      }
+    }
+    
+    
+    
+    /**
+     * Shows message when no Store Region control is found
+     */
+    function showNoRegionVariableMessage() {
+      const container = document.getElementById("storeRegionSelect");
+      const display = container.querySelector(".multiselect-display");
+      display.textContent = "No Store-Region control found in embed";
+      display.style.color = "red";
+      display.style.fontStyle = "italic";
+      display.classList.add('disabled');
+      if (DEBUG) console.log("Store-Region control not found");
+    }
+
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Decodes a base64url-encoded string (used for JWT components)
+     * @param {string} str - Base64url encoded string
+     * @returns {string} Decoded string
+     */
+    function base64UrlDecode(str) {
+      str = str.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = str.length % 4;
+      if (pad) str += "=".repeat(4 - pad);
+      return atob(str);
+    }
+
+    // ============================================================================
+    // SIGMA EMBED FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Generates JWT token and loads Sigma embed in iframe
+     * Populates sidebar with embed URL and decoded JWT information
+     */
+    async function loadEmbed() {
+      const selectedUser = document.getElementById("roleSelect").value;
+      const workbookUrlId = window.selectedworkbookUrlId;
+      const embedType = "workbook";
+
+      const decodeBlock = document.getElementById("jwt-decode-content");
+
+      decodeBlock.innerHTML = "<p>Loading JWT...</p>";
+      document.getElementById("jwt-display").textContent = "Loading JWT...";
+      document.getElementById("debug-embed-url").textContent = "N/A";
+
+      if (!selectedUser || !workbookUrlId) {
+        if (DEBUG) console.warn("Embed not loaded — missing required fields.");
+        return;
+      }
+
+      const hideFolderNav =
+        currentMode === "build"
+          ? "false"
+          : env.hide_folder_navigation || "true";
+      const hideMenu =
+        currentMode === "build" ? "false" : env.hide_menu || "true";
+      const menuPosition =
+        currentMode === "build" ? "top" : env.menu_position || "none";
+
+      if (DEBUG) {
+        console.log("Embed config:", {
+          currentMode,
+          hideFolderNav,
+          hideMenu,
+          menuPosition,
+        });
+      }
+
+      try {
+        const res = await fetch(
+          `/api/jwt/${embedType}?embedType=${embedType}&workbookUrlId=${encodeURIComponent(
+            workbookUrlId
+          )}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sub: selectedUser,
+              hide_folder_navigation: hideFolderNav,
+              hide_menu: hideMenu,
+              menu_position: menuPosition,
+              disable_auto_refresh: env.DISABLE_AUTO_REFRESH,
+              disable_mobile_view: env.DISABLE_MOBILE_VIEW,
+              hide_page_controls: env.HIDE_PAGE_CONTROLS,
+              hide_reload_button: env.HIDE_RELOAD_BUTTON,
+              hide_title: env.HIDE_TITLE,
+              hide_tooltip: env.HIDE_TOOLTIP,
+              hide_view_select: env.HIDE_VIEW_SELECT,
+              lng: env.LNG,
+              page_id: env.PAGE_ID,
+              responsive_height: env.RESPONSIVE_HEIGHT,
+              theme: env.THEME,
+              view_id: env.VIEW_ID,
+            }),
+          }
+        );
+
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (parseErr) {
+          throw new Error(`Invalid JSON response: ${text.slice(0, 100)}...`);
+        }
+
+        if (!res.ok) {
+          throw new Error(
+            json.error || res.statusText || "Failed to fetch embed"
+          );
+        }
+
+        const { jwt, embedUrl } = json;
+        if (DEBUG) console.log("Embed response:", { jwt, embedUrl });
+
+        // Show embed loader before setting src
+        showEmbedLoader();
+        
+        document.getElementById("sigma-embed").src = embedUrl;
+        document.getElementById("debug-embed-url").textContent =
+          embedUrl || "N/A";
+        document.getElementById("jwt-display").textContent = jwt;
+        
+        // Reset Store Region filter when new embed loads - but load immediately with hardcoded values
+        const container = document.getElementById("storeRegionSelect");
+        const display = container.querySelector(".multiselect-display");
+        const dropdown = container.querySelector(".multiselect-dropdown");
+        
+        // Use hardcoded regions immediately for faster loading
+        const hardcodedRegions = ['East', 'Midwest', 'South', 'Southwest', 'West'];
+        const hardcodedRegionVar = {
+          name: 'Store-Region',
+          data: {
+            availableValues: hardcodedRegions,
+            currentValue: hardcodedRegions.join(',') // Start with all selected
+          }
+        };
+        
+        // Populate immediately with hardcoded data
+        populateStoreRegionFilter(hardcodedRegionVar);
+        
+        // Set a fallback timer in case we miss the dataLoaded event
+        setTimeout(() => {
+          if (display.classList.contains('disabled') && display.textContent.includes("Loading regions")) {
+            if (DEBUG) console.log("Fallback: requesting variables after timeout");
+            requestVariablesList();
+          }
+        }, 3000);
+
+        if (jwt && jwt.split(".").length === 3) {
+          try {
+            const [headerStr, payloadStr] = jwt.split(".").slice(0, 2);
+            const header = JSON.parse(base64UrlDecode(headerStr));
+            const payload = JSON.parse(base64UrlDecode(payloadStr));
+            decodeBlock.innerHTML = `
+            <h3>Decoded JWT Header:</h3>
+            <pre>${JSON.stringify(header, null, 2)}</pre>
+            <h3>Decoded JWT Payload:</h3>
+            <pre>${JSON.stringify(payload, null, 2)}</pre>`;
+          } catch (decodeErr) {
+            decodeBlock.innerHTML = `<p style="color:red;">JWT decoding failed.</p>`;
+          }
+        } else {
+          decodeBlock.innerHTML = `<p style="color:red;">Missing or invalid JWT format.</p>`;
+        }
+      } catch (err) {
+        if (DEBUG) console.error("loadEmbed() failed:", err.message);
+        decodeBlock.innerHTML = `<p style="color:red;">${err.message}</p>`;
+        
+        // Hide embed loader if embed loading fails
+        hideEmbedLoader();
+      }
+    }
+
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Populates the user role dropdown with View and Build users from environment config
+     * Sets up event handler to update currentMode when user selection changes
+     */
+    async function loadUserOptions() {
+      const select = document.getElementById("roleSelect");
+      try {
+        const res = await fetch("/env.json");
+        const env = await res.json();
+
+        select.innerHTML = `
+        <option value="" disabled selected style="color:gray;font-style:italic">Select a user</option>
+        <option value="${env.VIEW_EMAIL}" data-mode="view">${env.VIEW_EMAIL}</option>
+        <option value="${env.BUILD_EMAIL}" data-mode="build">${env.BUILD_EMAIL}</option>`;
+
+        select.addEventListener("change", (e) => {
+          const selected = e.target.selectedOptions[0];
+          currentMode = selected.dataset.mode || "view";
+          if (DEBUG) console.log("Selected mode:", currentMode);
+
+          const workbookSelect = document.getElementById("workbookSelect");
+          const selectedWorkbook = workbookSelect?.value;
+          if (selectedWorkbook) {
+            window.selectedworkbookUrlId = selectedWorkbook;
+            loadEmbed();
+          }
+        });
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load user options:", err);
+      }
+    }
+
+    /**
+     * Fetches available workbooks from Sigma API and populates dropdown
+     * Focuses on the Embed_API_QuickStart workbook for this demo
+     */
+    async function loadWorkbooks() {
+      const select = document.getElementById("workbookSelect");
+
+      try {
+        const res = await fetch("/api/workbooks");
+        const { workbooks } = await res.json();
+
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select a workbook</option>`;
+
+        // Find the Embed_API_QuickStart workbook specifically
+        let quickStartWorkbook = null;
+        
+        workbooks.forEach((wb) => {
+          const match = wb.url.match(/workbook\/([a-zA-Z0-9]+)/);
+          const workbookUrlId = match ? match[1] : null;
+          if (!workbookUrlId) return;
+          
+          const opt = document.createElement("option");
+          opt.value = workbookUrlId;
+          opt.textContent = wb.name;
+          
+          // Highlight the QuickStart workbook
+          if (wb.name === "Embed_API_QuickStart") {
+            opt.textContent = `${wb.name} (Recommended for this demo)`;
+            opt.style.fontWeight = "bold";
+            quickStartWorkbook = workbookUrlId;
+            // Auto-select this workbook
+            opt.selected = true;
+            window.selectedworkbookUrlId = workbookUrlId;
+          }
+          
+          select.appendChild(opt);
+        });
+        
+        // If QuickStart workbook was found and auto-selected, load it
+        if (quickStartWorkbook && document.getElementById("roleSelect").value) {
+          if (DEBUG) console.log("Auto-loading Embed_API_QuickStart workbook");
+          loadEmbed();
+        }
+
+        select.addEventListener("change", () => {
+          window.selectedworkbookUrlId = select.value;
+          loadEmbed();
+        });
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load workbooks:", err);
+        select.innerHTML = `<option value="">Error loading workbooks</option>`;
+      }
+    }
+
+    // ============================================================================
+    // DATE RANGE FILTER FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Sends date range update to Sigma embed
+     * @param {string} fromDate - Start date in ISO 8601 format
+     * @param {string} toDate - End date in ISO 8601 format
+     */
+    function updateDateRangeFilter(fromDateTime, toDateTime) {
+      const iframe = document.getElementById("sigma-embed");
+      if (iframe && iframe.contentWindow) {
+        // Create date range value for Sigma - using the format: min:YYYY-MM-DDTHH:MM:SSZ,max:YYYY-MM-DDTHH:MM:SSZ
+        let dateRangeValue = null;
+        
+        if (fromDateTime && toDateTime) {
+          // Use Sigma's date range format: min:startDate,max:endDate (dates already in UTC with Z)
+          dateRangeValue = `min:${fromDateTime},max:${toDateTime}`;
+        } else if (fromDateTime) {
+          // Only start date - use min: prefix
+          dateRangeValue = `min:${fromDateTime}`;
+        } else if (toDateTime) {
+          // Only end date - use max: prefix
+          dateRangeValue = `max:${toDateTime}`;
+        }
+        
+        // Prevent duplicate updates
+        if (lastSentDateRange === dateRangeValue) {
+          if (DEBUG) console.log(`Skipping duplicate date range update: ${dateRangeValue}`);
+          return;
+        }
+        
+        if (dateRangeValue) {
+          showFilterLoader();
+          if (DEBUG) console.log("Filter loader shown for date range");
+        }
+        lastSentDateRange = dateRangeValue;
+        
+        const message = {
+          type: "workbook:variables:update",
+          variables: {
+            "Date-Filter": dateRangeValue
+          }
+        };
+        
+        console.log(`🗓️ Sending date range update: Date-Filter = ${dateRangeValue || 'null'}`);
+        console.log("📤 Date filter message:", JSON.stringify(message, null, 2));
+        
+        // Add timestamp to track how long the filter takes
+        if (DEBUG) {
+          const startTime = Date.now();
+          window.dateFilterStartTime = startTime;
+          console.log(`Date filter started at: ${new Date(startTime).toISOString()}`);
+        }
+        
+        iframe.contentWindow.postMessage(message, env.EMBED_URL_BASE || '*');
+        
+        // After sending the date filter, request variables to see what Sigma actually received
+        setTimeout(() => {
+          if (DEBUG) console.log("Requesting variables to check Date-Filter status...");
+          requestVariablesList();
+        }, 1000);
+      }
+    }
+    
+    /**
+     * Initializes jQuery date range picker with predefined ranges
+     */
+    function initializeDateRangeFilter() {
+      // Check if jQuery and daterangepicker are loaded
+      if (typeof jQuery === 'undefined') {
+        console.error('jQuery is not loaded');
+        return;
+      }
+      
+      if (typeof $.fn.daterangepicker === 'undefined') {
+        console.error('DateRangePicker plugin is not loaded');
+        return;
+      }
+      
+      // Wait for jQuery to be ready
+      $(document).ready(function() {
+        const dateRangePicker = $('#dateRangePicker');
+        const clearBtn = $('#clearDateRange');
+        
+        if (dateRangePicker.length === 0) {
+          console.error('Date range picker element not found');
+          return;
+        }
+        
+        // Clear any existing value on page load
+        dateRangePicker.val('');
+        
+        if (DEBUG) console.log('Initializing jQuery date range picker...');
+        
+        // Test basic jQuery functionality
+        dateRangePicker.on('click', function() {
+          if (DEBUG) console.log('Date range picker clicked');
+        });
+        
+        // Initialize the date range picker
+        try {
+          dateRangePicker.daterangepicker({
+          autoUpdateInput: false,
+          showDropdowns: true,
+          showWeekNumbers: false,
+          timePicker: false,
+          alwaysShowCalendars: true,
+          linkedCalendars: false, // Allow same month selection
+          showCustomRangeLabel: true,
+          opens: 'left',
+          drops: 'down',
+          minYear: 2020,
+          maxYear: moment().year() + 1,
+          ranges: {
+            'Today': [moment(), moment()],
+            'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+            'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+            'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+            'This Month': [moment().startOf('month'), moment().endOf('month')],
+            'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')],
+            'This Quarter': [moment().startOf('quarter'), moment().endOf('quarter')],
+            'Last Quarter': [moment().subtract(1, 'quarter').startOf('quarter'), moment().subtract(1, 'quarter').endOf('quarter')],
+            'This Year': [moment().startOf('year'), moment().endOf('year')],
+            'Last Year': [moment().subtract(1, 'year').startOf('year'), moment().subtract(1, 'year').endOf('year')]
+          },
+          locale: {
+            cancelLabel: 'Clear',
+            applyLabel: 'Apply',
+            customRangeLabel: 'Custom Range',
+            format: 'YYYY-MM-DD'
+          }
+        });
+        
+        // Handle date range selection
+        dateRangePicker.on('apply.daterangepicker', function(ev, picker) {
+          // Format for display (just dates)
+          const fromDateDisplay = picker.startDate.format('YYYY-MM-DD');
+          const toDateDisplay = picker.endDate.format('YYYY-MM-DD');
+          
+          // Create new moment objects to avoid mutating the picker dates
+          const startMoment = moment(picker.startDate);
+          const endMoment = moment(picker.endDate);
+          
+          // Format for Sigma - use ISO 8601 format with UTC timezone (YYYY-MM-DDTHH:MM:SSZ)
+          // Start of day for from date, end of day for to date
+          const fromDateTime = startMoment.startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+          const toDateTime = endMoment.endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+          
+          // Update the input display
+          $(this).val(fromDateDisplay + ' - ' + toDateDisplay);
+          
+          console.log('=== DATE RANGE DEBUG ===');
+          console.log('Original picker dates:', picker.startDate.format(), 'to', picker.endDate.format());
+          console.log('Display format:', fromDateDisplay, 'to', toDateDisplay);
+          console.log('Sigma format:', fromDateTime, 'to', toDateTime);
+          console.log('========================');
+          
+          updateDateRangeFilter(fromDateTime, toDateTime);
+        });
+        
+        // Handle cancel/clear from the picker
+        dateRangePicker.on('cancel.daterangepicker', function(ev, picker) {
+          $(this).val('');
+          if (DEBUG) console.log("Date range cleared from picker");
+          updateDateRangeFilter('', '');
+        });
+        
+        // Clear button functionality
+        clearBtn.on('click', function() {
+          dateRangePicker.val('');
+          if (DEBUG) console.log("Date range cleared from clear button");
+          updateDateRangeFilter('', '');
+        });
+        
+        if (DEBUG) console.log("jQuery date range picker initialized");
+        
+        } catch (error) {
+          console.error('Error initializing date range picker:', error);
+          // Fallback to basic functionality
+          dateRangePicker.on('focus', function() {
+            alert('Date range picker failed to load. Please refresh the page.');
+          });
+        }
+      });
+    }
+
+    // ============================================================================
+    // APPLICATION INITIALIZATION
+    // ============================================================================
+    (async () => {
+      await loadEnv();
+      await loadUserOptions();
+      await loadWorkbooks();
+    })();
+    
+    // Test jQuery loading
+    console.log('Testing jQuery availability:', typeof jQuery !== 'undefined' ? 'loaded' : 'not loaded');
+    console.log('Testing $ availability:', typeof $ !== 'undefined' ? 'loaded' : 'not loaded');
+    
+    // Initialize date range picker when everything is loaded
+    window.addEventListener('load', function() {
+      console.log('Window loaded, initializing date range picker...');
+      console.log('jQuery at window load:', typeof jQuery !== 'undefined' ? 'available' : 'not available');
+      console.log('DateRangePicker at window load:', typeof $.fn.daterangepicker !== 'undefined' ? 'available' : 'not available');
+      initializeDateRangeFilter();
+    });
+  </script>
+</html>
