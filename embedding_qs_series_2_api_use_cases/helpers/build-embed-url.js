@@ -21,6 +21,7 @@ module.exports = function buildEmbedUrl({
   // Optional UI parameter overrides
   hide_folder_navigation,
   hide_menu,
+  hide_page_controls,
   menu_position,
 }) {
   if (!orgSlug || !workbookUrlId) {
@@ -43,20 +44,20 @@ module.exports = function buildEmbedUrl({
   }
 
   const optionalParams = {
-    disable_auto_refresh: process.env.disable_auto_refresh,
-    disable_mobile_view: process.env.disable_mobile_view,
-    hide_folder_navigation: process.env.hide_folder_navigation,
-    hide_menu: process.env.hide_menu,
-    hide_page_controls: process.env.hide_page_controls,
-    hide_reload_button: process.env.hide_reload_button,
-    hide_title: process.env.hide_title,
-    hide_tooltip: process.env.hide_tooltip,
-    hide_view_select: process.env.hide_view_select,
-    lng: process.env.lng,
-    menu_position: process.env.menu_position,
-    responsive_height: process.env.responsive_height,
-    theme: process.env.theme,
-    view_id: process.env.view_id,
+    disable_auto_refresh: process.env.DISABLE_AUTO_REFRESH,
+    disable_mobile_view: process.env.DISABLE_MOBILE_VIEW,
+    hide_folder_navigation: process.env.HIDE_FOLDER_NAVIGATION,
+    hide_menu: process.env.HIDE_MENU,
+    hide_page_controls: process.env.HIDE_PAGE_CONTROLS,
+    hide_reload_button: process.env.HIDE_RELOAD_BUTTON,
+    hide_title: process.env.HIDE_TITLE,
+    hide_tooltip: process.env.HIDE_TOOLTIP,
+    hide_view_select: process.env.HIDE_VIEW_SELECT,
+    lng: process.env.LNG,
+    menu_position: process.env.MENU_POSITION,
+    responsive_height: process.env.RESPONSIVE_HEIGHT,
+    theme: process.env.THEME,
+    view_id: process.env.VIEW_ID,
   };
 
   // Allow request-time overrides
@@ -65,6 +66,9 @@ module.exports = function buildEmbedUrl({
 
   if (typeof hide_menu !== "undefined")
     optionalParams.hide_menu = hide_menu;
+
+  if (typeof hide_page_controls !== "undefined")
+    optionalParams.hide_page_controls = hide_page_controls;
 
   if (typeof menu_position !== "undefined")
     optionalParams.menu_position = menu_position;
