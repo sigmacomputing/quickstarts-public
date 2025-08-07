@@ -4,7 +4,7 @@
     <!-- Page metadata and layout styles -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>API Loading Indicators QuickStart</title>
+    <title>API Hide Sigma Menus / Page Nav QuickStart</title>
     <link rel="stylesheet" href="/styles/main.css" />
     <link rel="icon" href="data:," />
   </head>
@@ -17,7 +17,7 @@
         <button class="home-button" onclick="location.href='/'">
           ← Back to Landing Page
         </button>
-        <span class="header-title">API Loading Indicators QuickStart</span>
+        <span class="header-title">API Hide Sigma Menus / Page Nav QuickStart</span>
       </div>
 
       <!-- Controls for user and workbook selection -->
@@ -49,12 +49,30 @@
             </option>
           </select>
         </div>
+
+        <div class="control-group">
+          <label for="pageSelect">Page:</label>
+          <select id="pageSelect" disabled>
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a workbook first
+            </option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <button id="toggleMenus" disabled>Hide Sigma Menus</button>
+        </div>
       </div>
 
       <!-- Toggle info panel visibility and README link -->
       <div style="white-space: nowrap;">
         <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
-        <button onclick="window.open('/api-embed-custom-loader/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+        <button onclick="window.open('/api-embed-hide-menu-page-nav/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
       </div>
     </header>
 
@@ -64,8 +82,7 @@
       <aside class="sidebar">
         <h2>Information:</h2>
         <p>
-          The embedded content should render in the iframe on the right, based
-          on your .env file configuration.
+          This demo shows how to control Sigma menu visibility and navigate to specific workbook pages.
         </p>
         <code id="debug-embed-url">N/A</code>
 
@@ -73,6 +90,7 @@
           <h3>Decoded JWT:</h3>
           <div id="jwt-decode-content"><p>Loading...</p></div>
         </div>
+
 
         <h3>JWT:</h3>
         <p>The token is below:</p>
@@ -107,6 +125,35 @@
         z-index: 9999 !important;
         pointer-events: auto;
       }
+      
+      /* Additional styling for menu toggle button */
+      #toggleMenus {
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: background-color 0.2s;
+        position: absolute;
+        z-index: 10;
+      }
+      
+      #toggleMenus:hover:not(:disabled) {
+        background-color: #e65100;
+      }
+      
+      #toggleMenus:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+
+      /* Ensure control-group has proper styling */
+      .control-group {
+        position: relative;
+        z-index: 1;
+      }
+      
     </style>
   </body>
   <script>
@@ -116,8 +163,9 @@
     let DEBUG = false;
     let env = {};
     let currentMode = "view";
-    let loadingTimeout = null;
+    let menusHidden = false;
     let isEmbedLoading = false;
+    let embedLoadingTimeout = null;
 
     // ============================================================================
     // ENVIRONMENT & CONFIGURATION
@@ -170,11 +218,11 @@
     });
 
     // ============================================================================
-    // UTILITY FUNCTIONS
+    // EMBED LOADING FUNCTIONS
     // ============================================================================
     
     /**
-     * Shows the custom loading overlay
+     * Shows the embed loading overlay
      */
     function showEmbedLoader() {
       const overlay = document.getElementById("embedLoadingOverlay");
@@ -184,20 +232,20 @@
       iframe.classList.add("loading");
       isEmbedLoading = true;
       
-      if (DEBUG) console.log("Custom embed loader shown");
+      if (DEBUG) console.log("Embed loader shown");
       
-      // Set 30-second timeout
-      if (loadingTimeout) clearTimeout(loadingTimeout);
-      loadingTimeout = setTimeout(() => {
+      // Set 30-second timeout for embed loading
+      if (embedLoadingTimeout) clearTimeout(embedLoadingTimeout);
+      embedLoadingTimeout = setTimeout(() => {
         if (isEmbedLoading) {
           hideEmbedLoader();
-          showLoadingError();
+          showEmbedLoadingError();
         }
       }, 30000); // 30 seconds
     }
     
     /**
-     * Hides the custom loading overlay
+     * Hides the embed loading overlay
      */
     function hideEmbedLoader() {
       const overlay = document.getElementById("embedLoadingOverlay");
@@ -207,21 +255,25 @@
       iframe.classList.remove("loading");
       isEmbedLoading = false;
       
-      if (loadingTimeout) {
-        clearTimeout(loadingTimeout);
-        loadingTimeout = null;
+      if (embedLoadingTimeout) {
+        clearTimeout(embedLoadingTimeout);
+        embedLoadingTimeout = null;
       }
       
-      if (DEBUG) console.log("Custom embed loader hidden");
+      if (DEBUG) console.log("Embed loader hidden");
     }
     
     /**
-     * Shows error message when loading timeout occurs
+     * Shows error message when embed loading timeout occurs
      */
-    function showLoadingError() {
+    function showEmbedLoadingError() {
       alert("There was a problem loading the requested content.\n\nPlease refresh the page and try again.");
       if (DEBUG) console.error("Embed loading timeout after 30 seconds");
     }
+
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
     
     /**
      * Decodes a base64url-encoded string (used for JWT components)
@@ -235,6 +287,25 @@
       return atob(str);
     }
 
+
+    /**
+     * Updates the toggle button text based on current menu state and embed type
+     */
+    function updateToggleButtonText() {
+      const button = document.getElementById("toggleMenus");
+      const selectedPageId = document.getElementById("pageSelect").value;
+      const isPageLevel = selectedPageId && selectedPageId.trim() !== "";
+      
+      if (isPageLevel) {
+        // Hide button for page-level embeds - no menus to toggle
+        button.style.display = "none";
+      } else {
+        // Show button for workbook-level embeds
+        button.style.display = "inline-block";
+        button.textContent = menusHidden ? "Show Sigma Menus" : "Hide Sigma Menus";
+      }
+    }
+
     // ============================================================================
     // SIGMA EMBED FUNCTIONS
     // ============================================================================
@@ -246,7 +317,7 @@
     async function loadEmbed() {
       const selectedUser = document.getElementById("roleSelect").value;
       const workbookUrlId = window.selectedworkbookUrlId;
-      const embedType = "workbook";
+      const selectedPageId = document.getElementById("pageSelect").value;
 
       const decodeBlock = document.getElementById("jwt-decode-content");
 
@@ -259,49 +330,82 @@
         return;
       }
 
-      // Show custom loader immediately when starting to load embed
-      showEmbedLoader();
+      // Determine embed type and target ID based on page selection
+      const embedType = selectedPageId ? "page" : "workbook";
+      const targetId = selectedPageId ? selectedPageId.trim() : "";
+      const isPageLevel = selectedPageId && selectedPageId.trim() !== "";
+      
+      // For workbook-level: control all menus (folder nav, main menu, page controls)
+      // For page-level: only control page navigation at bottom
+      let hideFolderNav, hideMenu, hidePageControls, menuPosition;
+      
+      if (isPageLevel) {
+        // Page-level embedding: just show the page content, no menus to toggle
+        hideFolderNav = "true";  // Always hidden for page-level
+        hideMenu = "true";       // Always hidden for page-level  
+        hidePageControls = "true"; // Always hidden for page-level
+        menuPosition = "none";   // Clean page view
+      } else {
+        // Workbook-level embedding: use .env defaults initially, override when button clicked
+        if (menusHidden) {
+          // Button clicked to hide - must set menu_position=none to fully hide menus
+          hideFolderNav = "true";
+          hideMenu = "true"; 
+          hidePageControls = "true";
+          menuPosition = "none";
+        } else {
+          // Use .env defaults (should show menus)
+          hideFolderNav = env.HIDE_FOLDER_NAVIGATION || "false";
+          hideMenu = env.HIDE_MENU || "false"; 
+          hidePageControls = env.HIDE_PAGE_CONTROLS || "false";
+          menuPosition = env.MENU_POSITION || "top";
+        }
+      }
 
-      const hideFolderNav =
-        currentMode === "build"
-          ? "false"
-          : env.hide_folder_navigation || "true";
-      const hideMenu =
-        currentMode === "build" ? "false" : env.hide_menu || "true";
-      const menuPosition =
-        currentMode === "build" ? "top" : env.menu_position || "none";
+      console.log("📋 Embed config:", {
+        currentMode,
+        embedType,
+        isPageLevel,
+        hideFolderNav,
+        hideMenu,
+        hidePageControls,
+        menuPosition,
+        selectedPageId,
+        menusHidden
+      });
 
-      if (DEBUG) {
-        console.log("Embed config:", {
-          currentMode,
-          hideFolderNav,
-          hideMenu,
-          menuPosition,
-        });
+      console.log("🔍 EXPECTED BEHAVIOR:", {
+        embedType,
+        shouldShowFolderNav: hideFolderNav === "false",
+        shouldShowMainMenu: hideMenu === "false", 
+        shouldShowPageControls: hidePageControls === "false",
+        menuPosition,
+        expectFullSigmaMenus: !isPageLevel && !menusHidden,
+        expectCleanPageView: isPageLevel
+      });
+
+      let url = `/api/jwt/workbook?embedType=${embedType}&workbookUrlId=${encodeURIComponent(workbookUrlId)}`;
+      if (targetId) {
+        url += `&targetId=${encodeURIComponent(targetId)}`;
       }
 
       try {
-        const res = await fetch(
-          `/api/jwt/${embedType}?embedType=${embedType}&workbookUrlId=${encodeURIComponent(
-            workbookUrlId
-          )}`,
-          {
+        const res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               sub: selectedUser,
               hide_folder_navigation: hideFolderNav,
               hide_menu: hideMenu,
+              hide_page_controls: hidePageControls,
               menu_position: menuPosition,
               disable_auto_refresh: env.DISABLE_AUTO_REFRESH,
               disable_mobile_view: env.DISABLE_MOBILE_VIEW,
-              hide_page_controls: env.HIDE_PAGE_CONTROLS,
               hide_reload_button: env.HIDE_RELOAD_BUTTON,
               hide_title: env.HIDE_TITLE,
               hide_tooltip: env.HIDE_TOOLTIP,
               hide_view_select: env.HIDE_VIEW_SELECT,
               lng: env.LNG,
-              page_id: env.PAGE_ID,
               responsive_height: env.RESPONSIVE_HEIGHT,
               theme: env.THEME,
               view_id: env.VIEW_ID,
@@ -324,12 +428,19 @@
         }
 
         const { jwt, embedUrl } = json;
-        if (DEBUG) console.log("Embed response:", { jwt, embedUrl });
+        console.log("📤 Embed response:", { jwt, embedUrl });
+        console.log("🔗 Final embed URL:", embedUrl);
 
+        // Show embed loader before setting src
+        showEmbedLoader();
+        
         document.getElementById("sigma-embed").src = embedUrl;
         document.getElementById("debug-embed-url").textContent =
           embedUrl || "N/A";
         document.getElementById("jwt-display").textContent = jwt;
+        
+        // Update button text
+        updateToggleButtonText();
 
         if (jwt && jwt.split(".").length === 3) {
           try {
@@ -351,7 +462,7 @@
         if (DEBUG) console.error("loadEmbed() failed:", err.message);
         decodeBlock.innerHTML = `<p style="color:red;">${err.message}</p>`;
         
-        // Hide loader if embed loading fails
+        // Hide embed loader if embed loading fails
         hideEmbedLoader();
       }
     }
@@ -367,8 +478,10 @@
     async function loadUserOptions() {
       const select = document.getElementById("roleSelect");
       try {
+        console.log("Loading user options...");
         const res = await fetch("/env.json");
         const env = await res.json();
+        console.log("Env loaded:", env);
 
         select.innerHTML = `
         <option value="" disabled selected style="color:gray;font-style:italic">Select a user</option>
@@ -384,56 +497,181 @@
           const selectedWorkbook = workbookSelect?.value;
           if (selectedWorkbook) {
             window.selectedworkbookUrlId = selectedWorkbook;
-            if (DEBUG) console.log("User changed, reloading embed for workbook:", selectedWorkbook);
             loadEmbed();
           }
         });
       } catch (err) {
-        if (DEBUG) console.error("Failed to load user options:", err);
+        console.error("Failed to load user options:", err);
       }
     }
 
     /**
      * Fetches available workbooks from Sigma API and populates dropdown
-     * Sets up event handler to trigger embed loading when workbook is selected
+     * Focuses on the Embed_API_QuickStart workbook for this demo
      */
     async function loadWorkbooks() {
       const select = document.getElementById("workbookSelect");
 
       try {
+        console.log("Loading workbooks...");
         const res = await fetch("/api/workbooks");
         const { workbooks } = await res.json();
+        console.log("Workbooks loaded:", workbooks.length);
 
         select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select a workbook</option>`;
 
+        // Find the Embed_API_QuickStart workbook specifically
+        let quickStartWorkbook = null;
+        
         workbooks.forEach((wb) => {
           const match = wb.url.match(/workbook\/([a-zA-Z0-9]+)/);
           const workbookUrlId = match ? match[1] : null;
           if (!workbookUrlId) return;
+          
           const opt = document.createElement("option");
           opt.value = workbookUrlId;
           opt.textContent = wb.name;
+          
+          // Highlight the QuickStart workbook
+          if (wb.name === "Embed_API_QuickStart") {
+            opt.textContent = `${wb.name} (Recommended for this demo)`;
+            opt.style.fontWeight = "bold";
+            quickStartWorkbook = workbookUrlId;
+          }
+          
           select.appendChild(opt);
         });
 
-        select.addEventListener("change", () => {
+        select.addEventListener("change", async () => {
           window.selectedworkbookUrlId = select.value;
-          if (DEBUG) console.log("Workbook selected:", select.value);
-          loadEmbed();
+          
+          // Load pages for the selected workbook
+          await loadPages(select.value);
+          
+          // Enable toggle button since we now have a workbook selected
+          document.getElementById("toggleMenus").disabled = false;
+          
+          // Auto-load workbook level if user is already selected
+          if (document.getElementById("roleSelect").value) {
+            loadEmbed();
+          }
         });
       } catch (err) {
-        if (DEBUG) console.error("Failed to load workbooks:", err);
+        console.error("Failed to load workbooks:", err);
         select.innerHTML = `<option value="">Error loading workbooks</option>`;
       }
     }
+
+    /**
+     * Fetches available pages for the selected workbook and populates dropdown
+     * @param {string} workbookUrlId - The workbook URL ID to fetch pages for
+     */
+    async function loadPages(workbookUrlId) {
+      const select = document.getElementById("pageSelect");
+
+      if (!workbookUrlId) {
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select a workbook first</option>`;
+        select.disabled = true;
+        return;
+      }
+
+      try {
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Loading pages...</option>`;
+        select.disabled = true;
+
+        const res = await fetch(`/api/pages?workbookUrlId=${encodeURIComponent(workbookUrlId)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to fetch pages");
+        }
+
+        const pages = data.entries || [];
+        
+        if (pages.length === 0) {
+          select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">No pages found</option>`;
+          select.disabled = true;
+          return;
+        }
+
+        // Clear and populate pages dropdown - Workbook first, then individual pages
+        select.innerHTML = `<option value="">Workbook (all pages)</option>`;
+        
+        pages.forEach((page, index) => {
+          const opt = document.createElement("option");
+          opt.value = page.pageId;
+          opt.textContent = page.name;
+          select.appendChild(opt);
+        });
+
+        select.disabled = false;
+
+        select.addEventListener("change", () => {
+          // Reset menu state when switching between workbook/page levels
+          menusHidden = false;
+          updateToggleButtonText();
+          
+          // Load embed with selected page
+          if (document.getElementById("roleSelect").value) {
+            loadEmbed();
+          }
+        });
+
+        if (DEBUG) console.log(`Loaded ${pages.length} pages for workbook:`, workbookUrlId);
+
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load pages:", err);
+        select.innerHTML = `<option value="">Error loading pages</option>`;
+        select.disabled = true;
+      }
+    }
+
+    // ============================================================================
+    // MENU TOGGLE FUNCTIONALITY
+    // ============================================================================
+    
+    /**
+     * Toggles the visibility of Sigma menus and reloads the embed
+     */
+    function toggleMenus() {
+      menusHidden = !menusHidden;
+      
+      console.log("🔄 Menu visibility toggled:", menusHidden ? "hidden" : "visible");
+      console.log("🔄 menusHidden state:", menusHidden);
+      
+      // Update button text
+      updateToggleButtonText();
+      
+      // Reload embed with new menu settings
+      loadEmbed();
+    }
+
+
+    // ============================================================================
+    // EVENT LISTENERS
+    // ============================================================================
+    
+    // Menu toggle button
+    document.getElementById("toggleMenus").addEventListener("click", () => {
+      console.log("🔘 Toggle button clicked!");
+      toggleMenus();
+    });
 
     // ============================================================================
     // APPLICATION INITIALIZATION
     // ============================================================================
     (async () => {
+      console.log("Starting initialization...");
       await loadEnv();
+      console.log("Environment loaded");
       await loadUserOptions();
+      console.log("Users loaded");
       await loadWorkbooks();
+      console.log("Workbooks loaded");
+      
+      // Initialize button text based on initial menu state
+      updateToggleButtonText();
+      console.log("Initialization complete");
     })();
   </script>
 </html>

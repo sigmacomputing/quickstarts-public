@@ -19,6 +19,7 @@ router.post("/:mode", async (req, res) => {
       exploreKey,
       hide_folder_navigation,
       hide_menu,
+      hide_page_controls,
       menu_position,
     } = req.body;
 
@@ -94,6 +95,7 @@ router.post("/:mode", async (req, res) => {
       exploreKey,
       hide_folder_navigation,
       hide_menu,
+      hide_page_controls,
       menu_position,
     });
 
