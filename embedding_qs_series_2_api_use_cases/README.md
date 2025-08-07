@@ -4,13 +4,15 @@ A comprehensive collection of examples demonstrating Sigma Computing's embedding
 
 ## Overview
 
-This project provides five distinct QuickStart examples that progressively demonstrate Sigma's embedding features:
+This project provides seven distinct QuickStart examples that progressively demonstrate Sigma's embedding features:
 
 1. **Getting Started** - Basic embedding with JWT authentication
 2. **Embed Bookmarks** - Direct Sigma API bookmark functionality  
 3. **Bookmark Sharing with Local DB** - Enhanced bookmarks with local storage and sharing
 4. **Embed Controls** - Flexible embedding (workbook/page/element types)
 5. **API Export Modal** - Scheduled export functionality using the Sigma API
+6. **Custom Loading Screen** - Enhanced embedding with custom loading overlays
+7. **Menu Control & Page Navigation** - Advanced menu visibility control and page navigation
 
 Each QuickStart includes a complete web interface with user switching, debug information, and comprehensive documentation.
 
@@ -48,6 +50,8 @@ embedding_qs_series_2_api_use_cases/
 │   ├── api-embed-bookmarks_db/      # Database-enhanced bookmarks
 │   ├── api-embed-controls/          # Flexible embed types
 │   ├── api-embed-export-modal/      # Scheduled export functionality
+│   ├── api-embed-custom-loader/     # Custom loading overlay implementation
+│   ├── api-embed-hide-menu-page-nav/ # Menu control and page navigation
 │   └── styles/                      # Shared CSS styles
 ├── routes/                          # Express.js API routes
 │   └── api/                         # API endpoints
@@ -71,6 +75,10 @@ embedding_qs_series_2_api_use_cases/
 - **Local Database Integration** - Enhanced metadata storage with lowdb
 - **Permission-Based Filtering** - User-specific bookmark visibility
 - **Flexible Embedding** - Support for workbook, page, and element embedding
+- **Custom Loading Overlays** - Branded loading experiences with Sigma postMessage integration
+- **Menu Visibility Control** - Toggle Sigma menus on/off with intelligent state management
+- **Page Navigation** - Dynamic page discovery and navigation with hidden page filtering
+- **Dual Embedding Modes** - Workbook-level vs page-level embedding patterns
 - **Responsive Design** - Mobile-friendly interfaces
 
 ### Developer Tools
@@ -154,6 +162,31 @@ This approach enables a complete export management experience directly within th
 
 **Best For**: Applications requiring comprehensive export functionality with embedded workbook management
 
+### 6. Custom Loading Screen (`/api-embed-custom-loader`)
+**Purpose**: Implement branded loading overlays that properly integrate with Sigma's loading lifecycle
+
+**Features**:
+- Custom loading overlay with CSS animations
+- Sigma postMessage event integration (`workbook:dataLoaded`)
+- High z-index positioning to override Sigma's default loader
+- Event-driven loading state management (not timer-based)
+- Proper iframe content area coverage
+
+**Best For**: Applications requiring branded loading experiences and professional embed presentation
+
+### 7. Menu Control & Page Navigation (`/api-embed-hide-menu-page-nav`)
+**Purpose**: Demonstrate advanced menu visibility control and intelligent page navigation patterns
+
+**Features**:
+- Smart menu toggle for workbook-level embeds (hide/show all Sigma menus)
+- Dual embedding modes: workbook-level (interactive) vs page-level (clean view)
+- Dynamic page discovery with hidden page filtering
+- Intelligent UI controls (toggle button only appears when relevant)
+- Parameter state management across embedding mode switches
+- Security-first page filtering (hidden pages excluded server-side)
+
+**Best For**: Applications requiring granular control over Sigma UI elements and custom navigation experiences
+
 ## Configuration
 
 ### Environment Variables
@@ -204,7 +237,7 @@ The application includes user provisioning capabilities:
 - `POST /api/exports/:workbookId/send/:scheduleId` - Send export immediately
 
 ### Content Discovery
-- `GET /api/pages` - List pages in a workbook
+- `GET /api/pages` - List pages in a workbook (with hidden page filtering)
 - `GET /api/elements` - List elements on a page
 
 ## Development
