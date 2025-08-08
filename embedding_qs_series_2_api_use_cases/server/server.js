@@ -28,6 +28,7 @@ app.use("/api/jwt", require("../routes/api/jwt"));
 app.use("/api/bookmarks", require("../routes/api/bookmarks"));
 app.use("/api/bookmarks_db", require("../routes/api/bookmarks_db"));
 app.use("/api/exports", require("../routes/api/exports"));
+app.use("/api/default-workbook", require("../routes/api/default-workbook"));
 app.use("/api/workbook-descriptions", require("../routes/api/workbook-descriptions"));
 app.use("/api/workbook-copy-create", require("../routes/api/workbook-copy-create"));
 
