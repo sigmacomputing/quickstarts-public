@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Page metadata and layout styles -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Set Default Workbook QuickStart</title>
+    <link rel="stylesheet" href="/styles/main.css" />
+    <link rel="icon" href="data:," />
+  </head>
+
+  <body>
+    <!-- === Topbar === -->
+    <header class="layout-topbar">
+      <!-- Navigation and title -->
+      <div style="display: flex; align-items: center; gap: 0.5rem">
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+        <span class="header-title">API Set Default Workbook QuickStart</span>
+      </div>
+
+      <!-- Controls for user and workbook selection -->
+      <div class="control-panel">
+        <div class="control-group">
+          <label for="roleSelect">Current User:</label>
+          <select id="roleSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a user
+            </option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label>Workbooks:</label>
+            <button id="toggleWorkbooks" class="toggle-button" style="display: none;">
+              <span id="workbookToggleIcon">▶</span>
+            </button>
+          </div>
+          <div id="workbookContainer" class="workbook-container collapsed">
+            <div id="workbookList" class="workbook-list">
+              <p style="color: gray; font-style: italic;">Select a user first</p>
+            </div>
+            <div class="workbook-actions" style="margin-top: 8px; display: flex; gap: 8px;">
+              <button id="setDefaultBtn" style="display: none; background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">
+                Set as Default
+              </button>
+              <button id="clearDefaultBtn" style="display: none; background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">
+                Clear Default
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toggle info panel visibility and README link -->
+      <div style="white-space: nowrap;">
+        <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
+        <button onclick="window.open('/api-embed-default-workbook-users/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+      </div>
+    </header>
+
+    <!-- === Main Layout === -->
+    <div class="main">
+      <!-- === Sidebar Info Panel === -->
+      <aside class="sidebar">
+        <h2>Information:</h2>
+        <p>
+          The embedded content should render in the iframe on the right, based
+          on your .env file configuration.
+        </p>
+        <code id="debug-embed-url">N/A</code>
+
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <div id="jwt-decode-content"><p>Loading...</p></div>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+      </aside>
+
+      <!-- === Right-hand Content Area === -->
+      <main class="content">
+        <!-- Loading Overlay for Iframe -->
+        <div id="embedLoadingOverlay" class="embed-loading-overlay" style="display: none;">
+          <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading workbook...</div>
+            <button id="forceCloseLoader" onclick="hideEmbedLoader()" style="margin-top: 20px; background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; display: none;">
+              Close Loader
+            </button>
+          </div>
+        </div>
+        
+        <iframe id="sigma-embed" src=""></iframe>
+      </main>
+    </div>
+
+    <!-- === Footer === -->
+    <footer class="layout-footer">Sigma &copy; 2025</footer>
+    
+    <style>
+      /* Workbook list styling */
+      .workbook-list {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 8px;
+        background: white;
+        color: #333;
+        font-family: inherit;
+      }
+      
+      .workbook-item {
+        display: flex;
+        align-items: center;
+        padding: 8px 4px;
+        border-bottom: 1px solid #f0f0f0;
+        min-height: 32px;
+      }
+      
+      .workbook-item:last-child {
+        border-bottom: none;
+      }
+      
+      .workbook-item input[type="radio"] {
+        margin-right: 8px;
+      }
+      
+      .workbook-item label {
+        flex: 1;
+        cursor: pointer;
+        margin: 0;
+        color: #333;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      
+      .workbook-item.default-workbook label {
+        font-weight: bold;
+        color: #007bff;
+      }
+      
+      .workbook-item.default-workbook::after {
+        content: " (Default)";
+        color: #007bff;
+        font-size: 0.8em;
+        font-weight: normal;
+      }
+      
+      /* Custom loading overlay */
+      .embed-loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999 !important;
+        border-radius: var(--border-radius);
+      }
+      
+      .content {
+        position: relative;
+      }
+      
+      /* Workbook toggle functionality */
+      .toggle-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 12px;
+        color: #666;
+        padding: 2px 4px;
+        border-radius: 2px;
+        transition: all 0.2s ease;
+      }
+      
+      .toggle-button:hover {
+        background: #f0f0f0;
+        color: #333;
+      }
+      
+      .workbook-container {
+        transition: all 0.3s ease;
+        overflow: hidden;
+      }
+      
+      .workbook-container.collapsed {
+        max-height: 0;
+        opacity: 0;
+        margin-top: 0;
+        padding-top: 0;
+      }
+      
+      .workbook-container:not(.collapsed) {
+        max-height: 400px;
+        opacity: 1;
+        margin-top: 8px;
+      }
+    </style>
+  </body>
+  <script>
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+    let DEBUG = false;
+    let env = {};
+    let currentMode = "view";
+    let currentUserDefault = null;
+    let memberID = null;
+    let loadingTimeout = null;
+    let isLoading = false;
+    let embedLoadTimeout = null;
+    let isUserOperation = false; // Flag to prevent auto-load during user operations
+
+    // ============================================================================
+    // ENVIRONMENT & CONFIGURATION
+    // ============================================================================
+    
+    /**
+     * Loads environment configuration from the server
+     * Sets DEBUG flag and populates global env object with .env variables
+     */
+    async function loadEnv() {
+      try {
+        const res = await fetch("/env.json");
+        env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode enabled via /env.json");
+      } catch (err) {
+        if (DEBUG) console.warn("Failed to load /env.json config");
+      }
+    }
+
+    // ============================================================================
+    // UI INTERACTIONS
+    // ============================================================================
+    const sidebar = document.querySelector(".sidebar");
+    document.getElementById("collapse-info").addEventListener("click", () => {
+      sidebar.classList.toggle("collapsed");
+    });
+
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Decodes a base64url-encoded string (used for JWT components)
+     * @param {string} str - Base64url encoded string
+     * @returns {string} Decoded string
+     */
+    function base64UrlDecode(str) {
+      str = str.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = str.length % 4;
+      if (pad) str += "=".repeat(4 - pad);
+      return atob(str);
+    }
+
+    // ============================================================================
+    // SIGMA EMBED EVENT HANDLING
+    // ============================================================================
+    
+    /**
+     * Listen for postMessage events from Sigma embed
+     * Specifically waiting for workbook:dataLoaded event to hide custom loader
+     */
+    window.addEventListener("message", (event) => {
+      try {
+        // Verify the message is from Sigma embed
+        if (!event.origin || (event.origin !== env.EMBED_URL_BASE && !event.origin.includes('sigmacomputing.com'))) {
+          return;
+        }
+        
+        if (DEBUG) console.log("Received postMessage from Sigma:", event.data);
+        
+        // Check for workbook:dataLoaded event (handle both possible case variations)
+        if (event.data && typeof event.data === 'object') {
+          const eventType = event.data.type;
+          if (eventType === "workbook:dataLoaded" || eventType === "workbook:dataloaded" || 
+              eventType === "workbook:loaded" || eventType === "embed:loaded") {
+            if (DEBUG) console.log("Workbook loaded event received:", eventType);
+            hideEmbedLoader();
+          }
+        }
+      } catch (error) {
+        if (DEBUG) console.error("Error handling postMessage:", error);
+      }
+    });
+
+    // ============================================================================
+    // EMBED LOADING FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Shows the embed loading overlay with fallback timeout
+     */
+    function showEmbedLoader() {
+      const overlay = document.getElementById("embedLoadingOverlay");
+      const forceCloseBtn = document.getElementById("forceCloseLoader");
+      
+      if (overlay) {
+        overlay.style.display = "flex";
+        isLoading = true;
+        
+        // Hide the force close button initially
+        if (forceCloseBtn) forceCloseBtn.style.display = "none";
+        
+        // Clear any existing timeout
+        if (loadingTimeout) {
+          clearTimeout(loadingTimeout);
+        }
+        
+        // Show force close button only after 12 seconds (for truly stuck loaders)
+        setTimeout(() => {
+          if (isLoading && forceCloseBtn) {
+            forceCloseBtn.style.display = "inline-block";
+            if (DEBUG) console.log("Force close button shown due to extended loading");
+          }
+        }, 12000);
+        
+        // Fallback timeout to hide loader if postMessage doesn't work
+        loadingTimeout = setTimeout(() => {
+          if (DEBUG) console.warn("Loading timeout reached, hiding loader");
+          hideEmbedLoader();
+        }, 15000); // 15 second timeout (increased)
+        
+        if (DEBUG) console.log("Embed loader shown with timeout");
+      }
+    }
+
+    /**
+     * Hides the embed loading overlay
+     */
+    function hideEmbedLoader() {
+      const overlay = document.getElementById("embedLoadingOverlay");
+      if (overlay) {
+        overlay.style.display = "none";
+        isLoading = false;
+        
+        // Clear timeout since we're done loading
+        if (loadingTimeout) {
+          clearTimeout(loadingTimeout);
+          loadingTimeout = null;
+        }
+        
+        if (DEBUG) console.log("Embed loader hidden");
+      }
+    }
+
+    // ============================================================================
+    // EMBED MANAGEMENT FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Clears the embed iframe and resets UI state
+     */
+    function clearEmbed() {
+      const iframe = document.getElementById("sigma-embed");
+      const decodeBlock = document.getElementById("jwt-decode-content");
+      
+      // Clear iframe src
+      if (iframe) {
+        iframe.src = "";
+      }
+      
+      // Clear sidebar information
+      document.getElementById("jwt-display").textContent = "No workbook loaded";
+      document.getElementById("debug-embed-url").textContent = "N/A";
+      
+      if (decodeBlock) {
+        decodeBlock.innerHTML = "<p>Select a workbook to view embed details</p>";
+      }
+      
+      // Clear selected workbook globals
+      window.selectedworkbookUrlId = null;
+      window.selectedWorkbookName = null;
+      
+      // Hide loading overlay if it's showing
+      hideEmbedLoader();
+      
+      if (DEBUG) console.log("Embed cleared");
+    }
+
+    // ============================================================================
+    // DEFAULT WORKBOOK FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Gets the current user's default workbook from the API
+     */
+    async function getUserDefault(userEmail) {
+      try {
+        const response = await fetch(`/api/default-workbook/${encodeURIComponent(userEmail)}`);
+        const result = await response.json();
+        return result.hasDefault ? result : null;
+      } catch (err) {
+        if (DEBUG) console.error("Error getting user default:", err);
+        return null;
+      }
+    }
+
+    /**
+     * Sets a workbook as the user's default
+     */
+    async function setUserDefault(userEmail, memberID, workbookName, workbookUrlId) {
+      try {
+        const response = await fetch('/api/default-workbook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userEmail,
+            memberID,
+            workbookName,
+            workbookUrlId
+          })
+        });
+        const result = await response.json();
+        if (DEBUG) console.log("Default workbook set:", result);
+        return result.success;
+      } catch (err) {
+        if (DEBUG) console.error("Error setting default workbook:", err);
+        return false;
+      }
+    }
+
+    /**
+     * Clears the user's default workbook
+     */
+    async function clearUserDefault(userEmail) {
+      try {
+        const response = await fetch(`/api/default-workbook/${encodeURIComponent(userEmail)}`, {
+          method: 'DELETE'
+        });
+        const result = await response.json();
+        if (DEBUG) console.log("Default workbook cleared:", result);
+        return result.success;
+      } catch (err) {
+        if (DEBUG) console.error("Error clearing default workbook:", err);
+        return false;
+      }
+    }
+
+    // ============================================================================
+    // SIGMA EMBED FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Generates JWT token and loads Sigma embed in iframe with debouncing
+     * Populates sidebar with embed URL and decoded JWT information
+     */
+    async function loadEmbed() {
+      // Debounce rapid calls
+      if (embedLoadTimeout) {
+        clearTimeout(embedLoadTimeout);
+      }
+      
+      embedLoadTimeout = setTimeout(async () => {
+        await _loadEmbedInternal();
+      }, 300); // 300ms debounce
+    }
+
+    /**
+     * Internal embed loading function
+     */
+    async function _loadEmbedInternal() {
+      const selectedUser = document.getElementById("roleSelect").value;
+      const workbookUrlId = window.selectedworkbookUrlId;
+      const embedType = "workbook";
+
+      const decodeBlock = document.getElementById("jwt-decode-content");
+
+      decodeBlock.innerHTML = "<p>Loading JWT...</p>";
+      document.getElementById("jwt-display").textContent = "Loading JWT...";
+      document.getElementById("debug-embed-url").textContent = "N/A";
+
+      if (!selectedUser || !workbookUrlId) {
+        if (DEBUG) console.warn("Embed not loaded — missing required fields.");
+        return;
+      }
+
+      // Prevent concurrent loading
+      if (isLoading) {
+        if (DEBUG) console.warn("Embed already loading, skipping...");
+        return;
+      }
+
+      // Show loading overlay
+      showEmbedLoader();
+
+      const hideFolderNav =
+        currentMode === "build"
+          ? "false"
+          : env.hide_folder_navigation || "true";
+      const hideMenu =
+        currentMode === "build" ? "false" : env.hide_menu || "true";
+      const menuPosition =
+        currentMode === "build" ? "top" : env.menu_position || "none";
+
+      if (DEBUG) {
+        console.log("Embed config:", {
+          currentMode,
+          hideFolderNav,
+          hideMenu,
+          menuPosition,
+        });
+      }
+
+      try {
+        const res = await fetch(
+          `/api/jwt/${embedType}?embedType=${embedType}&workbookUrlId=${encodeURIComponent(
+            workbookUrlId
+          )}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sub: selectedUser,
+              hide_folder_navigation: hideFolderNav,
+              hide_menu: hideMenu,
+              menu_position: menuPosition,
+              disable_auto_refresh: env.DISABLE_AUTO_REFRESH,
+              disable_mobile_view: env.DISABLE_MOBILE_VIEW,
+              hide_page_controls: env.HIDE_PAGE_CONTROLS,
+              hide_reload_button: env.HIDE_RELOAD_BUTTON,
+              hide_title: env.HIDE_TITLE,
+              hide_tooltip: env.HIDE_TOOLTIP,
+              hide_view_select: env.HIDE_VIEW_SELECT,
+              lng: env.LNG,
+              page_id: env.PAGE_ID,
+              responsive_height: env.RESPONSIVE_HEIGHT,
+              theme: env.THEME,
+              view_id: env.VIEW_ID,
+            }),
+          }
+        );
+
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (parseErr) {
+          throw new Error(`Invalid JSON response: ${text.slice(0, 100)}...`);
+        }
+
+        if (!res.ok) {
+          throw new Error(
+            json.error || res.statusText || "Failed to fetch embed"
+          );
+        }
+
+        const { jwt, embedUrl } = json;
+        if (DEBUG) console.log("Embed response:", { jwt, embedUrl });
+
+        document.getElementById("sigma-embed").src = embedUrl;
+        document.getElementById("debug-embed-url").textContent =
+          embedUrl || "N/A";
+        document.getElementById("jwt-display").textContent = jwt;
+
+        if (jwt && jwt.split(".").length === 3) {
+          try {
+            const [headerStr, payloadStr] = jwt.split(".").slice(0, 2);
+            const header = JSON.parse(base64UrlDecode(headerStr));
+            const payload = JSON.parse(base64UrlDecode(payloadStr));
+            decodeBlock.innerHTML = `
+            <h3>Decoded JWT Header:</h3>
+            <pre>${JSON.stringify(header, null, 2)}</pre>
+            <h3>Decoded JWT Payload:</h3>
+            <pre>${JSON.stringify(payload, null, 2)}</pre>`;
+          } catch (decodeErr) {
+            decodeBlock.innerHTML = `<p style="color:red;">JWT decoding failed.</p>`;
+          }
+        } else {
+          decodeBlock.innerHTML = `<p style="color:red;">Missing or invalid JWT format.</p>`;
+        }
+      } catch (err) {
+        if (DEBUG) console.error("loadEmbed() failed:", err.message);
+        decodeBlock.innerHTML = `<p style="color:red;">${err.message}</p>`;
+      }
+    }
+
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Populates the user role dropdown with View and Build users from environment config
+     * Sets up event handler to update currentMode when user selection changes
+     */
+    async function loadUserOptions() {
+      const select = document.getElementById("roleSelect");
+      try {
+        const res = await fetch("/env.json");
+        const env = await res.json();
+
+        select.innerHTML = `
+        <option value="" disabled selected style="color:gray;font-style:italic">Select a user</option>
+        <option value="${env.VIEW_EMAIL}" data-mode="view">${env.VIEW_EMAIL}</option>
+        <option value="${env.BUILD_EMAIL}" data-mode="build">${env.BUILD_EMAIL}</option>`;
+
+        select.addEventListener("change", async (e) => {
+          const selected = e.target.selectedOptions[0];
+          currentMode = selected.dataset.mode || "view";
+          const userEmail = e.target.value;
+          
+          if (DEBUG) console.log("Selected mode:", currentMode, "User:", userEmail);
+          
+          // Clear previous user's embed immediately when switching users
+          clearEmbed();
+
+          // Get memberID for this user (needed for default workbook API)
+          try {
+            const provisionRes = await fetch("/provision-users");
+            const provisionData = await provisionRes.json();
+            
+            if (currentMode === "build") {
+              memberID = provisionData.build.memberId;
+            } else {
+              memberID = provisionData.view.memberId;
+            }
+            
+            if (DEBUG) console.log("MemberID for", userEmail, ":", memberID);
+          } catch (err) {
+            if (DEBUG) console.error("Failed to get memberID:", err);
+            memberID = null;
+          }
+
+          // Load workbooks for this user
+          await loadWorkbooks(userEmail);
+        });
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load user options:", err);
+      }
+    }
+
+    /**
+     * Fetches available workbooks and user's default, displays as radio button list
+     * Handles default workbook setting, clearing, and auto-loading
+     */
+    async function loadWorkbooks(userEmail) {
+      const workbookList = document.getElementById("workbookList");
+      const clearBtn = document.getElementById("clearDefaultBtn");
+      const setDefaultBtn = document.getElementById("setDefaultBtn");
+      const toggleBtn = document.getElementById("toggleWorkbooks");
+      const workbookContainer = document.getElementById("workbookContainer");
+
+      if (!userEmail) {
+        workbookList.innerHTML = '<p style="color: gray; font-style: italic;">Select a user first</p>';
+        clearBtn.style.display = "none";
+        setDefaultBtn.style.display = "none";
+        toggleBtn.style.display = "none";
+        return;
+      }
+
+      try {
+        // Fetch workbooks and user default concurrently
+        const [workbooksRes, defaultRes] = await Promise.all([
+          fetch("/api/workbooks"),
+          getUserDefault(userEmail)
+        ]);
+        
+        const { workbooks } = await workbooksRes.json();
+        currentUserDefault = defaultRes;
+
+        if (workbooks.length === 0) {
+          workbookList.innerHTML = '<p style="color: gray;">No workbooks available</p>';
+          clearBtn.style.display = "none";
+          setDefaultBtn.style.display = "none";
+          toggleBtn.style.display = "none";
+          return;
+        }
+
+        // Show toggle button when workbooks are loaded
+        toggleBtn.style.display = "inline-block";
+        
+        // Set up toggle functionality (only set up once)
+        if (!toggleBtn.hasAttribute('data-initialized')) {
+          setupWorkbookToggle();
+          toggleBtn.setAttribute('data-initialized', 'true');
+        }
+
+        // Build radio button list
+        let html = '';
+        let defaultFound = false;
+        
+        workbooks.forEach((wb) => {
+          const match = wb.url.match(/workbook\/([a-zA-Z0-9]+)/);
+          const workbookUrlId = match ? match[1] : null;
+          if (!workbookUrlId) return;
+          
+          const isDefault = currentUserDefault && currentUserDefault.workbookUrlId === workbookUrlId;
+          if (isDefault) defaultFound = true;
+          
+          const itemClass = isDefault ? 'workbook-item default-workbook' : 'workbook-item';
+          
+          html += `
+            <div class="${itemClass}">
+              <input type="radio" 
+                     id="wb_${workbookUrlId}" 
+                     name="selectedWorkbook" 
+                     value="${workbookUrlId}"
+                     data-name="${wb.name}"
+                     ${isDefault ? 'checked' : ''}>
+              <label for="wb_${workbookUrlId}">${wb.name}</label>
+            </div>
+          `;
+        });
+
+        workbookList.innerHTML = html;
+        
+        // Show/hide buttons based on state
+        clearBtn.style.display = defaultFound ? "inline-block" : "none";
+        setDefaultBtn.style.display = "none"; // Will be shown when a workbook is selected
+
+        // Set up event handlers (only set up once)
+        if (!workbookList.hasAttribute('data-handlers-initialized')) {
+          setupWorkbookEventHandlers(userEmail);
+          workbookList.setAttribute('data-handlers-initialized', 'true');
+        }
+        
+        // Auto-load default workbook if it exists (but not during user operations)
+        if (currentUserDefault && defaultFound && !isUserOperation) {
+          window.selectedworkbookUrlId = currentUserDefault.workbookUrlId;
+          if (DEBUG) console.log("Auto-loading default workbook:", currentUserDefault.workbookName);
+          loadEmbed();
+        } else if (isUserOperation && DEBUG) {
+          console.log("Auto-load skipped due to ongoing user operation");
+        } else if (!currentUserDefault && !isUserOperation) {
+          // Clear iframe if user has no default workbook
+          clearEmbed();
+          if (DEBUG) console.log("No default workbook for user, clearing embed");
+        }
+
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load workbooks:", err);
+        workbookList.innerHTML = '<p style="color: red;">Error loading workbooks</p>';
+        clearBtn.style.display = "none";
+        setDefaultBtn.style.display = "none";
+        toggleBtn.style.display = "none";
+      }
+    }
+
+    /**
+     * Sets up the workbook list toggle functionality
+     */
+    function setupWorkbookToggle() {
+      const toggleBtn = document.getElementById("toggleWorkbooks");
+      const toggleIcon = document.getElementById("workbookToggleIcon");
+      const workbookContainer = document.getElementById("workbookContainer");
+      
+      toggleBtn.addEventListener("click", () => {
+        const isCollapsed = workbookContainer.classList.contains("collapsed");
+        
+        if (isCollapsed) {
+          workbookContainer.classList.remove("collapsed");
+          toggleIcon.textContent = "▼";
+        } else {
+          workbookContainer.classList.add("collapsed");
+          toggleIcon.textContent = "▶";
+        }
+        
+        if (DEBUG) console.log("Workbook list toggled:", isCollapsed ? "expanded" : "collapsed");
+      });
+    }
+
+    /**
+     * Sets up event handlers for workbook radio buttons and action buttons
+     */
+    function setupWorkbookEventHandlers(userEmail) {
+      const workbookList = document.getElementById("workbookList");
+      const clearBtn = document.getElementById("clearDefaultBtn");
+      const setDefaultBtn = document.getElementById("setDefaultBtn");
+
+      // Handle radio button selection
+      workbookList.addEventListener("change", async (e) => {
+        if (e.target.type === "radio") {
+          const workbookUrlId = e.target.value;
+          const workbookName = e.target.dataset.name;
+          
+          window.selectedworkbookUrlId = workbookUrlId;
+          window.selectedWorkbookName = workbookName;
+          
+          // Show "Set as Default" button when a workbook is selected
+          const isDefault = currentUserDefault && currentUserDefault.workbookUrlId === workbookUrlId;
+          setDefaultBtn.style.display = isDefault ? "none" : "inline-block";
+          
+          loadEmbed();
+          
+          if (DEBUG) console.log("Workbook selected:", workbookName);
+        }
+      });
+
+      // Handle setting default workbook (dedicated button)
+      setDefaultBtn.addEventListener("click", async () => {
+        const currentUserEmail = document.getElementById("roleSelect").value;
+        
+        if (DEBUG) console.log("Set default button clicked for user:", currentUserEmail);
+        
+        if (!currentUserEmail) {
+          console.error("No user selected for set default operation");
+          return;
+        }
+        
+        // Set user operation flag to prevent race conditions
+        isUserOperation = true;
+        
+        try {
+          if (window.selectedworkbookUrlId && window.selectedWorkbookName) {
+            const success = await setUserDefault(currentUserEmail, memberID, window.selectedWorkbookName, window.selectedworkbookUrlId);
+            if (DEBUG) console.log("Set default result:", success);
+            if (success) {
+              // Reload workbooks to update UI
+              await loadWorkbooks(currentUserEmail);
+            } else {
+              console.error("Failed to set default for user:", currentUserEmail);
+            }
+          } else {
+            console.error("No workbook selected for default setting");
+          }
+        } finally {
+          // Clear user operation flag after a delay to ensure operations complete
+          setTimeout(() => {
+            isUserOperation = false;
+            if (DEBUG) console.log("User operation flag cleared");
+          }, 500);
+        }
+      });
+
+      // Handle clear default button
+      clearBtn.addEventListener("click", async () => {
+        const currentUserEmail = document.getElementById("roleSelect").value;
+        if (DEBUG) console.log("Clear button clicked for user:", currentUserEmail);
+        
+        if (!currentUserEmail) {
+          console.error("No user selected for clear operation");
+          return;
+        }
+        
+        // Set user operation flag to prevent race conditions
+        isUserOperation = true;
+        
+        try {
+          const success = await clearUserDefault(currentUserEmail);
+          if (DEBUG) console.log("Clear result:", success);
+          if (success) {
+            // Reload workbooks to update UI
+            await loadWorkbooks(currentUserEmail);
+          } else {
+            console.error("Failed to clear default for user:", currentUserEmail);
+          }
+        } finally {
+          // Clear user operation flag after a delay to ensure operations complete
+          setTimeout(() => {
+            isUserOperation = false;
+            if (DEBUG) console.log("User operation flag cleared");
+          }, 500);
+        }
+      });
+    }
+
+    // ============================================================================
+    // APPLICATION INITIALIZATION
+    // ============================================================================
+    (async () => {
+      await loadEnv();
+      await loadUserOptions();
+      // loadWorkbooks will be called when user is selected
+    })();
+  </script>
+</html>
