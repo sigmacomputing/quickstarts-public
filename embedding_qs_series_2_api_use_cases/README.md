@@ -4,7 +4,7 @@ A comprehensive collection of examples demonstrating Sigma Computing's embedding
 
 ## Overview
 
-This project provides seven distinct QuickStart examples that progressively demonstrate Sigma's embedding features:
+This project provides eight distinct QuickStart examples that progressively demonstrate Sigma's embedding features:
 
 1. **Getting Started** - Basic embedding with JWT authentication
 2. **Embed Bookmarks** - Direct Sigma API bookmark functionality  
@@ -13,6 +13,7 @@ This project provides seven distinct QuickStart examples that progressively demo
 5. **API Export Modal** - Scheduled export functionality using the Sigma API
 6. **Custom Loading Screen** - Enhanced embedding with custom loading overlays
 7. **Menu Control & Page Navigation** - Advanced menu visibility control and page navigation
+8. **Set Default Workbook** - User-specific default workbook management with persistent storage
 
 Each QuickStart includes a complete web interface with user switching, debug information, and comprehensive documentation.
 
@@ -52,6 +53,7 @@ embedding_qs_series_2_api_use_cases/
 │   ├── api-embed-export-modal/      # Scheduled export functionality
 │   ├── api-embed-custom-loader/     # Custom loading overlay implementation
 │   ├── api-embed-hide-menu-page-nav/ # Menu control and page navigation
+│   ├── api-embed-default-workbook-users/ # User default workbook management
 │   └── styles/                      # Shared CSS styles
 ├── routes/                          # Express.js API routes
 │   └── api/                         # API endpoints
@@ -187,6 +189,23 @@ This approach enables a complete export management experience directly within th
 
 **Best For**: Applications requiring granular control over Sigma UI elements and custom navigation experiences
 
+### 8. Set Default Workbook (`/api-embed-default-workbook-users`)
+**Purpose**: Implement user-specific default workbook management with persistent local storage
+
+**Features**:
+- User-based default workbook system with one default per user
+- Radio button interface with collapsible workbook list (collapsed by default)
+- Visual indicators for default workbooks (bold text + "(Default)" suffix)
+- Dedicated "Set as Default" and "Clear Default" buttons for intuitive operation
+- Persistent storage using lowDB with JSON file backend
+- Automatic loading of user defaults on selection and page refresh
+- Custom loading overlay with Sigma postMessage integration and fallback mechanisms
+- Race condition protection for rapid user/workbook switching
+- Clean user state isolation (no workbook bleeding between users)
+- Comprehensive debug logging and error handling
+
+**Best For**: Applications requiring personalized user experiences with workbook preferences and robust state management
+
 ## Configuration
 
 ### Environment Variables
@@ -235,6 +254,11 @@ The application includes user provisioning capabilities:
 - `PATCH /api/exports/:scheduleId` - Update existing export schedule
 - `DELETE /api/exports/:workbookId/:scheduleId` - Delete export schedule
 - `POST /api/exports/:workbookId/send/:scheduleId` - Send export immediately
+
+### Default Workbook Endpoints
+- `GET /api/default-workbook/:userEmail` - Get user's default workbook
+- `POST /api/default-workbook` - Set workbook as user's default
+- `DELETE /api/default-workbook/:userEmail` - Clear user's default workbook
 
 ### Content Discovery
 - `GET /api/pages` - List pages in a workbook (with hidden page filtering)
