@@ -320,7 +320,7 @@
 
       try {
         const res = await fetch(
-          `/api/jwt/api-embed-export-modal?workbookUrlId=${encodeURIComponent(
+          `/api/jwt/view?workbookUrlId=${encodeURIComponent(
             workbookUrlId
           )}&embedType=${embedType}`,
           {

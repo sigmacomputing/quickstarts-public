@@ -384,7 +384,7 @@
         expectCleanPageView: isPageLevel
       });
 
-      let url = `/api/jwt/workbook?embedType=${embedType}&workbookUrlId=${encodeURIComponent(workbookUrlId)}`;
+      let url = `/api/jwt/${currentMode}?embedType=${embedType}&workbookUrlId=${encodeURIComponent(workbookUrlId)}`;
       if (targetId) {
         url += `&targetId=${encodeURIComponent(targetId)}`;
       }
