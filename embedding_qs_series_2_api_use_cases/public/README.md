@@ -6,15 +6,15 @@ A comprehensive collection of examples demonstrating Sigma Computing's embedding
 
 This project provides nine distinct QuickStart examples that progressively demonstrate Sigma's embedding features:
 
-1. **Getting Started** - Basic embedding with JWT authentication
-2. **Embed Bookmarks** - Direct Sigma API bookmark functionality  
-3. **Bookmark Sharing with Local DB** - Enhanced bookmarks with local storage and sharing
-4. **Embed Controls** - Flexible embedding (workbook/page/element types)
-5. **API Export Modal** - Scheduled export functionality using the Sigma API
-6. **Custom Loading Screen** - Enhanced embedding with custom loading overlays
-7. **Menu Control & Page Navigation** - Advanced menu visibility control and page navigation
-8. **Set Default Workbook** - User-specific default workbook management with persistent storage
-9. **Workbook Carousel** - Interactive workbook selection using visual carousel interface
+1. Getting Started - Basic embedding with JWT authentication
+2. Embed Bookmarks - Direct Sigma API bookmark functionality  
+3. Bookmark Sharing with Local DB - Enhanced bookmarks with local storage and sharing
+4. Embed Controls - Flexible embedding (workbook/page/element types)
+5. API Export Modal - Scheduled export functionality using the Sigma API
+6. Custom Loading Screen - Enhanced embedding with custom loading overlays
+7. Menu Control & Page Navigation - Advanced menu visibility control and page navigation
+8. Set Default Workbook - User-specific default workbook management with persistent storage
+9. Workbook Carousel - Interactive workbook selection using visual carousel interface
 
 Each QuickStart includes a complete web interface with user switching, debug information, and comprehensive documentation.
 
@@ -69,119 +69,119 @@ embedding_qs_series_2_api_use_cases/
 ## Features
 
 ### Core Functionality
-- **JWT Authentication** - Secure token generation for embedding
-- **User Role Management** - Switch between View and Build users
-- **Workbook Discovery** - Dynamic workbook loading from Sigma API
-- **Debug Mode** - Comprehensive logging and token inspection
+- JWT Authentication - Secure token generation for embedding
+- User Role Management - Switch between View and Build users
+- Workbook Discovery - Dynamic workbook loading from Sigma API
+- Debug Mode - Comprehensive logging and token inspection
 
 ### Advanced Features
-- **Bookmark Management** - Create, save, and share bookmarks
-- **Local Database Integration** - Enhanced metadata storage with lowdb
-- **Permission-Based Filtering** - User-specific bookmark visibility
-- **Flexible Embedding** - Support for workbook, page, and element embedding
-- **Custom Loading Overlays** - Branded loading experiences with Sigma postMessage integration
-- **Menu Visibility Control** - Toggle Sigma menus on/off with intelligent state management
-- **Page Navigation** - Dynamic page discovery and navigation with hidden page filtering
-- **Dual Embedding Modes** - Workbook-level vs page-level embedding patterns
-- **Responsive Design** - Mobile-friendly interfaces
+- Bookmark Management - Create, save, and share bookmarks
+- Local Database Integration - Enhanced metadata storage with lowdb
+- Permission-Based Filtering - User-specific bookmark visibility
+- Flexible Embedding - Support for workbook, page, and element embedding
+- Custom Loading Overlays - Branded loading experiences with Sigma postMessage integration
+- Menu Visibility Control - Toggle Sigma menus on/off with intelligent state management
+- Page Navigation - Dynamic page discovery and navigation with hidden page filtering
+- Dual Embedding Modes - Workbook-level vs page-level embedding patterns
+- Responsive Design - Mobile-friendly interfaces
 
 ### Developer Tools
-- **Environment Configuration** - Centralized .env management
-- **Debug Logging** - Detailed console output when DEBUG=true
-- **API Documentation** - Individual README files for each QuickStart
-- **User Provisioning** - Automated test user creation
+- Environment Configuration - Centralized .env management
+- Debug Logging - Detailed console output when DEBUG=true
+- API Documentation - Individual README files for each QuickStart
+- User Provisioning - Automated test user creation
 
 ## QuickStart Examples
 
 ### 1. Getting Started (`/api-getting-started`)
-**Purpose**: Learn the basics of Sigma embedding with JWT authentication
+Purpose: Learn the basics of Sigma embedding with JWT authentication
 
-**Features**:
+Features:
 - User and workbook selection
 - JWT token generation and display
 - Basic embed configuration
 - Debug information panel
 
-**Best For**: First-time Sigma embedding implementation
+Best For: First-time Sigma embedding implementation
 
 ### 2. Embed Bookmarks (`/api-embed-bookmarks`)
-**Purpose**: Implement bookmark functionality using Sigma's native API
+Purpose: Implement bookmark functionality using Sigma's native API
 
-**Features**:
+Features:
 - Create and manage bookmarks
 - ExploreKey capture from embedded content
 - User permission-based bookmark creation
 - Direct Sigma API integration
 
-**Best For**: Basic bookmark functionality without additional complexity
+Best For: Basic bookmark functionality without additional complexity
 
 ### 3. Bookmark Sharing with Local DB (`/api-embed-bookmarks_db`)
-**Purpose**: Advanced bookmark management with sharing and local storage
+Purpose: Advanced bookmark management with sharing and local storage
 
-**Features**:
+Features:
 - Enhanced bookmark metadata storage
 - User-specific sharing controls
 - Permission-based bookmark filtering
 - Bulk bookmark operations
 - "Clear All" functionality with API synchronization
 
-**Best For**: Enterprise scenarios requiring advanced bookmark management
+Best For: Enterprise scenarios requiring advanced bookmark management
 
 ### 4. Embed Controls (`/api-embed-controls`)
-**Purpose**: Demonstrate flexible embedding options for different content types
+Purpose: Demonstrate flexible embedding options for different content types
 
-**Features**:
+Features:
 - Dynamic embed type selection (workbook/page/element)
 - Cascading content discovery
 - Adaptive interface based on embed type
 - Content-specific JWT generation
 
-**Best For**: Applications requiring granular content embedding
+Best For: Applications requiring granular content embedding
 
 ### 5. API Export Modal (`/api-embed-export-modal`)
-**Purpose**: Extend an embedded Sigma workbook with scheduled export functionality using the Sigma REST API
+Purpose: Extend an embedded Sigma workbook with scheduled export functionality using the Sigma REST API
 
 This QuickStart demonstrates how to create a comprehensive export management system within a host application. Unlike basic embedding, this implementation provides `View` users with the ability to create, manage, and immediately send scheduled exports directly from the embedded interface.
 
-**Features**:
-- **Export Scheduling**: Create email-based export schedules with custom recipients, subjects, and messages
-- **Format Selection**: Support for PDF, CSV, and Excel export formats with configurable options
-- **Frequency Management**: Configure daily, weekly, or monthly export schedules with custom timing
-- **Export Management**: View, edit, delete, and immediately run existing export schedules
-- **Workbook Integration**: Seamless integration with embedded workbook selection and preview
-- **Security Features**: View-only embed permissions with recipient privacy protection
+Features:
+- Export Scheduling: Create email-based export schedules with custom recipients, subjects, and messages
+- Format Selection: Support for PDF, CSV, and Excel export formats with configurable options
+- Frequency Management: Configure daily, weekly, or monthly export schedules with custom timing
+- Export Management: View, edit, delete, and immediately run existing export schedules
+- Workbook Integration: Seamless integration with embedded workbook selection and preview
+- Security Features: View-only embed permissions with recipient privacy protection
 
 We will cover these key workflows:
 
-**1: Schedule an Export:**<br>
+1: Schedule an Export:<br>
 Allow users to create scheduled exports by configuring recipients, format, frequency, and timing. The system handles workbook ID resolution and validates all export parameters before creating the schedule via the Sigma API.
 
-**2: Manage Export Schedules:**<br>
+2: Manage Export Schedules:<br>
 Provide users with a comprehensive management interface to view existing schedules, edit configurations (with recipient re-entry for security), and delete schedules they no longer need.
 
-**3: Run Exports Immediately:**<br>
+3: Run Exports Immediately:<br>
 Enable users to trigger immediate export delivery using existing schedule configurations, with the ability to specify custom recipients for ad-hoc sharing.
 
 This approach enables a complete export management experience directly within the embedded environment. It's especially useful for SaaS providers, internal dashboards, or any scenario where users need to share Sigma content via email without requiring direct access to the Sigma interface.
 
-**Best For**: Applications requiring comprehensive export functionality with embedded workbook management
+Best For: Applications requiring comprehensive export functionality with embedded workbook management
 
 ### 6. Custom Loading Screen (`/api-embed-custom-loader`)
-**Purpose**: Implement branded loading overlays that properly integrate with Sigma's loading lifecycle
+Purpose: Implement branded loading overlays that properly integrate with Sigma's loading lifecycle
 
-**Features**:
+Features:
 - Custom loading overlay with CSS animations
 - Sigma postMessage event integration (`workbook:dataLoaded`)
 - High z-index positioning to override Sigma's default loader
 - Event-driven loading state management (not timer-based)
 - Proper iframe content area coverage
 
-**Best For**: Applications requiring branded loading experiences and professional embed presentation
+Best For: Applications requiring branded loading experiences and professional embed presentation
 
 ### 7. Menu Control & Page Navigation (`/api-embed-hide-menu-page-nav`)
-**Purpose**: Demonstrate advanced menu visibility control and intelligent page navigation patterns
+Purpose: Demonstrate advanced menu visibility control and intelligent page navigation patterns
 
-**Features**:
+Features:
 - Smart menu toggle for workbook-level embeds (hide/show all Sigma menus)
 - Dual embedding modes: workbook-level (interactive) vs page-level (clean view)
 - Dynamic page discovery with hidden page filtering
@@ -189,12 +189,12 @@ This approach enables a complete export management experience directly within th
 - Parameter state management across embedding mode switches
 - Security-first page filtering (hidden pages excluded server-side)
 
-**Best For**: Applications requiring granular control over Sigma UI elements and custom navigation experiences
+Best For: Applications requiring granular control over Sigma UI elements and custom navigation experiences
 
 ### 8. Set Default Workbook (`/api-embed-default-workbook-users`)
-**Purpose**: Implement user-specific default workbook management with persistent local storage
+Purpose: Implement user-specific default workbook management with persistent local storage
 
-**Features**:
+Features:
 - User-based default workbook system with one default per user
 - Radio button interface with collapsible workbook list (collapsed by default)
 - Visual indicators for default workbooks (bold text + "(Default)" suffix)
@@ -206,12 +206,12 @@ This approach enables a complete export management experience directly within th
 - Clean user state isolation (no workbook bleeding between users)
 - Comprehensive debug logging and error handling
 
-**Best For**: Applications requiring personalized user experiences with workbook preferences and robust state management
+Best For: Applications requiring personalized user experiences with workbook preferences and robust state management
 
 ### 9. Workbook Carousel (`/api-embed-carousel`)
-**Purpose**: Implement interactive workbook selection using visual carousel interface with user-specific content filtering
+Purpose: Implement interactive workbook selection using visual carousel interface with user-specific content filtering
 
-**Features**:
+Features:
 - Visual workbook browser with thumbnail previews and smooth navigation
 - User-specific content filtering using Sigma's member-based API approach
 - Stable carousel implementation designed for reliable performance
@@ -221,7 +221,7 @@ This approach enables a complete export management experience directly within th
 - Fixed positioning to avoid layout conflicts
 - Permission-based workbook access (shows all workbooks accessible via List member files endpoint)
 
-**Security Architecture**:
+Security Architecture:
 It is important to understand how the workbooks displayed in the carousel are selected. Sigma is very flexible and workbooks can be stored in multiple locations, leading to content sprawl and the risk of exposing content to unauthorized users, whether embedded or not.
 
 For that reason, it is best practice to store workbooks in dedicated workspaces and share those workspaces with specific users or teams. In the embed context, maintaining a 1:1 relationship between workspaces and user groups is ideal to simplify management and ensure proper access control.
@@ -230,7 +230,7 @@ Our implementation uses the List member files endpoint, which returns all docume
 
 For enhanced security, you could implement path-based filtering - for example, if you wanted to only allow users access to content in the `Embed_Users` workspace, you could use the user's team membership to filter the results accordingly. This additional filtering helps prevent accidental exposure of content that users shouldn't have access to, even if Sigma's permission system technically allows it.
 
-**Best For**: Applications requiring intuitive workbook discovery interfaces with visual selection and robust access control
+Best For: Applications requiring intuitive workbook discovery interfaces with visual selection and robust access control
 
 ## Configuration
 
@@ -321,10 +321,10 @@ Each QuickStart can be tested independently:
 ## Deployment
 
 ### Production Considerations
-- **Security**: Never commit real credentials to version control
-- **Environment**: Use production Sigma URLs in `.env`
-- **HTTPS**: Ensure HTTPS for production deployments
-- **Rate Limiting**: Implement API rate limiting for production use
+- Security: Never commit real credentials to version control
+- Environment: Use production Sigma URLs in `.env`
+- HTTPS: Ensure HTTPS for production deployments
+- Rate Limiting: Implement API rate limiting for production use
 
 ### Environment Setup
 1. Update `.env` with production values
@@ -335,10 +335,10 @@ Each QuickStart can be tested independently:
 ## Troubleshooting
 
 ### Common Issues
-- **JWT Errors**: Check CLIENT_ID and SECRET in `.env`
-- **CORS Issues**: Verify EMBED_URL_BASE matches your Sigma instance
-- **User Permissions**: Ensure test users have appropriate Sigma permissions
-- **Bookmark Issues**: Check workbook sharing and user access rights
+- JWT Errors: Check CLIENT_ID and SECRET in `.env`
+- CORS Issues: Verify EMBED_URL_BASE matches your Sigma instance
+- User Permissions: Ensure test users have appropriate Sigma permissions
+- Bookmark Issues: Check workbook sharing and user access rights
 
 ### Debug Steps
 1. Enable `DEBUG=true` in `.env`
