@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Page metadata and layout styles -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Custom Workbook List QuickStart</title>
+    <link rel="stylesheet" href="/styles/main.css" />
+    <link rel="icon" href="data:," />
+  </head>
+
+  <body>
+    <!-- === Topbar === -->
+    <header class="layout-topbar">
+      <!-- Navigation and title -->
+      <div style="display: flex; align-items: center; gap: 0.5rem">
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+        <span class="header-title">API Custom Workbook List QuickStart</span>
+      </div>
+
+      <!-- Controls for user and workbook selection -->
+      <div class="control-panel">
+        <div class="control-group">
+          <label for="roleSelect">Current User:</label>
+          <select id="roleSelect">
+            <option
+              value=""
+              disabled
+              selected
+              style="color: gray; font-style: italic"
+            >
+              Select a user
+            </option>
+          </select>
+        </div>
+
+        <div class="control-group" style="position: relative;">
+          <label for="workbookCarousel">Workbooks:</label>
+          <div class="carousel-toggle">
+            <button id="carouselToggle" class="chevron-only-btn" disabled title="Select a workbook">
+              <svg class="chevron-icon" viewBox="0 0 24 24" width="20" height="20">
+                <path fill="currentColor" d="M7 10l5 5 5-5z"/>
+              </svg>
+            </button>
+            <span id="selectedWorkbookName" class="selected-workbook-name" style="display: none;"></span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- === Workbook Carousel (simple custom implementation) === -->
+      <div id="workbookCarouselContainer" class="carousel-container" style="display: none;">
+        <div class="simple-carousel">
+          <button class="carousel-nav prev" id="prevBtn">‹</button>
+          <div class="carousel-viewport">
+            <div class="carousel-track" id="carouselTrack">
+              <!-- Carousel items will be populated here -->
+            </div>
+          </div>
+          <button class="carousel-nav next" id="nextBtn">›</button>
+        </div>
+      </div>
+
+      <!-- Toggle info panel visibility and README link -->
+      <div style="white-space: nowrap;">
+        <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
+        <button onclick="window.open('/api-embed-carousel/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+      </div>
+    </header>
+
+    <!-- === Main Layout === -->
+    <div class="main">
+      <!-- === Sidebar Info Panel === -->
+      <aside class="sidebar">
+        <h2>Information:</h2>
+        <p>
+          The embedded content should render in the iframe on the right, based
+          on your .env file configuration.
+        </p>
+        <code id="debug-embed-url">N/A</code>
+
+        <div id="jwt-decoded" style="margin-bottom: 1rem">
+          <h3>Decoded JWT:</h3>
+          <div id="jwt-decode-content"><p>Loading...</p></div>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is below:</p>
+        <pre id="jwt-display" class="token-display">Loading JWT...</pre>
+      </aside>
+
+      <!-- === Right-hand Content Area === -->
+      <main class="content">
+        <iframe id="sigma-embed" src=""></iframe>
+      </main>
+    </div>
+
+    <!-- === Footer === -->
+    <footer class="layout-footer">Sigma &copy; 2025</footer>
+  </body>
+  <script>
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+    let DEBUG = false;
+    let env = {};
+    let currentMode = "view";
+    let workbookCarousel = null;
+    let availableWorkbooks = [];
+    let carouselExpanded = false;
+
+    // ============================================================================
+    // ENVIRONMENT & CONFIGURATION
+    // ============================================================================
+    
+    /**
+     * Loads environment configuration from the server
+     * Sets DEBUG flag and populates global env object with .env variables
+     */
+    async function loadEnv() {
+      try {
+        const res = await fetch("/env.json");
+        env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode enabled via /env.json");
+      } catch (err) {
+        if (DEBUG) console.warn("Failed to load /env.json config");
+      }
+    }
+
+    // ============================================================================
+    // UI INTERACTIONS
+    // ============================================================================
+    const sidebar = document.querySelector(".sidebar");
+    document.getElementById("collapse-info").addEventListener("click", () => {
+      sidebar.classList.toggle("collapsed");
+    });
+
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Decodes a base64url-encoded string (used for JWT components)
+     * @param {string} str - Base64url encoded string
+     * @returns {string} Decoded string
+     */
+    function base64UrlDecode(str) {
+      str = str.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = str.length % 4;
+      if (pad) str += "=".repeat(4 - pad);
+      return atob(str);
+    }
+
+    // ============================================================================
+    // SIGMA EMBED FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Generates JWT token and loads Sigma embed in iframe
+     * Populates sidebar with embed URL and decoded JWT information
+     */
+    async function loadEmbed() {
+      const selectedUser = document.getElementById("roleSelect").value;
+      const workbookUrlId = window.selectedworkbookUrlId;
+      const embedType = "workbook";
+
+      const decodeBlock = document.getElementById("jwt-decode-content");
+
+      decodeBlock.innerHTML = "<p>Loading JWT...</p>";
+      document.getElementById("jwt-display").textContent = "Loading JWT...";
+      document.getElementById("debug-embed-url").textContent = "N/A";
+
+      if (!selectedUser || !workbookUrlId) {
+        if (DEBUG) console.warn("Embed not loaded — missing required fields.");
+        return;
+      }
+
+      const hideFolderNav =
+        currentMode === "build"
+          ? "false"
+          : env.hide_folder_navigation || "true";
+      const hideMenu =
+        currentMode === "build" ? "false" : env.hide_menu || "true";
+      const menuPosition =
+        currentMode === "build" ? "top" : env.menu_position || "none";
+
+      if (DEBUG) {
+        console.log("Embed config:", {
+          currentMode,
+          hideFolderNav,
+          hideMenu,
+          menuPosition,
+        });
+      }
+
+      try {
+        const res = await fetch(
+          `/api/jwt/${currentMode}?embedType=${embedType}&workbookUrlId=${encodeURIComponent(
+            workbookUrlId
+          )}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sub: selectedUser,
+              hide_folder_navigation: hideFolderNav,
+              hide_menu: hideMenu,
+              menu_position: menuPosition,
+              disable_auto_refresh: env.DISABLE_AUTO_REFRESH,
+              disable_mobile_view: env.DISABLE_MOBILE_VIEW,
+              hide_page_controls: env.HIDE_PAGE_CONTROLS,
+              hide_reload_button: env.HIDE_RELOAD_BUTTON,
+              hide_title: env.HIDE_TITLE,
+              hide_tooltip: env.HIDE_TOOLTIP,
+              hide_view_select: env.HIDE_VIEW_SELECT,
+              lng: env.LNG,
+              page_id: env.PAGE_ID,
+              responsive_height: env.RESPONSIVE_HEIGHT,
+              theme: env.THEME,
+              view_id: env.VIEW_ID,
+            }),
+          }
+        );
+
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (parseErr) {
+          throw new Error(`Invalid JSON response: ${text.slice(0, 100)}...`);
+        }
+
+        if (!res.ok) {
+          throw new Error(
+            json.error || res.statusText || "Failed to fetch embed"
+          );
+        }
+
+        const { jwt, embedUrl } = json;
+        if (DEBUG) console.log("Embed response:", { jwt, embedUrl });
+
+        const iframe = document.getElementById("sigma-embed");
+        iframe.removeAttribute("srcdoc"); // Clear loading state
+        iframe.src = embedUrl;
+        document.getElementById("debug-embed-url").textContent =
+          embedUrl || "N/A";
+        document.getElementById("jwt-display").textContent = jwt;
+
+        if (jwt && jwt.split(".").length === 3) {
+          try {
+            const [headerStr, payloadStr] = jwt.split(".").slice(0, 2);
+            const header = JSON.parse(base64UrlDecode(headerStr));
+            const payload = JSON.parse(base64UrlDecode(payloadStr));
+            decodeBlock.innerHTML = `
+            <h3>Decoded JWT Header:</h3>
+            <pre>${JSON.stringify(header, null, 2)}</pre>
+            <h3>Decoded JWT Payload:</h3>
+            <pre>${JSON.stringify(payload, null, 2)}</pre>`;
+          } catch (decodeErr) {
+            decodeBlock.innerHTML = `<p style="color:red;">JWT decoding failed.</p>`;
+          }
+        } else {
+          decodeBlock.innerHTML = `<p style="color:red;">Missing or invalid JWT format.</p>`;
+        }
+      } catch (err) {
+        if (DEBUG) console.error("loadEmbed() failed:", err.message);
+        decodeBlock.innerHTML = `<p style="color:red;">${err.message}</p>`;
+      }
+    }
+
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Populates the user role dropdown with View and Build users from environment config
+     * Sets up event handler to update currentMode when user selection changes
+     */
+    async function loadUserOptions() {
+      const select = document.getElementById("roleSelect");
+      try {
+        const res = await fetch("/env.json");
+        const env = await res.json();
+
+        const buildMode = (env.BUILD_ACCOUNT_TYPE || 'Build').toLowerCase() === 'admin' ? 'admin' : 'build';
+        const viewMode = (env.VIEW_ACCOUNT_TYPE || 'View').toLowerCase();
+        
+        select.innerHTML = `
+        <option value="" disabled selected style="color:gray;font-style:italic">Select a user</option>
+        <option value="${env.VIEW_EMAIL}" data-mode="${viewMode}">${env.VIEW_EMAIL}</option>
+        <option value="${env.BUILD_EMAIL}" data-mode="${buildMode}">${env.BUILD_EMAIL}</option>`;
+
+        select.addEventListener("change", async (e) => {
+          const selected = e.target.selectedOptions[0];
+          currentMode = selected.dataset.mode || "view";
+          if (DEBUG) console.log("Selected mode:", currentMode);
+          if (DEBUG) console.log("Selected option dataset:", selected.dataset);
+          
+          // Show carousel toggle button when user is selected
+          const toggleBtn = document.getElementById("carouselToggle");
+          toggleBtn.disabled = false;
+          document.getElementById("selectedWorkbookName").textContent = "Select a workbook";
+          document.getElementById("selectedWorkbookName").style.display = "none";
+          
+          // Clear any existing carousel state
+          currentSlide = 0;
+          
+          // Close carousel if open
+          const container = document.getElementById("workbookCarouselContainer");
+          const chevron = toggleBtn.querySelector(".chevron-icon");
+          container.style.display = "none";
+          chevron.style.transform = "rotate(0deg)";
+          carouselExpanded = false;
+          
+          // Reload workbooks for the new user
+          await loadWorkbooks();
+        });
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load user options:", err);
+      }
+    }
+
+    /**
+     * Fetches available workbooks from Sigma API and stores them for carousel
+     */
+    async function loadWorkbooks() {
+      try {
+        const selectedUser = document.getElementById("roleSelect").value;
+        if (!selectedUser) {
+          if (DEBUG) console.log("No user selected, skipping workbook load");
+          return;
+        }
+        
+        const url = `/api/workbook-copy-create/all-workbooks?userEmail=${encodeURIComponent(selectedUser)}`;
+        const res = await fetch(url);
+        const { workbooks } = await res.json();
+        
+        availableWorkbooks = workbooks.map(wb => {
+          const match = wb.url.match(/workbook\/([a-zA-Z0-9]+)/);
+          const workbookUrlId = match ? match[1] : null;
+          return {
+            id: workbookUrlId,
+            name: wb.name,
+            url: wb.url
+          };
+        }).filter(wb => wb.id); // Remove any without valid IDs
+        
+        if (DEBUG) console.log("Loaded workbooks:", availableWorkbooks);
+        
+        // Set up carousel toggle
+        setupCarouselToggle();
+        
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load workbooks:", err);
+        availableWorkbooks = [];
+      }
+    }
+
+    // ============================================================================
+    // CAROUSEL FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Sets up the carousel toggle button event listener
+     */
+    function setupCarouselToggle() {
+      const toggleBtn = document.getElementById("carouselToggle");
+      toggleBtn.addEventListener("click", toggleCarousel);
+    }
+    
+    /**
+     * Toggles the carousel visibility
+     */
+    function toggleCarousel() {
+      const container = document.getElementById("workbookCarouselContainer");
+      const toggleBtn = document.getElementById("carouselToggle");
+      const chevron = toggleBtn.querySelector(".chevron-icon");
+      
+      if (carouselExpanded) {
+        // Collapse carousel
+        container.style.display = "none";
+        chevron.style.transform = "rotate(0deg)";
+        carouselExpanded = false;
+      } else {
+        // Expand carousel
+        container.style.display = "block";
+        chevron.style.transform = "rotate(180deg)";
+        carouselExpanded = true;
+        
+        // Initialize carousel if not already done
+        if (availableWorkbooks.length > 0) {
+          initializeCarousel();
+        }
+      }
+    }
+    
+    /**
+     * Initializes the simple custom carousel with workbook thumbnails
+     */
+    let currentSlide = 0;
+    
+    function initializeCarousel() {
+      const track = document.getElementById("carouselTrack");
+      const prevBtn = document.getElementById("prevBtn");
+      const nextBtn = document.getElementById("nextBtn");
+      
+      // Ensure we have workbooks to display
+      if (!availableWorkbooks || availableWorkbooks.length === 0) {
+        if (DEBUG) console.log("No workbooks available for carousel");
+        return;
+      }
+      
+      // Clear existing items completely
+      track.innerHTML = "";
+      currentSlide = 0;
+      
+      if (DEBUG) console.log(`Initializing carousel with ${availableWorkbooks.length} workbooks`);
+      
+      // Create items for each workbook
+      availableWorkbooks.forEach((workbook, index) => {
+        const thumbnailUrl = `/assets/workbook-thumbnails/${encodeURIComponent(workbook.name)}.png`;
+        
+        const item = document.createElement("div");
+        item.className = "carousel-item";
+        item.innerHTML = `
+          <div class="workbook-card" data-workbook-id="${workbook.id}" data-workbook-name="${workbook.name}" onclick="selectWorkbook('${workbook.id}', '${workbook.name.replace(/'/g, "\\'")}')">
+            <div class="workbook-thumbnail">
+              <img src="${thumbnailUrl}" alt="${workbook.name}" />
+            </div>
+            <div class="workbook-title">${workbook.name}</div>
+          </div>
+        `;
+        track.appendChild(item);
+      });
+      
+      // Set up navigation
+      prevBtn.onclick = () => {
+        if (currentSlide > 0) {
+          currentSlide--;
+          updateCarousel();
+        }
+      };
+      
+      nextBtn.onclick = () => {
+        const maxSlide = Math.max(0, availableWorkbooks.length - 2);
+        if (currentSlide < maxSlide) {
+          currentSlide++;
+          updateCarousel();
+        }
+      };
+      
+      updateCarousel();
+    }
+    
+    function updateCarousel() {
+      const track = document.getElementById("carouselTrack");
+      const prevBtn = document.getElementById("prevBtn");
+      const nextBtn = document.getElementById("nextBtn");
+      
+      const offset = currentSlide * -300; // 280px width + 20px gap
+      track.style.transform = `translateX(${offset}px)`;
+      
+      prevBtn.disabled = currentSlide === 0;
+      nextBtn.disabled = currentSlide >= Math.max(0, availableWorkbooks.length - 2);
+    }
+    
+    /**
+     * Shows fallback text when thumbnail image fails to load
+     */
+    function showThumbnailFallback(img) {
+      const fallback = img.nextElementSibling;
+      img.style.display = "none";
+      fallback.style.display = "flex";
+    }
+    
+    /**
+     * Shows immediate loading feedback in iframe
+     */
+    function showLoadingState(workbookName) {
+      const iframe = document.getElementById("sigma-embed");
+      const loadingHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              display: flex; 
+              flex-direction: column;
+              justify-content: center; 
+              align-items: center; 
+              height: 100vh; 
+              margin: 0; 
+              background: #f8f9fa;
+              color: #495057;
+            }
+            .spinner {
+              width: 40px;
+              height: 40px;
+              border: 4px solid #e9ecef;
+              border-top: 4px solid #007bff;
+              border-radius: 50%;
+              animation: spin 1s linear infinite;
+              margin-bottom: 1rem;
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+            .loading-text {
+              font-size: 1.1rem;
+              font-weight: 500;
+            }
+            .workbook-name {
+              font-size: 0.9rem;
+              color: #6c757d;
+              margin-top: 0.5rem;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="spinner"></div>
+          <div class="loading-text">Loading workbook...</div>
+          <div class="workbook-name">${workbookName}</div>
+        </body>
+        </html>
+      `;
+      
+      iframe.srcdoc = loadingHTML;
+    }
+
+    /**
+     * Adds visual selection state to clicked thumbnail
+     */
+    function showSelectedThumbnail(workbookId) {
+      // Remove previous selection
+      document.querySelectorAll('.workbook-card').forEach(card => {
+        card.classList.remove('selected');
+      });
+      
+      // Add selection to clicked thumbnail
+      const selectedCard = document.querySelector(`[data-workbook-id="${workbookId}"]`);
+      if (selectedCard) {
+        selectedCard.classList.add('selected');
+      }
+    }
+
+    /**
+     * Handles workbook selection from carousel
+     */
+    function selectWorkbook(workbookId, workbookName) {
+      // 1. Immediate visual feedback
+      showSelectedThumbnail(workbookId);
+      showLoadingState(workbookName);
+      
+      window.selectedworkbookUrlId = workbookId;
+      
+      // Update selected workbook name display (show it now)
+      const nameDisplay = document.getElementById("selectedWorkbookName");
+      nameDisplay.textContent = workbookName;
+      nameDisplay.classList.add("has-selection");
+      nameDisplay.style.display = "inline";
+      
+      // Collapse carousel (force close)
+      const container = document.getElementById("workbookCarouselContainer");
+      const toggleBtn = document.getElementById("carouselToggle");
+      const chevron = toggleBtn.querySelector(".chevron-icon");
+      container.style.display = "none";
+      chevron.style.transform = "rotate(0deg)";
+      carouselExpanded = false;
+      
+      // Load the embed (this will replace the loading state)
+      loadEmbed();
+      
+      if (DEBUG) console.log("Selected workbook:", workbookName, workbookId);
+    }
+    
+    // ============================================================================
+    // APPLICATION INITIALIZATION
+    // ============================================================================
+    (async () => {
+      await loadEnv();
+      await loadUserOptions();
+      // loadWorkbooks() is now called only when a user is selected
+    })();
+  </script>
+</html>

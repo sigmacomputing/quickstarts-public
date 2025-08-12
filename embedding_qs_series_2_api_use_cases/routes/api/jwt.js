@@ -43,14 +43,12 @@ router.post("/:mode", async (req, res) => {
     const userMap = {
       view: process.env.VIEW_EMAIL,
       build: process.env.BUILD_EMAIL,
+      admin: process.env.BUILD_EMAIL, // Admin maps to build email but with admin permissions
     };
     const sub = userMap[selectedUser] || selectedUser;
 
-    // Determine permissions based on actual user email
-    let permissions = ["view"];
-    if (sub === process.env.BUILD_EMAIL) {
-      permissions = ["build"];
-    }
+    // Determine permissions based on mode and account type (let create-jwt.js handle this)
+    let permissions = null; // Let create-jwt.js determine permissions based on mode
 
     const metadata = await getWorkbookMetadata(workbookUrlId);
     if (!metadata) {
@@ -80,6 +78,7 @@ router.post("/:mode", async (req, res) => {
       console.log("embedType:", embedType);
       console.log("workbookUrlId:", workbookUrlId);
       console.log("selectedUser (sub):", sub);
+      console.log("MODE RECEIVED:", mode);
       console.log("bookmarkId:", bookmarkId);
       console.log("exploreKey:", exploreKey);
     }
@@ -99,7 +98,7 @@ router.post("/:mode", async (req, res) => {
       menu_position,
     });
 
-    // Now pass permissions explicitly
+    // Pass mode to generateJwt (permissions will be determined based on mode)
     const jwt = generateJwt({ embedUrl, mode, sub, permissions });
 
     if (process.env.DEBUG === "true") {

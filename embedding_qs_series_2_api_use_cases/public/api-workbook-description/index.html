@@ -291,7 +291,7 @@
 
       try {
         const res = await fetch(
-          `/api/jwt/api-workbook-description?workbookUrlId=${encodeURIComponent(
+          `/api/jwt/build?workbookUrlId=${encodeURIComponent(
             workbookUrlId
           )}&embedType=${embedType}`,
           {

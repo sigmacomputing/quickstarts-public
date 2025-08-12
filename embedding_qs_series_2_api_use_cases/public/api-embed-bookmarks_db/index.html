@@ -915,7 +915,7 @@
 
       try {
         const res = await fetch(
-          `/api/jwt/api-embed-bookmarks_db?workbookUrlId=${encodeURIComponent(
+          `/api/jwt/${currentMode}?workbookUrlId=${encodeURIComponent(
             workbookUrlId
           )}&embedType=${embedType}`,
           {
