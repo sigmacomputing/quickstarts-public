@@ -29,8 +29,17 @@ async function getWorkbooksByTeam(teamName = process.env.WORKSPACE_NAME) {
 
   const data = await response.json();
 
+  if (process.env.DEBUG === "true") {
+    console.log(`All workbooks returned by API:`, data?.entries?.map(w => ({ name: w.name, path: w.path })));
+    console.log(`Filtering for team: "${teamName}"`);
+  }
+
   // Filter workbooks by exact match to provided team/workspace path
   const filtered = data?.entries?.filter((w) => w.path === teamName);
+
+  if (process.env.DEBUG === "true") {
+    console.log(`Filtered workbooks:`, filtered?.map(w => ({ name: w.name, path: w.path })));
+  }
 
   // Return only relevant metadata for downstream use
   return filtered.map((w) => ({

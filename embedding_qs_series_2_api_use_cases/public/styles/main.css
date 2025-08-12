@@ -1299,3 +1299,259 @@ body.panel-open #clearAllBookmarks {
   height: auto !important;
 }
 
+/* ============================================================================
+   CAROUSEL COMPONENT STYLES
+   ============================================================================ */
+
+/* Carousel Toggle Button */
+.carousel-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chevron-only-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chevron-only-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chevron-only-btn:hover:not(:disabled) {
+  background: #e9ecef;
+  border-color: #007bff;
+}
+
+.selected-workbook-name {
+  font-size: 0.9rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.selected-workbook-name.has-selection {
+  color: #495057;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.chevron-icon {
+  transition: transform 0.3s ease;
+}
+
+/* Carousel Container */
+.carousel-container {
+  position: fixed;
+  top: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+  padding: 2rem;
+  margin-top: 0.5rem;
+  animation: slideDown 0.3s ease;
+}
+
+.control-group {
+  position: relative;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Swiper Carousel Styles */
+.workbook-swiper {
+  width: 100%;
+  height: 400px;
+  padding-top: 50px;
+  padding-bottom: 50px;
+  background-color: #f8f9fa; /* Light gray background - customize as needed */
+  border-radius: 12px;
+}
+
+.workbook-swiper .swiper-slide {
+  background-position: center;
+  background-size: cover;
+  width: 300px;
+  height: 250px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Workbook Card */
+.workbook-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  padding: 1rem;
+  border-radius: 8px;
+  transition: transform 0.2s ease;
+  height: 100%;
+}
+
+.workbook-card:hover {
+  transform: scale(1.05);
+}
+
+.workbook-card.selected {
+  transform: scale(1.1);
+  position: relative;
+}
+
+.workbook-card.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: #007bff;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(0,123,255,0.4);
+  z-index: 10;
+}
+
+.workbook-card.selected .workbook-thumbnail {
+  border: 3px solid #007bff;
+  box-shadow: 0 8px 25px rgba(0,123,255,0.3);
+}
+
+.workbook-thumbnail {
+  width: 240px;
+  height: 140px;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  background: #f5f5f5;
+  border: 2px solid #fff;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  margin-bottom: 0.8rem;
+  /* Force new stacking context and layout isolation */
+  transform: translateZ(0);
+  contain: layout style;
+}
+
+.workbook-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+
+.thumbnail-fallback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+  color: #6c757d;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.workbook-title {
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: center;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #333;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* Swiper Pagination */
+.workbook-swiper .swiper-pagination-bullet {
+  background: #007bff;
+  opacity: 0.3;
+}
+
+.workbook-swiper .swiper-pagination-bullet-active {
+  opacity: 1;
+}
+
+/* Simple Custom Carousel */
+.simple-carousel {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.carousel-nav {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.carousel-nav:hover {
+  background: #0056b3;
+}
+
+.carousel-nav:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.carousel-viewport {
+  overflow: hidden;
+  width: 600px;
+  height: 280px;
+}
+
+.carousel-track {
+  display: flex;
+  transition: transform 0.3s ease;
+  gap: 20px;
+}
+
+.carousel-item {
+  flex-shrink: 0;
+  width: 280px;
+}
+

@@ -39,12 +39,12 @@ app.get("/provision-users", async (req, res) => {
     const result = {
       build: {
         email: process.env.BUILD_EMAIL,
-        accountType: "Build",
+        accountType: process.env.BUILD_ACCOUNT_TYPE,
         memberId: await provisionEmbedUser(
           process.env.BUILD_EMAIL,
-          "Build",
+          process.env.BUILD_ACCOUNT_TYPE,
           "QuickStarts",
-          "Build"
+          process.env.BUILD_ACCOUNT_TYPE
         ),
       },
       view: {
@@ -82,6 +82,8 @@ app.get("/env.json", (req, res) => {
     BUILD_EMAIL: process.env.BUILD_EMAIL || "",
     VIEW_EMAIL: process.env.VIEW_EMAIL || "",
     ADMIN_EMAIL: process.env.ADMIN_EMAIL || "",
+    BUILD_ACCOUNT_TYPE: process.env.BUILD_ACCOUNT_TYPE || "Build",
+    VIEW_ACCOUNT_TYPE: process.env.VIEW_ACCOUNT_TYPE || "View",
     
     // Application Constants
     ORG_SLUG: process.env.ORG_SLUG,
