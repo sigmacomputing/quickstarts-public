@@ -1,3 +1,12 @@
 {
-  "defaults": []
+  "defaults": [
+    {
+      "userEmail": "view.embed.qs@example.com",
+      "memberID": "Upf4cYouz5fAvk1SDH80L4pGihtUg",
+      "workbookName": "Plugs Transactions",
+      "workbookUrlId": "6QEnNYADhD50tbSnlwMltH",
+      "createdAt": "2025-08-08T19:33:58.595Z",
+      "updatedAt": "2025-08-08T19:33:58.595Z"
+    }
+  ]
 }
