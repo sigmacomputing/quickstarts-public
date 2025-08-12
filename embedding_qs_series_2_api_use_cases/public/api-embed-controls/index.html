@@ -298,7 +298,7 @@
           const selected = e.target.selectedOptions[0];
           currentMode = selected.dataset.mode || "view";
           if (DEBUG) console.log("Selected user mode:", currentMode);
-          loadEmbed();
+          loadEmbed(currentMode);
         });
       } catch (err) {
         if (DEBUG) console.error("Failed to load user options:", err);
@@ -329,7 +329,7 @@
 
         select.addEventListener("change", () => {
           window.selectedworkbookUrlId = select.value;
-          loadEmbed();
+          loadEmbed(currentMode);
         });
       } catch (err) {
         if (DEBUG) console.error("Failed to load workbooks:", err);
@@ -362,7 +362,7 @@
           document.getElementById("element-id-group").style.display = "flex";
           loadTargetIdOptions("element");
         } else {
-          loadEmbed();
+          loadEmbed(currentMode);
         }
 
         document.getElementById("sigma-embed").style.display = "none";
@@ -397,7 +397,7 @@
         });
 
         if (embedType === "page") {
-          pageSelect.onchange = () => loadEmbed();
+          pageSelect.onchange = () => loadEmbed(currentMode);
         } else if (embedType === "element") {
           pageSelect.onchange = async () => {
             const selectedPageId = pageSelect.value;
@@ -422,7 +422,7 @@
                   elementSelect.appendChild(opt);
                 });
 
-              elementSelect.onchange = () => loadEmbed();
+              elementSelect.onchange = () => loadEmbed(currentMode);
             } catch (err) {
               if (DEBUG) console.error("Failed to fetch elements:", err);
             }

@@ -646,12 +646,13 @@ router.get("/workbook/:workbookId/folder", async (req, res) => {
 // GET /api/workbook-copy-create/all-workbooks - Get all workbooks accessible to the embed user
 router.get("/all-workbooks", async (req, res) => {
   try {
-    if (DEBUG) console.log("Fetching workbooks accessible to embed user via member-based filtering");
+    // Get user email from query parameter, default to build user for backwards compatibility
+    const embedUserEmail = req.query.userEmail || process.env.BUILD_EMAIL;
+    if (DEBUG) console.log(`Fetching workbooks accessible to embed user: ${embedUserEmail}`);
 
     const headers = await getSigmaHeaders();
     
     // Step 1: Get the memberId for the embed user
-    const embedUserEmail = process.env.BUILD_EMAIL;
     const memberId = await lookupMemberId(embedUserEmail);
     if (DEBUG) console.log(`Found memberId for ${embedUserEmail}: ${memberId}`);
 
@@ -669,17 +670,13 @@ router.get("/all-workbooks", async (req, res) => {
     const workbooksResponse = await axios.get(`${process.env.BASE_URL}/workbooks?limit=500`, { headers });
     const allWorkbooks = workbooksResponse.data.entries || [];
     
-    // Step 4: Filter workbooks to only include those accessible to the member BUT EXCLUDE My Documents
+    // Step 4: Filter workbooks to only include those accessible to the member
     const accessibleWorkbooks = allWorkbooks.filter(workbook => {
       const isAccessible = memberFileIds.includes(workbook.workbookId);
-      const path = workbook.path || "";
-      const isMyDocuments = path === "My Documents" || path.includes("My Documents");
-      
-      // Include if accessible but NOT in My Documents (those go in the other dropdown)
-      return isAccessible && !isMyDocuments;
+      return isAccessible;
     });
     
-    if (DEBUG) console.log(`Found ${accessibleWorkbooks.length} non-My-Documents workbooks accessible to embed user out of ${allWorkbooks.length} total workbooks`);
+    if (DEBUG) console.log(`Found ${accessibleWorkbooks.length} workbooks accessible to embed user out of ${allWorkbooks.length} total workbooks`);
 
     // Return in same format as regular workbooks endpoint
     const formattedWorkbooks = accessibleWorkbooks.map((w) => ({

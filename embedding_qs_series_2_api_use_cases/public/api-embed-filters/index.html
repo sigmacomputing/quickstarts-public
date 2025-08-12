@@ -922,7 +922,7 @@
 
       try {
         const res = await fetch(
-          `/api/jwt/${embedType}?embedType=${embedType}&workbookUrlId=${encodeURIComponent(
+          `/api/jwt/${currentMode}?embedType=${embedType}&workbookUrlId=${encodeURIComponent(
             workbookUrlId
           )}`,
           {

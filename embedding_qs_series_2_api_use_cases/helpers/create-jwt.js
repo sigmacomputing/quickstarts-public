@@ -17,7 +17,9 @@ function generateJwt({ embedUrl, mode, sub, permissions }) {
   }
 
   const finalPermissions =
-    permissions || (mode === "build" ? ["build", "view"] : ["view"]);
+    permissions || 
+    (mode === "admin" ? ["build", "view", "admin"] : 
+     mode === "build" ? ["build"] : ["view"]);
 
   const payload = {
     iss: process.env.CLIENT_ID,
