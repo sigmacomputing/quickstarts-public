@@ -279,7 +279,13 @@ export default function Home() {
                 {activeCategory && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {activeCategory.recipes.map((recipe) => (
-                      <RecipeCard key={recipe.id} recipe={recipe} hasValidToken={hasValidToken} />
+                      <RecipeCard 
+                        key={recipe.id} 
+                        recipe={recipe} 
+                        hasValidToken={hasValidToken}
+                        authToken={authToken}
+                        baseURL={authBaseURL}
+                      />
                     ))}
                   </div>
                 )}

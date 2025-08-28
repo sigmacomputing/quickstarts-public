@@ -135,7 +135,7 @@ envLines.forEach(line => {
 // File-based token caching
 function getTokenCacheFile(clientId: string) {
   const configHash = clientId ? clientId.substring(0, 8) : "default";
-  return path.join(os.tmpdir(), `sigma-portal-token-${configHash}.json`);
+  return path.join(os.tmpdir(), "sigma-portal-token-" + configHash + ".json");
 }
 
 function getCachedToken(): { token: string; clientId: string } | null {

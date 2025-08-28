@@ -38,7 +38,7 @@ export function SmartParameterForm({
 
   // Fetch resource data for dropdown parameters
   useEffect(() => {
-    console.log('SmartParameterForm useEffect triggered - authToken changed:', authToken?.substring(0,20) + '...');
+    console.log('SmartParameterForm useEffect triggered - authToken:', authToken?.substring(0,20) + '...', 'baseURL:', baseURL);
     
     if (!authToken) {
       setResourceData({});
@@ -119,7 +119,7 @@ export function SmartParameterForm({
             console.warn(`Error response:`, errorText);
           }
         } catch (error) {
-          if (error.name === 'AbortError') {
+          if (error instanceof Error && error.name === 'AbortError') {
             console.log(`Fetch ${resourceType} aborted`);
           } else {
             console.warn(`Error fetching ${resourceType}:`, error);
@@ -140,7 +140,7 @@ export function SmartParameterForm({
       isCancelled = true;
       abortController.abort();
     };
-  }, [parameters, authToken, values]);
+  }, [parameters, authToken, baseURL, values]);
 
   const handleChange = (paramName: string, value: string) => {
     const newValues = { ...values, [paramName]: value };

@@ -16,6 +16,8 @@ interface CodeViewerProps {
   defaultTab?: 'params' | 'run' | 'code' | 'readme';
   hasValidToken?: boolean;
   readmePath?: string;
+  authToken?: string | null;
+  baseURL?: string;
 }
 
 interface ExecutionResult {
@@ -45,7 +47,7 @@ const openDownloadsFolder = async () => {
   }
 };
 
-export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables = [], useEnvFile = false, onTokenObtained, onTokenCleared, defaultTab = 'params', hasValidToken = false, readmePath }: CodeViewerProps) {
+export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables = [], useEnvFile = false, onTokenObtained, onTokenCleared, defaultTab = 'params', hasValidToken = false, readmePath, authToken: propAuthToken, baseURL: propBaseURL }: CodeViewerProps) {
   const [code, setCode] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +60,10 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [authBaseURL, setAuthBaseURL] = useState<string>('https://aws-api.sigmacomputing.com/v2'); // Store baseURL from auth config
   const [clearingToken, setClearingToken] = useState(false);
+  
+  // Use props when provided, otherwise fall back to local state (for auth modal scenarios)
+  const effectiveAuthToken = propAuthToken || authToken;
+  const effectiveBaseURL = propBaseURL || authBaseURL;
   const [storeKeysLocally, setStoreKeysLocally] = useState(false);
   const [hasStoredKeys, setHasStoredKeys] = useState(false);
   const [currentFormIsStored, setCurrentFormIsStored] = useState(false);
@@ -219,21 +225,24 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
 
   const checkAuthToken = async () => {
     try {
-      console.log('checkAuthToken: Fetching current token from /api/token');
+      console.log('CodeViewer checkAuthToken: Fetching current token from /api/token');
       const response = await fetch('/api/token');
       if (response.ok) {
         const data = await response.json();
-        console.log('checkAuthToken: Response from /api/token:', { hasValidToken: data.hasValidToken, clientId: data.clientId?.substring(0,8), baseURL: data.baseURL });
+        console.log('CodeViewer checkAuthToken: Response from /api/token:', { hasValidToken: data.hasValidToken, clientId: data.clientId?.substring(0,8), baseURL: data.baseURL });
         if (data.hasValidToken && data.token) {
-          console.log('checkAuthToken: Updating authToken and baseURL state');
+          console.log('CodeViewer checkAuthToken: Updating authToken and baseURL state:', data.baseURL);
           setAuthToken(data.token);
           if (data.baseURL) {
+            console.log('CodeViewer checkAuthToken: Setting authBaseURL to:', data.baseURL);
             setAuthBaseURL(data.baseURL); // Store baseURL to prevent race conditions
           }
+        } else {
+          setAuthToken(null);
         }
       }
     } catch (error) {
-      console.log('No cached token available');
+      console.log('CodeViewer checkAuthToken: No cached token available');
     }
   };
 
@@ -586,8 +595,8 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
       const coreAuthVars = {
         'CLIENT_ID': useEnvFile ? (currentEnvValues['CLIENT_ID'] || envFileValues['CLIENT_ID'] || '') : (currentEnvValues['CLIENT_ID'] || ''),
         'SECRET': useEnvFile ? (currentEnvValues['SECRET'] || envFileValues['SECRET'] || '') : (currentEnvValues['SECRET'] || ''),
-        'authURL': useEnvFile ? (envFileValues['authURL'] || 'https://aws-api.sigmacomputing.com/v2/auth/token') : 'https://aws-api.sigmacomputing.com/v2/auth/token',
-        'baseURL': useEnvFile ? (envFileValues['baseURL'] || 'https://aws-api.sigmacomputing.com/v2') : 'https://aws-api.sigmacomputing.com/v2'
+        'authURL': useEnvFile ? (envFileValues['authURL'] || 'https://aws-api.sigmacomputing.com/v2/auth/token') : (currentEnvValues['authURL'] || 'https://aws-api.sigmacomputing.com/v2/auth/token'),
+        'baseURL': useEnvFile ? (envFileValues['baseURL'] || 'https://aws-api.sigmacomputing.com/v2') : (currentEnvValues['baseURL'] || 'https://aws-api.sigmacomputing.com/v2')
       };
       
       // Validate that required auth credentials are provided (for auth script only)
@@ -692,8 +701,11 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
           }
         }
         
-        // Refresh the auth token for smart parameter dropdowns
-        setTimeout(() => checkAuthToken(), 1000);
+        // Refresh the auth token for smart parameter dropdowns and notify parent
+        setTimeout(async () => {
+          await checkAuthToken();
+          if (onTokenObtained) onTokenObtained(); // Notify parent to update its auth state
+        }, 1000);
       }
       
       if (!response.ok) {
@@ -1333,7 +1345,7 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                   </div>
 
                   {/* Authentication Status */}
-                  {(authToken || hasValidToken) && (
+                  {(effectiveAuthToken || hasValidToken) && (
                     <div className="pt-3 border-t border-gray-200">
                       <div className="flex items-center">
                         <span className="text-green-600 text-lg mr-2">✅</span>
@@ -1355,10 +1367,10 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                   parameters={smartParameters}
                   values={envValues}
                   onChange={setEnvValues}
-                  authToken={authToken}
-                  baseURL={authBaseURL} // Pass baseURL to prevent race conditions
+                  authToken={effectiveAuthToken}
+                  baseURL={effectiveBaseURL} // Pass baseURL to prevent race conditions
                   onRunScript={() => {
-                    console.log('SmartParameterForm authToken:', authToken, 'baseURL:', authBaseURL);
+                    console.log('SmartParameterForm authToken:', effectiveAuthToken?.substring(0,20) + '...', 'baseURL:', effectiveBaseURL);
                     // Switch to Response tab immediately so user can see progress
                     setActiveTab('run');
                     if (!executing) {

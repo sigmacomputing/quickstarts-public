@@ -11,8 +11,8 @@ function getCurrentTokenInfo() {
     const files = fs.readdirSync(tempDir);
     const tokenFiles = files.filter(file => file.startsWith('sigma-portal-token-') && file.endsWith('.json'));
     
-    let mostRecentToken = null;
-    let mostRecentTime = 0;
+    let namedConfigTokens = [];
+    let defaultToken = null;
     
     for (const file of tokenFiles) {
       try {
@@ -24,14 +24,21 @@ function getCurrentTokenInfo() {
         if (tokenData.expiresAt && now < tokenData.expiresAt) {
           const lastAccessTime = tokenData.lastAccessed || tokenData.createdAt;
           
-          if (lastAccessTime > mostRecentTime) {
-            mostRecentTime = lastAccessTime;
-            mostRecentToken = {
-              hasValidToken: true,
-              token: tokenData.token,
-              clientId: tokenData.clientId?.substring(0,8), // Use short form for consistency
-              filePath: filePath
-            };
+          const tokenInfo = {
+            hasValidToken: true,
+            token: tokenData.token,
+            clientId: tokenData.clientId, // Use full clientId for environment variables
+            baseURL: tokenData.baseURL,
+            authURL: tokenData.authURL,
+            filePath: filePath,
+            lastAccessTime: lastAccessTime
+          };
+          
+          // Use same classification logic as /api/token
+          if (tokenData.clientId && tokenData.clientId.length > 8) {
+            namedConfigTokens.push(tokenInfo);
+          } else {
+            defaultToken = tokenInfo;
           }
         } else {
           // Token expired, remove file
@@ -42,7 +49,15 @@ function getCurrentTokenInfo() {
       }
     }
     
-    return mostRecentToken;
+    // Prioritize named config tokens over default token (same as /api/token)
+    if (namedConfigTokens.length > 0) {
+      namedConfigTokens.sort((a, b) => b.lastAccessTime - a.lastAccessTime);
+      return namedConfigTokens[0];
+    } else if (defaultToken) {
+      return defaultToken;
+    }
+    
+    return null;
   } catch (error) {
     return null;
   }
@@ -117,11 +132,33 @@ export async function POST(request: Request) {
     // Add the path to the env file in the content
     envContent += `ENV_FILE_PATH=${tempEnvPath}\n`;
     
-    fs.writeFileSync(tempEnvPath, envContent);
-
     // Use the same token selection logic as /api/token to get the current config  
     const currentTokenInfo = getCurrentTokenInfo();
     console.log('Current token info:', currentTokenInfo);
+    
+    // Auto-populate authentication variables from current token if not explicitly provided or empty
+    if (currentTokenInfo && (!envVariables || !envVariables.CLIENT_ID || envVariables.CLIENT_ID.trim() === '')) {
+      // Replace empty CLIENT_ID with the populated one
+      envContent = envContent.replace(/^CLIENT_ID=\s*$/m, `CLIENT_ID=${currentTokenInfo.clientId}`);
+      console.log('Auto-populated CLIENT_ID from token:', currentTokenInfo.clientId?.substring(0,8) + '...');
+    }
+    if (currentTokenInfo && (!envVariables || !envVariables.baseURL || envVariables.baseURL.trim() === '')) {
+      // Replace empty baseURL with the populated one  
+      envContent = envContent.replace(/^baseURL=\s*$/m, `baseURL=${currentTokenInfo.baseURL}`);
+      console.log('Auto-populated baseURL from token:', currentTokenInfo.baseURL);
+    }
+    if (currentTokenInfo && (!envVariables || !envVariables.authURL || envVariables.authURL.trim() === '')) {
+      // Replace empty authURL with the populated one
+      envContent = envContent.replace(/^authURL=\s*$/m, `authURL=${currentTokenInfo.authURL}`);
+      console.log('Auto-populated authURL from token:', currentTokenInfo.authURL);
+    }
+
+    fs.writeFileSync(tempEnvPath, envContent);
+    
+    // Debug: Log the final environment file content
+    console.log('=== ENVIRONMENT FILE CONTENT ===');
+    console.log(envContent);
+    console.log('=== END ENVIRONMENT FILE ===');
     
     // Execute the script with timeout  
     const output = await executeScript(resolvedPath, tempEnvPath, currentTokenInfo?.clientId);
@@ -152,7 +189,7 @@ export async function POST(request: Request) {
   }
 }
 
-function executeScript(scriptPath: string, envFilePath: string, clientId: string = null): Promise<{
+function executeScript(scriptPath: string, envFilePath: string, clientId: string | null = null): Promise<{
   stdout: string;
   stderr: string;
   success: boolean;

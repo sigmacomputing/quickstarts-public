@@ -4,7 +4,7 @@ import path from 'path';
 import os from 'os';
 
 // Configuration-specific token caching
-function getTokenCacheFile(clientId) {
+function getTokenCacheFile(clientId: string | null) {
   // Create a safe filename using first 8 chars of clientId
   const configHash = clientId ? clientId.substring(0, 8) : 'default';
   return path.join(os.tmpdir(), `sigma-portal-token-${configHash}.json`);

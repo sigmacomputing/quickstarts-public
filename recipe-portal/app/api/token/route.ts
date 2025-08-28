@@ -51,10 +51,10 @@ export async function GET() {
           // Separate named configs from default token
           if (tokenData.clientId && tokenData.clientId.length > 8) {
             namedConfigTokens.push(tokenInfo);
-            console.log(`  -> This is a named config token`);
+            console.log(`  -> This is a named config token (full clientId: ${tokenData.clientId.length} chars)`);
           } else {
             defaultToken = tokenInfo;
-            console.log(`  -> This is the default token`);
+            console.log(`  -> This is the default token (clientId: ${tokenData.clientId || 'none'})`);
           }
         } else {
           // Token expired, remove file
