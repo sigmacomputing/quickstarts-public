@@ -56,6 +56,7 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
   const [smartParameters, setSmartParameters] = useState<SmartParameter[]>([]);
   const [authToken, setAuthToken] = useState<string | null>(null);
+  const [authBaseURL, setAuthBaseURL] = useState<string>('https://aws-api.sigmacomputing.com/v2'); // Store baseURL from auth config
   const [clearingToken, setClearingToken] = useState(false);
   const [storeKeysLocally, setStoreKeysLocally] = useState(false);
   const [hasStoredKeys, setHasStoredKeys] = useState(false);
@@ -222,10 +223,13 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
       const response = await fetch('/api/token');
       if (response.ok) {
         const data = await response.json();
-        console.log('checkAuthToken: Response from /api/token:', { hasValidToken: data.hasValidToken, clientId: data.clientId?.substring(0,8) });
+        console.log('checkAuthToken: Response from /api/token:', { hasValidToken: data.hasValidToken, clientId: data.clientId?.substring(0,8), baseURL: data.baseURL });
         if (data.hasValidToken && data.token) {
-          console.log('checkAuthToken: Updating authToken state');
+          console.log('checkAuthToken: Updating authToken and baseURL state');
           setAuthToken(data.token);
+          if (data.baseURL) {
+            setAuthBaseURL(data.baseURL); // Store baseURL to prevent race conditions
+          }
         }
       }
     } catch (error) {
@@ -1352,8 +1356,9 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                   values={envValues}
                   onChange={setEnvValues}
                   authToken={authToken}
+                  baseURL={authBaseURL} // Pass baseURL to prevent race conditions
                   onRunScript={() => {
-                    console.log('SmartParameterForm authToken:', authToken);
+                    console.log('SmartParameterForm authToken:', authToken, 'baseURL:', authBaseURL);
                     // Switch to Response tab immediately so user can see progress
                     setActiveTab('run');
                     if (!executing) {

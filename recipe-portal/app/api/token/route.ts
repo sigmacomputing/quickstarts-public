@@ -42,6 +42,8 @@ export async function GET() {
             expiresAt: tokenData.expiresAt,
             timeRemaining: Math.round((tokenData.expiresAt - now) / 1000 / 60), // minutes
             clientId: tokenData.clientId,
+            baseURL: tokenData.baseURL, // Include baseURL to prevent race conditions
+            authURL: tokenData.authURL, // Include authURL for completeness
             filePath: filePath,
             lastAccessTime: lastAccessTime
           };

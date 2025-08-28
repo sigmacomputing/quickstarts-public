@@ -136,7 +136,7 @@ function getCachedToken(clientId) {
 /**
  * Cache a new token
  */
-function cacheToken(token, clientId, expiresIn = 3600) {
+function cacheToken(token, clientId, expiresIn = 3600, baseURL = null, authURL = null) {
   try {
     const tempDir = os.tmpdir();
     const configHash = clientId ? clientId.substring(0, 8) : 'default';
@@ -145,6 +145,8 @@ function cacheToken(token, clientId, expiresIn = 3600) {
     const tokenData = {
       token: token,
       clientId: clientId,
+      baseURL: baseURL, // Store baseURL with token for race condition prevention
+      authURL: authURL, // Store authURL with token for completeness
       createdAt: Date.now(),
       lastAccessed: Date.now(),
       expiresAt: Date.now() + (expiresIn * 1000) // Convert to milliseconds
@@ -197,8 +199,8 @@ async function getBearerToken(configName) {
     
     console.log('Bearer token obtained successfully:', response.data.access_token);
     
-    // Cache the new token
-    cacheToken(token, credentials.clientId, expiresIn);
+    // Cache the new token with baseURL and authURL to prevent race conditions
+    cacheToken(token, credentials.clientId, expiresIn, credentials.baseURL, credentials.authURL);
     
     return token;
   } catch (error) {

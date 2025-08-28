@@ -2,11 +2,10 @@ import { NextResponse } from 'next/server';
 import axios from 'axios';
 
 // Base resource fetching function
-async function fetchWithAuth(endpoint: string, token: string) {
+async function fetchWithAuth(endpoint: string, token: string, baseURL: string) {
   try {
-    const baseURL = process.env.SIGMA_BASE_URL || 'https://aws-api.sigmacomputing.com/v2';
     const url = `${baseURL}${endpoint}`;
-    console.log(`Fetching: ${url}`);
+    console.log(`Fetching: ${url} (baseURL from auth config: ${baseURL})`);
     const response = await axios.get(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -26,6 +25,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
     const token = searchParams.get('token');
+    const baseURL = searchParams.get('baseURL') || 'https://aws-api.sigmacomputing.com/v2'; // Default fallback
+
+    console.log(`Resources API: type=${type}, baseURL=${baseURL}, token=${token?.substring(0,20)}...`);
 
     if (!token) {
       return NextResponse.json(
@@ -46,7 +48,7 @@ export async function GET(request: Request) {
 
     switch (type) {
       case 'teams':
-        data = await fetchWithAuth('/teams', token);
+        data = await fetchWithAuth('/teams', token, baseURL);
         transformedData = (data.entries || data).map((team: any) => ({
           id: team.teamId,
           name: team.name,
@@ -56,7 +58,7 @@ export async function GET(request: Request) {
         break;
 
       case 'members':
-        data = await fetchWithAuth('/members', token);
+        data = await fetchWithAuth('/members', token, baseURL);
         // Filter out potentially inactive members and map to display format
         const activeMembers = (data.entries || data).filter((member: any) => {
           // Add filters for inactive members based on patterns you identify
@@ -75,7 +77,7 @@ export async function GET(request: Request) {
         break;
 
       case 'workbooks':
-        data = await fetchWithAuth('/workbooks', token);
+        data = await fetchWithAuth('/workbooks', token, baseURL);
         transformedData = (data.entries || data).map((workbook: any) => ({
           id: workbook.workbookId,
           name: workbook.name,
@@ -87,7 +89,7 @@ export async function GET(request: Request) {
         break;
 
       case 'connections':
-        data = await fetchWithAuth('/connections', token);
+        data = await fetchWithAuth('/connections', token, baseURL);
         transformedData = (data.entries || data).map((connection: any) => ({
           id: connection.connectionId,
           name: connection.name,
@@ -97,7 +99,7 @@ export async function GET(request: Request) {
         break;
 
       case 'workspaces':
-        data = await fetchWithAuth('/workspaces', token);
+        data = await fetchWithAuth('/workspaces', token, baseURL);
         transformedData = (data.entries || data).map((workspace: any) => ({
           id: workspace.workspaceId,
           name: workspace.name,
@@ -107,7 +109,7 @@ export async function GET(request: Request) {
 
       case 'bookmarks':
         // Using favorites endpoint since bookmarks API maps to favorites
-        data = await fetchWithAuth('/favorites', token);
+        data = await fetchWithAuth('/favorites', token, baseURL);
         transformedData = (data.entries || data).map((favorite: any) => ({
           id: favorite.favoriteId || favorite.inodeId,
           name: favorite.name || favorite.title,
@@ -118,7 +120,7 @@ export async function GET(request: Request) {
         break;
 
       case 'templates':
-        data = await fetchWithAuth('/templates', token);
+        data = await fetchWithAuth('/templates', token, baseURL);
         transformedData = (data.entries || data).map((template: any) => ({
           id: template.templateId,
           name: template.name,
@@ -128,7 +130,7 @@ export async function GET(request: Request) {
         break;
 
       case 'datasets':
-        data = await fetchWithAuth('/datasets', token);
+        data = await fetchWithAuth('/datasets', token, baseURL);
         transformedData = (data.entries || data).map((dataset: any) => ({
           id: dataset.datasetId,
           name: dataset.name,
@@ -138,7 +140,7 @@ export async function GET(request: Request) {
         break;
 
       case 'dataModels':
-        data = await fetchWithAuth('/dataModels', token);
+        data = await fetchWithAuth('/dataModels', token, baseURL);
         transformedData = (data.entries || data).map((dataModel: any) => ({
           id: dataModel.dataModelId,
           name: dataModel.name,
@@ -148,7 +150,7 @@ export async function GET(request: Request) {
         break;
 
       case 'accountTypes':
-        data = await fetchWithAuth('/accountTypes', token);
+        data = await fetchWithAuth('/accountTypes', token, baseURL);
         console.log('AccountTypes raw data:', JSON.stringify(data, null, 2));
         transformedData = (data.entries || data).map((accountType: any) => ({
           id: accountType.accountTypeName,
@@ -171,7 +173,7 @@ export async function GET(request: Request) {
         try {
           // First, get all pages from the workbook
           console.log(`Fetching pages for workbook: ${workbookId}`);
-          const pagesData = await fetchWithAuth(`/workbooks/${workbookId}/pages`, token);
+          const pagesData = await fetchWithAuth(`/workbooks/${workbookId}/pages`, token, baseURL);
           console.log('Pages data:', JSON.stringify(pagesData, null, 2));
           
           const pages = pagesData.entries || pagesData || [];
@@ -183,7 +185,7 @@ export async function GET(request: Request) {
             if (pageId) {
               try {
                 console.log(`Fetching elements for page: ${pageId}`);
-                const elementsData = await fetchWithAuth(`/workbooks/${workbookId}/pages/${pageId}/elements`, token);
+                const elementsData = await fetchWithAuth(`/workbooks/${workbookId}/pages/${pageId}/elements`, token, baseURL);
                 console.log(`Elements data for page ${pageId}:`, JSON.stringify(elementsData, null, 2));
                 
                 const pageElements = elementsData.entries || elementsData || [];
@@ -233,7 +235,7 @@ export async function GET(request: Request) {
         
         try {
           console.log(`Fetching materialization schedules for workbook: ${workbookIdForMat}`);
-          const schedulesData = await fetchWithAuth(`/workbooks/${workbookIdForMat}/materialization-schedules`, token);
+          const schedulesData = await fetchWithAuth(`/workbooks/${workbookIdForMat}/materialization-schedules`, token, baseURL);
           console.log('Materialization schedules data:', JSON.stringify(schedulesData, null, 2));
           
           const schedules = schedulesData.entries || schedulesData || [];

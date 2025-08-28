@@ -55,7 +55,7 @@ function getCachedToken(): { token: string; clientId: string } | null {
 
 export async function POST(request: Request) {
   try {
-    const { endpoint, method, parameters = {}, requestBody } = await request.json();
+    const { endpoint, method, parameters = {}, requestBody, baseURL: providedBaseURL } = await request.json();
     
     if (!endpoint) {
       return NextResponse.json(
@@ -76,9 +76,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Build the full URL
-    const baseURL = process.env.SIGMA_BASE_URL || 'https://aws-api.sigmacomputing.com/v2';
+    // Build the full URL - use provided baseURL to prevent race conditions, fallback to environment/default
+    const baseURL = providedBaseURL || process.env.SIGMA_BASE_URL || 'https://aws-api.sigmacomputing.com/v2';
     let url = `${baseURL}${endpoint}`;
+    
+    console.log(`API Call: ${method} ${url} (baseURL from auth config: ${baseURL})`);
 
     // Add query parameters
     if (parameters.query && Object.keys(parameters.query).length > 0) {

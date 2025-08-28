@@ -21,6 +21,7 @@ interface QuickApiModalProps {
   endpoint: QuickApiEndpoint;
   hasValidToken: boolean;
   authToken?: string | null;
+  baseURL?: string; // Add baseURL prop to prevent race conditions
 }
 
 interface ExecutionResult {
@@ -33,7 +34,7 @@ interface ExecutionResult {
   requestMethod?: string;
 }
 
-export function QuickApiModal({ isOpen, onClose, endpoint, hasValidToken, authToken }: QuickApiModalProps) {
+export function QuickApiModal({ isOpen, onClose, endpoint, hasValidToken, authToken, baseURL = 'https://aws-api.sigmacomputing.com/v2' }: QuickApiModalProps) {
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [executing, setExecuting] = useState(false);
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
@@ -60,6 +61,7 @@ export function QuickApiModal({ isOpen, onClose, endpoint, hasValidToken, authTo
         body: JSON.stringify({
           endpoint: url,
           method: endpoint.method,
+          baseURL: baseURL, // Pass baseURL to prevent race conditions
           parameters: {
             path: {},
             query: {},
@@ -140,6 +142,7 @@ export function QuickApiModal({ isOpen, onClose, endpoint, hasValidToken, authTo
                 values={paramValues}
                 onChange={setParamValues}
                 authToken={authToken}
+                baseURL={baseURL} // Pass baseURL to prevent race conditions
                 context="api"
               />
             </div>

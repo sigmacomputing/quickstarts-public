@@ -8,6 +8,7 @@ interface SmartParameterFormProps {
   values: Record<string, string>;
   onChange: (values: Record<string, string>) => void;
   authToken?: string | null;
+  baseURL?: string; // Add baseURL prop to prevent race conditions
   onRunScript?: () => void;
   executing?: boolean;
   context?: 'recipe' | 'api';
@@ -26,6 +27,7 @@ export function SmartParameterForm({
   values, 
   onChange, 
   authToken,
+  baseURL = 'https://aws-api.sigmacomputing.com/v2', // Default fallback baseURL
   onRunScript,
   executing = false,
   context = 'recipe',
@@ -80,7 +82,7 @@ export function SmartParameterForm({
         setLoadingResources(prev => ({ ...prev, [resourceType]: true }));
         
         try {
-          let url = `/api/resources?type=${resourceType}&token=${encodeURIComponent(authToken)}`;
+          let url = `/api/resources?type=${resourceType}&token=${encodeURIComponent(authToken)}&baseURL=${encodeURIComponent(baseURL)}`;
           if (param?.dependsOn && dependentValue) {
             // Map parameter names to expected API parameter names
             const paramMapping: Record<string, string> = {

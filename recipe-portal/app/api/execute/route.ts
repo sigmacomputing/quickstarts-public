@@ -262,12 +262,14 @@ function getCachedToken(preferredClientId = null) {
   return null;
 }
 
-function cacheToken(token, clientId = null) {
+function cacheToken(token, clientId = null, baseURL = null, authURL = null) {
   try {
     const TOKEN_CACHE_FILE = getTokenCacheFile(clientId);
     const tokenData = {
       token: token,
       clientId: clientId,
+      baseURL: baseURL, // Store baseURL with token for race condition prevention
+      authURL: authURL, // Store authURL with token for completeness
       expiresAt: Date.now() + (60 * 60 * 1000), // 1 hour from now
       createdAt: Date.now()
     };
@@ -301,7 +303,7 @@ async function getBearerToken(clientId = null) {
   console.error = originalConsoleError;
   
   if (newToken) {
-    cacheToken(newToken);
+    cacheToken(newToken, null, process.env.baseURL || 'https://aws-api.sigmacomputing.com/v2', process.env.authURL || 'https://aws-api.sigmacomputing.com/v2/auth/token');
   }
   
   return newToken;
@@ -319,8 +321,8 @@ try {
       console.log('Token will expire in 1 hour');
       console.log('HTTP Status: 200 OK - Authentication successful');
       
-      // Cache the token for future use
-      cacheToken(token, '${clientId || ""}');
+      // Cache the token for future use with baseURL and authURL from env
+      cacheToken(token, '${clientId || ""}', process.env.baseURL || 'https://aws-api.sigmacomputing.com/v2', process.env.authURL || 'https://aws-api.sigmacomputing.com/v2/auth/token');
     } else {
       console.log('❌ Failed to obtain bearer token');
       process.exit(1);
