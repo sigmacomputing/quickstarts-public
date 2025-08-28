@@ -7,6 +7,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const filePath = searchParams.get('path');
     
+    console.log('=== CODE API DEBUG ===');
+    console.log('Received filePath:', filePath);
+    console.log('Process CWD:', process.cwd());
+    
     if (!filePath) {
       return NextResponse.json(
         { error: 'File path is required' },
@@ -14,9 +18,15 @@ export async function GET(request: Request) {
       );
     }
 
+    // Force the file path to be relative to our current working directory  
+    const relativePath = filePath.replace(/^.*recipes\//, 'recipes/');
+    const correctedPath = path.join(process.cwd(), relativePath);
+    
+    console.log('Corrected path:', correctedPath);
+
     // Security check: ensure the file is within the recipes directory
     const recipesPath = path.join(process.cwd(), 'recipes');
-    const resolvedPath = path.resolve(filePath);
+    const resolvedPath = path.resolve(correctedPath);
     const resolvedRecipesPath = path.resolve(recipesPath);
     
     if (!resolvedPath.startsWith(resolvedRecipesPath)) {

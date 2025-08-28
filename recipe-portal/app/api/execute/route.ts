@@ -4,9 +4,59 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
+// Get current token info using same logic as /api/token
+function getCurrentTokenInfo() {
+  try {
+    const tempDir = os.tmpdir();
+    const files = fs.readdirSync(tempDir);
+    const tokenFiles = files.filter(file => file.startsWith('sigma-portal-token-') && file.endsWith('.json'));
+    
+    let mostRecentToken = null;
+    let mostRecentTime = 0;
+    
+    for (const file of tokenFiles) {
+      try {
+        const filePath = path.join(tempDir, file);
+        const tokenData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        const now = Date.now();
+        
+        // Check if token is still valid (not expired)
+        if (tokenData.expiresAt && now < tokenData.expiresAt) {
+          const lastAccessTime = tokenData.lastAccessed || tokenData.createdAt;
+          
+          if (lastAccessTime > mostRecentTime) {
+            mostRecentTime = lastAccessTime;
+            mostRecentToken = {
+              hasValidToken: true,
+              token: tokenData.token,
+              clientId: tokenData.clientId?.substring(0,8), // Use short form for consistency
+              filePath: filePath
+            };
+          }
+        } else {
+          // Token expired, remove file
+          fs.unlinkSync(filePath);
+        }
+      } catch (err) {
+        // Skip invalid token files
+      }
+    }
+    
+    return mostRecentToken;
+  } catch (error) {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { filePath, envVariables } = await request.json();
+    
+    console.log('=== EXECUTE API DEBUG ===');
+    console.log('Received filePath:', filePath);
+    console.log('Process CWD:', process.cwd());
+    console.log('Environment variables CLIENT_ID:', envVariables?.CLIENT_ID);
+    console.log('Environment variables keys:', Object.keys(envVariables || {}));
     
     if (!filePath) {
       return NextResponse.json(
@@ -17,8 +67,17 @@ export async function POST(request: Request) {
 
     // Security check: ensure the file is within the recipes directory
     const recipesPath = path.join(process.cwd(), 'recipes');
-    const resolvedPath = path.resolve(filePath);
+    
+    // Force the file path to be relative to our current working directory
+    const fileName = path.basename(filePath);
+    const relativePath = filePath.replace(/^.*recipes\//, 'recipes/');
+    const resolvedPath = path.join(process.cwd(), relativePath);
     const resolvedRecipesPath = path.resolve(recipesPath);
+    
+    console.log('Recipes path:', recipesPath);
+    console.log('Relative path:', relativePath);
+    console.log('Resolved path:', resolvedPath);
+    console.log('Resolved recipes path:', resolvedRecipesPath);
     
     if (!resolvedPath.startsWith(resolvedRecipesPath)) {
       return NextResponse.json(
@@ -60,8 +119,12 @@ export async function POST(request: Request) {
     
     fs.writeFileSync(tempEnvPath, envContent);
 
+    // Use the same token selection logic as /api/token to get the current config  
+    const currentTokenInfo = getCurrentTokenInfo();
+    console.log('Current token info:', currentTokenInfo);
+    
     // Execute the script with timeout  
-    const output = await executeScript(resolvedPath, tempEnvPath, envVariables?.CLIENT_ID);
+    const output = await executeScript(resolvedPath, tempEnvPath, currentTokenInfo?.clientId);
     
     // Clean up temp file
     try {
@@ -95,8 +158,11 @@ function executeScript(scriptPath: string, envFilePath: string, clientId: string
   success: boolean;
 }> {
   return new Promise((resolve) => {
-    const scriptDir = path.dirname(scriptPath);
-    const recipesRoot = path.join(scriptDir, '..');
+    // Always use the current working directory as the base for recipes
+    const recipesRoot = path.join(process.cwd(), 'recipes');
+    console.log('Process CWD:', process.cwd());
+    console.log('Recipes Root:', recipesRoot);
+    console.log('Script Path:', scriptPath);
     
     // Create a wrapper script that handles module resolution and environment setup
     const scriptName = path.basename(scriptPath);
@@ -104,6 +170,8 @@ function executeScript(scriptPath: string, envFilePath: string, clientId: string
     const wrapperScript = `
 // Change to the recipes directory for proper module resolution
 process.chdir('${recipesRoot}');
+console.log('Executing from directory:', process.cwd());
+console.log('Client ID for token caching: ${clientId || "null"}');
 
 // Import required modules
 const fs = require('fs');
@@ -128,21 +196,66 @@ function getTokenCacheFile(clientId) {
   return path.join(os.tmpdir(), 'sigma-portal-token-' + configHash + '.json');
 }
 
-function getCachedToken(clientId = null) {
+function getCachedToken(preferredClientId = null) {
   try {
-    const TOKEN_CACHE_FILE = getTokenCacheFile(clientId);
-    if (fs.existsSync(TOKEN_CACHE_FILE)) {
-      const tokenData = JSON.parse(fs.readFileSync(TOKEN_CACHE_FILE, 'utf8'));
-      const now = Date.now();
-      
-      // Check if token is still valid (not expired)
-      if (tokenData.expiresAt && now < tokenData.expiresAt) {
-        return tokenData.token;
-      } else {
-        // Token expired, remove file
-        fs.unlinkSync(TOKEN_CACHE_FILE);
+    // Look for tokens, prioritizing current config over pure recency
+    const tempDir = os.tmpdir();
+    const files = fs.readdirSync(tempDir);
+    const tokenFiles = files.filter(file => file.startsWith('sigma-portal-token-') && file.endsWith('.json'));
+    
+    console.log('Found token files:', tokenFiles);
+    console.log('Preferred client ID:', preferredClientId);
+    
+    let preferredToken = null;
+    let mostRecentToken = null;
+    let mostRecentTime = 0;
+    
+    for (const file of tokenFiles) {
+      try {
+        const filePath = path.join(tempDir, file);
+        const tokenData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        const now = Date.now();
+        
+        console.log('Token ' + file + ':', 'clientId=' + tokenData.clientId + ', createdAt=' + new Date(tokenData.createdAt) + ', lastAccessed=' + new Date(tokenData.lastAccessed || tokenData.createdAt) + ', lastAccessTime=' + (tokenData.lastAccessed || tokenData.createdAt));
+        
+        // Check if token is still valid (not expired)
+        if (tokenData.expiresAt && now < tokenData.expiresAt) {
+          const lastAccessTime = tokenData.lastAccessed || tokenData.createdAt;
+          
+          // Check if this matches the preferred client ID
+          if (preferredClientId && tokenData.clientId && tokenData.clientId.startsWith(preferredClientId)) {
+            preferredToken = tokenData.token;
+            console.log('  -> Found preferred client ID token');
+          }
+          
+          // Track most recent regardless
+          if (lastAccessTime > mostRecentTime) {
+            mostRecentTime = lastAccessTime;
+            mostRecentToken = tokenData.token;
+            console.log('  -> This is the most recent token so far');
+          }
+        } else {
+          // Token expired, remove file
+          fs.unlinkSync(filePath);
+          console.log('  -> Token expired, removed file');
+        }
+      } catch (err) {
+        // Skip invalid token files
+        console.log('  -> Invalid token file, skipping');
       }
     }
+    
+    // Prioritize preferred client token, fallback to most recent
+    const selectedToken = preferredToken || mostRecentToken;
+    if (selectedToken) {
+      if (preferredToken) {
+        console.log('Selected preferred client token');
+      } else {
+        console.log('Selected most recent valid token (no preferred match)');
+      }
+    }
+    
+    return selectedToken;
   } catch (error) {
     // Ignore errors, just return null
   }
@@ -207,7 +320,7 @@ try {
       console.log('HTTP Status: 200 OK - Authentication successful');
       
       // Cache the token for future use
-      cacheToken(token, '${clientId}');
+      cacheToken(token, '${clientId || ""}');
     } else {
       console.log('❌ Failed to obtain bearer token');
       process.exit(1);
@@ -218,7 +331,7 @@ try {
   });
   ` : `
   // For regular scripts, check for cached token first
-  const cachedToken = getCachedToken('${clientId}');
+  const cachedToken = getCachedToken('${clientId || ""}');
   
   if (cachedToken) {
     console.log('Using cached authentication token');

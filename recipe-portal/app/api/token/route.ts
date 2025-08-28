@@ -22,6 +22,9 @@ export async function GET() {
     
     console.log('Found token files:', tokenFiles);
     
+    let namedConfigTokens = [];
+    let defaultToken = null;
+    
     for (const file of tokenFiles) {
       try {
         const filePath = path.join(tempDir, file);
@@ -30,21 +33,26 @@ export async function GET() {
         
         // Check if token is still valid (not expired)
         if (tokenData.expiresAt && now < tokenData.expiresAt) {
-          // Use the most recently created/accessed token
           const lastAccessTime = tokenData.lastAccessed || tokenData.createdAt;
-          console.log(`Token ${file}: clientId=${tokenData.clientId?.substring(0,8)}, createdAt=${new Date(tokenData.createdAt)}, lastAccessed=${tokenData.lastAccessed ? new Date(tokenData.lastAccessed) : 'none'}, lastAccessTime=${lastAccessTime}`);
+          console.log(`Token ${file}: clientId=${tokenData.clientId?.substring(0,8) || 'default'}, createdAt=${new Date(tokenData.createdAt)}, lastAccessed=${tokenData.lastAccessed ? new Date(tokenData.lastAccessed) : 'none'}, lastAccessTime=${lastAccessTime}`);
           
-          if (lastAccessTime > mostRecentTime) {
-            console.log(`  -> This is the most recent token so far`);
-            mostRecentTime = lastAccessTime;
-            mostRecentToken = {
-              hasValidToken: true,
-              token: tokenData.token,
-              expiresAt: tokenData.expiresAt,
-              timeRemaining: Math.round((tokenData.expiresAt - now) / 1000 / 60), // minutes
-              clientId: tokenData.clientId,
-              filePath: filePath // Keep track of which file this came from
-            };
+          const tokenInfo = {
+            hasValidToken: true,
+            token: tokenData.token,
+            expiresAt: tokenData.expiresAt,
+            timeRemaining: Math.round((tokenData.expiresAt - now) / 1000 / 60), // minutes
+            clientId: tokenData.clientId,
+            filePath: filePath,
+            lastAccessTime: lastAccessTime
+          };
+          
+          // Separate named configs from default token
+          if (tokenData.clientId && tokenData.clientId.length > 8) {
+            namedConfigTokens.push(tokenInfo);
+            console.log(`  -> This is a named config token`);
+          } else {
+            defaultToken = tokenInfo;
+            console.log(`  -> This is the default token`);
           }
         } else {
           // Token expired, remove file
@@ -54,6 +62,17 @@ export async function GET() {
         // Skip invalid token files
         console.warn(`Failed to read token file ${file}:`, err);
       }
+    }
+    
+    // Prioritize named config tokens over default token
+    if (namedConfigTokens.length > 0) {
+      // Sort named config tokens by most recent access time
+      namedConfigTokens.sort((a, b) => b.lastAccessTime - a.lastAccessTime);
+      mostRecentToken = namedConfigTokens[0];
+      console.log(`  -> Selected most recent named config token: ${mostRecentToken.clientId?.substring(0,8)}`);
+    } else if (defaultToken) {
+      mostRecentToken = defaultToken;
+      console.log(`  -> No named config tokens, using default token`);
     }
     
     if (mostRecentToken) {
