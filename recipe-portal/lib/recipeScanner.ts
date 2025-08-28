@@ -17,12 +17,12 @@ export interface RecipeCategory {
   recipes: Recipe[];
 }
 
-const RECIPES_PATH = path.join(process.cwd(), '..', 'sigma-api-recipes');
+const RECIPES_PATH = path.join(process.cwd(), 'recipes');
 
 /**
  * Extract environment variables from a JavaScript file (excluding core auth variables)
  */
-function extractEnvVariables(fileContent: string): string[] {
+function extractEnvVariables(fileContent: string, fileName?: string): string[] {
   const envRegex = /process\.env\.([A-Z_][A-Z0-9_]*)/g;
   const matches = Array.from(fileContent.matchAll(envRegex));
   const envVars = matches.map(match => match[1]);
@@ -30,8 +30,26 @@ function extractEnvVariables(fileContent: string): string[] {
   // Core auth variables that are handled centrally
   const coreAuthVars = new Set(['CLIENT_ID', 'SECRET', 'authURL', 'baseURL']);
   
-  // Filter out core auth variables since they're handled by the centralized auth system
-  const recipeSpecificVars = envVars.filter(envVar => !coreAuthVars.has(envVar));
+  // Variables that are set programmatically by master scripts (don't expose in UI)
+  const masterScriptVars = new Set(['MEMBERID', 'WORKSPACEID']);
+  
+  // For master-script.js, be more aggressive about filtering
+  const isMasterScript = fileName?.includes('master-script');
+  
+  // Filter out core auth variables and master script variables
+  let recipeSpecificVars = envVars.filter(envVar => 
+    !coreAuthVars.has(envVar) && 
+    !masterScriptVars.has(envVar)
+  );
+  
+  // For master scripts, only include variables that are used in validation or logging
+  if (isMasterScript) {
+    const allowedMasterVars = new Set([
+      'EMAIL', 'NEW_MEMBER_FIRST_NAME', 'NEW_MEMBER_LAST_NAME', 'NEW_MEMBER_TYPE',
+      'TEAMID', 'CONNECTIONID', 'WORKSPACE_NAME', 'PERMISSION'
+    ]);
+    recipeSpecificVars = recipeSpecificVars.filter(envVar => allowedMasterVars.has(envVar));
+  }
   
   return Array.from(new Set(recipeSpecificVars)); // Remove duplicates
 }
@@ -117,7 +135,7 @@ function scanRecipeFile(filePath: string, category: string): Recipe | null {
       description: extractDescription(fileContent),
       category: category,
       filePath: filePath,
-      envVariables: extractEnvVariables(fileContent),
+      envVariables: extractEnvVariables(fileContent, filename),
       isAuthRequired: requiresAuth(fileContent),
       readmePath: hasReadme ? readmePath : undefined
     };

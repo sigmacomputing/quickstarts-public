@@ -15,14 +15,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Security check: ensure the file is within the sigma-api-recipes directory
-    const recipesPath = path.join(process.cwd(), '..', 'sigma-api-recipes');
+    // Security check: ensure the file is within the recipes directory
+    const recipesPath = path.join(process.cwd(), 'recipes');
     const resolvedPath = path.resolve(filePath);
     const resolvedRecipesPath = path.resolve(recipesPath);
     
     if (!resolvedPath.startsWith(resolvedRecipesPath)) {
       return NextResponse.json(
-        { error: 'Access denied: File must be within sigma-api-recipes directory' },
+        { error: 'Access denied: File must be within recipes directory' },
         { status: 403 }
       );
     }
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     fs.writeFileSync(tempEnvPath, envContent);
 
     // Execute the script with timeout  
-    const output = await executeScript(resolvedPath, tempEnvPath);
+    const output = await executeScript(resolvedPath, tempEnvPath, envVariables?.CLIENT_ID);
     
     // Clean up temp file
     try {
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
   }
 }
 
-function executeScript(scriptPath: string, envFilePath: string): Promise<{
+function executeScript(scriptPath: string, envFilePath: string, clientId: string = null): Promise<{
   stdout: string;
   stderr: string;
   success: boolean;
@@ -100,6 +100,7 @@ function executeScript(scriptPath: string, envFilePath: string): Promise<{
     
     // Create a wrapper script that handles module resolution and environment setup
     const scriptName = path.basename(scriptPath);
+    const isMasterScript = scriptPath.includes('master-script.js');
     const wrapperScript = `
 // Change to the recipes directory for proper module resolution
 process.chdir('${recipesRoot}');
@@ -120,11 +121,16 @@ envLines.forEach(line => {
   }
 });
 
-// File-based token caching
-const TOKEN_CACHE_FILE = path.join(os.tmpdir(), 'sigma-portal-token.json');
+// Configuration-specific token caching
+function getTokenCacheFile(clientId) {
+  // Create a safe filename using first 8 chars of clientId
+  const configHash = clientId ? clientId.substring(0, 8) : 'default';
+  return path.join(os.tmpdir(), 'sigma-portal-token-' + configHash + '.json');
+}
 
-function getCachedToken() {
+function getCachedToken(clientId = null) {
   try {
+    const TOKEN_CACHE_FILE = getTokenCacheFile(clientId);
     if (fs.existsSync(TOKEN_CACHE_FILE)) {
       const tokenData = JSON.parse(fs.readFileSync(TOKEN_CACHE_FILE, 'utf8'));
       const now = Date.now();
@@ -143,10 +149,12 @@ function getCachedToken() {
   return null;
 }
 
-function cacheToken(token) {
+function cacheToken(token, clientId = null) {
   try {
+    const TOKEN_CACHE_FILE = getTokenCacheFile(clientId);
     const tokenData = {
       token: token,
+      clientId: clientId,
       expiresAt: Date.now() + (60 * 60 * 1000), // 1 hour from now
       createdAt: Date.now()
     };
@@ -157,9 +165,9 @@ function cacheToken(token) {
 }
 
 // Override getBearerToken function for recipes that use cached tokens
-async function getBearerToken() {
+async function getBearerToken(clientId = null) {
   // First check for cached token
-  const cached = getCachedToken();
+  const cached = getCachedToken(clientId);
   if (cached) {
     // Don't log anything about tokens in regular recipes
     return cached;
@@ -199,7 +207,7 @@ try {
       console.log('HTTP Status: 200 OK - Authentication successful');
       
       // Cache the token for future use
-      cacheToken(token);
+      cacheToken(token, '${clientId}');
     } else {
       console.log('❌ Failed to obtain bearer token');
       process.exit(1);
@@ -210,7 +218,7 @@ try {
   });
   ` : `
   // For regular scripts, check for cached token first
-  const cachedToken = getCachedToken();
+  const cachedToken = getCachedToken('${clientId}');
   
   if (cachedToken) {
     console.log('Using cached authentication token');
@@ -229,9 +237,29 @@ try {
       '{ $1 }' // Remove the require.main check so the script always executes
     );
     
+    // For master-script.js, we need to override the get-access-token module globally
+    // so that when sub-scripts import it, they get the cached token
+    const isMasterScript = '${scriptPath}'.includes('master-script.js');
+    const finalScript = isMasterScript ? 
+      '// Override get-access-token module globally for sub-scripts\\n' +
+      'const Module = require(\\'module\\');\\n' +
+      'const originalRequire = Module.prototype.require;\\n' +
+      '\\n' +
+      'Module.prototype.require = function(id) {\\n' +
+      '  if (id === \\'../get-access-token\\' || id.endsWith(\\'get-access-token\\')) {\\n' +
+      '    return async () => {\\n' +
+      '      console.log("Using master script cached token for sub-operation");\\n' +
+      '      return "' + cachedToken + '";\\n' +
+      '    };\\n' +
+      '  }\\n' +
+      '  return originalRequire.apply(this, arguments);\\n' +
+      '};\\n' +
+      '\\n' +
+      modifiedScript : modifiedScript;
+    
     // Write to a temporary file and require it
     const tempScriptPath = '${scriptPath}' + '.cached.js';
-    fs.writeFileSync(tempScriptPath, modifiedScript);
+    fs.writeFileSync(tempScriptPath, finalScript);
     
     try {
       // Clear require cache to ensure fresh execution
@@ -264,9 +292,13 @@ try {
     const tempScriptPath = path.join(os.tmpdir(), `temp-wrapper-${Date.now()}.js`);
     fs.writeFileSync(tempScriptPath, wrapperScript);
     
+    // Set timeout based on script type - materialization takes longer
+    const isMaterializationScript = scriptPath.includes('initiate-materialization.js');
+    const timeout = isMaterializationScript ? 300000 : 30000; // 5 minutes for materialization, 30 seconds for others
+    
     const child = spawn('node', [tempScriptPath], {
       cwd: recipesRoot,
-      timeout: 30000, // 30 second timeout
+      timeout: timeout,
     });
 
     let stdout = '';

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { detectSmartParameters, SmartParameter, analyzeRecipeCode } from '../lib/smartParameters';
+import { SmartParameterForm } from './SmartParameterForm';
 
 interface CodeViewerProps {
   isOpen: boolean;
@@ -10,19 +12,40 @@ interface CodeViewerProps {
   envVariables?: string[];
   useEnvFile?: boolean;
   onTokenObtained?: () => void;
+  onTokenCleared?: () => void;
   defaultTab?: 'params' | 'run' | 'code' | 'readme';
+  hasValidToken?: boolean;
+  readmePath?: string;
 }
 
 interface ExecutionResult {
   output: string;
   error: string;
-  success: boolean;
+  success: boolean | null;
   timestamp: string;
   httpStatus?: number;
   httpStatusText?: string;
+  downloadInfo?: {
+    filename: string;
+    localPath: string;
+    size: number;
+  };
 }
 
-export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables = [], useEnvFile = false, onTokenObtained, defaultTab = 'params' }: CodeViewerProps) {
+// Function to open the downloads folder via API
+const openDownloadsFolder = async () => {
+  try {
+    await fetch('/api/open-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder: 'downloaded-files' })
+    });
+  } catch (error) {
+    console.log('Could not open folder automatically. Please navigate to the downloaded-files folder manually.');
+  }
+};
+
+export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables = [], useEnvFile = false, onTokenObtained, onTokenCleared, defaultTab = 'params', hasValidToken = false, readmePath }: CodeViewerProps) {
   const [code, setCode] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +54,33 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
   const [envFileValues, setEnvFileValues] = useState<Record<string, string>>({});
   const [executing, setExecuting] = useState(false);
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
-  const [detectedParameters, setDetectedParameters] = useState<string[]>([]);
+  const [smartParameters, setSmartParameters] = useState<SmartParameter[]>([]);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [clearingToken, setClearingToken] = useState(false);
+  const [storeKeysLocally, setStoreKeysLocally] = useState(false);
+  const [hasStoredKeys, setHasStoredKeys] = useState(false);
+  const [currentFormIsStored, setCurrentFormIsStored] = useState(false);
+
+  // Reset form when modal is closed
+  useEffect(() => {
+    if (!isOpen) {
+      setEnvValues({});
+      setExecutionResult(null);
+      setActiveTab(defaultTab);
+      setError(null);
+      setSetAsDefault(false);
+      setCopyButtonText('Copy Output');
+    }
+  }, [isOpen, defaultTab]);
+  const [saveNotification, setSaveNotification] = useState<string | null>(null);
+  const [credentialSetName, setCredentialSetName] = useState('');
+  const [availableCredentialSets, setAvailableCredentialSets] = useState<string[]>([]);
+  const [selectedCredentialSet, setSelectedCredentialSet] = useState('');
+  const [setAsDefault, setSetAsDefault] = useState(false);
+  const [defaultCredentialSet, setDefaultCredentialSet] = useState<string | null>(null);
+  const [copyButtonText, setCopyButtonText] = useState('Copy Output');
+  const [customReadme, setCustomReadme] = useState<string | null>(null);
+  const [readmeLoading, setReadmeLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen && filePath) {
@@ -40,20 +89,37 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
       if (fileName === 'get-access-token.js') {
         // Auth script: README first
         smartDefaultTab = 'readme';
-      } else if (detectedParameters.length > 0) {
-        // Has parameters: Parameters first
+      } else if (smartParameters.length > 0) {
+        // Has parameters: Request first
         smartDefaultTab = 'params';
       } else {
         // No parameters: Run Script (Response) first
         smartDefaultTab = 'run';
       }
-      setActiveTab(smartDefaultTab);
+      
+      // Only set the tab if it's not already set to avoid switching during execution
+      // Don't switch tabs if we're currently executing or if we have results to show
+      if (!executing && !executionResult && (activeTab === defaultTab || (activeTab === 'run' && smartParameters.length > 0))) {
+        setActiveTab(smartDefaultTab);
+      }
       fetchCode();
+      checkAuthToken();
       if (useEnvFile) {
         fetchEnvFile();
       }
+    } else if (!isOpen) {
+      // Reset form when modal is closed
+      if (fileName === 'get-access-token.js') {
+        setEnvValues({
+          'baseURL': 'https://aws-api.sigmacomputing.com/v2',
+          'authURL': 'https://aws-api.sigmacomputing.com/v2/auth/token',
+          'CLIENT_ID': '',
+          'SECRET': ''
+        });
+      }
+      setExecutionResult(null);
     }
-  }, [isOpen, filePath, useEnvFile, fileName, detectedParameters.length]);
+  }, [isOpen, filePath, useEnvFile, fileName, executing, smartParameters.length, executionResult]);
 
   // Set default auth values for authentication script
   useEffect(() => {
@@ -64,24 +130,156 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
     }
   }, [fileName, envValues]);
 
-  // Detect parameters when code changes
+  // Sync internal auth state with parent
+  useEffect(() => {
+    if (!hasValidToken) {
+      setAuthToken(null);
+      
+      // Clear form fields when session is ended from main page
+      if (fileName === 'get-access-token.js') {
+        setEnvValues({
+          'baseURL': 'https://aws-api.sigmacomputing.com/v2',
+          'authURL': 'https://aws-api.sigmacomputing.com/v2/auth/token',
+          'CLIENT_ID': '',
+          'SECRET': ''
+        });
+      }
+    }
+  }, [hasValidToken, fileName]);
+
+  // Load custom README if available
+  useEffect(() => {
+    if (readmePath && isOpen) {
+      setReadmeLoading(true);
+      fetch(`/api/readme?path=${encodeURIComponent(readmePath)}&format=json`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            setCustomReadme(data.content);
+          }
+        })
+        .catch(error => {
+          console.error('Failed to load custom README:', error);
+        })
+        .finally(() => {
+          setReadmeLoading(false);
+        });
+    } else {
+      setCustomReadme(null);
+    }
+  }, [readmePath, isOpen]);
+
+  // Detect smart parameters when code changes
   useEffect(() => {
     if (code) {
-      const envVarPattern = /process\.env\.([A-Z_]+)/g;
-      const matches = code.match(envVarPattern) || [];
-      
-      const parameters = new Set<string>();
-      matches.forEach(match => {
-        const paramName = match.replace('process.env.', '');
-        // Filter out auth parameters since they're handled centrally
-        if (!['CLIENT_ID', 'SECRET', 'authURL', 'baseURL'].includes(paramName)) {
-          parameters.add(paramName);
+      // Analyze code to find parameters
+      const analysis = analyzeRecipeCode(code, { filePath });
+      const detected = detectSmartParameters(analysis.suggestedParameters, { filePath });
+      setSmartParameters(detected);
+    }
+  }, [code, filePath]);
+
+  // Check for stored credentials when auth modal opens
+  // Only auto-populate if form is empty (app startup scenario)
+  useEffect(() => {
+    const checkStoredCredentials = async () => {
+      if (isOpen && fileName === 'get-access-token.js') {
+        try {
+          const response = await fetch('/api/keys?retrieve=true');
+          if (response.ok) {
+            const data = await response.json();
+            setHasStoredKeys(data.hasStoredKeys);
+            setAvailableCredentialSets(data.credentialSets || []);
+            setDefaultCredentialSet(data.defaultSet || null);
+            
+            // Only auto-populate if fields are empty AND we have a valid token
+            // This prevents re-population after "End Session" is clicked
+            const hasEmptyFields = !envValues['CLIENT_ID'] && !envValues['SECRET'];
+            
+            if (data.hasStoredKeys && data.credentials && hasEmptyFields && hasValidToken) {
+              // Auto-populate form with complete config on startup
+              handleEnvChange('CLIENT_ID', data.credentials.clientId);
+              handleEnvChange('SECRET', data.credentials.clientSecret);
+              handleEnvChange('baseURL', data.credentials.baseURL);
+              handleEnvChange('authURL', data.credentials.authURL);
+              setStoreKeysLocally(true); // Check the checkbox since keys are stored
+              setSelectedCredentialSet(data.defaultSet || '');
+              setCurrentFormIsStored(true); // Mark current form as representing stored data
+            }
+          }
+        } catch (error) {
+          console.log('Error checking stored credentials:', error);
         }
+      }
+    };
+    
+    checkStoredCredentials();
+  }, [isOpen, fileName]);
+
+  const checkAuthToken = async () => {
+    try {
+      console.log('checkAuthToken: Fetching current token from /api/token');
+      const response = await fetch('/api/token');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('checkAuthToken: Response from /api/token:', { hasValidToken: data.hasValidToken, clientId: data.clientId?.substring(0,8) });
+        if (data.hasValidToken && data.token) {
+          console.log('checkAuthToken: Updating authToken state');
+          setAuthToken(data.token);
+        }
+      }
+    } catch (error) {
+      console.log('No cached token available');
+    }
+  };
+
+  const clearToken = async () => {
+    setClearingToken(true);
+    try {
+      // Clear the session token
+      const response = await fetch('/api/token/clear', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ clearAll: true })
       });
       
-      setDetectedParameters(Array.from(parameters));
+      if (response.ok) {
+        setAuthToken(null);
+        
+        // Handle stored keys logic for auth script
+        if (fileName === 'get-access-token.js') {
+          if (!storeKeysLocally && hasStoredKeys) {
+            // User unchecked the box - clear stored keys
+            await fetch('/api/keys', { method: 'DELETE' });
+            setHasStoredKeys(false);
+          }
+          
+          // Always clear form fields on End Session
+          // This implements the new UX flow:
+          // - Session-only: fields cleared
+          // - Storage enabled: fields cleared (will be restored on next startup)
+          setEnvValues({
+            'baseURL': 'https://aws-api.sigmacomputing.com/v2',
+            'authURL': 'https://aws-api.sigmacomputing.com/v2/auth/token',
+            'CLIENT_ID': '',
+            'SECRET': ''
+          });
+        }
+        
+        if (onTokenCleared) {
+          onTokenCleared();
+        }
+      } else {
+        console.error('Failed to clear token');
+      }
+    } catch (error) {
+      console.error('Error clearing token:', error);
+    } finally {
+      setClearingToken(false);
     }
-  }, [code]);
+  };
 
 
   const fetchCode = async () => {
@@ -128,7 +326,240 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
     }
   };
 
+  const getDownloadFilename = (fileName: string, envValues: Record<string, string>) => {
+    switch (fileName) {
+      case 'export-workbook-element-csv.js':
+        return envValues['EXPORT_FILENAME'] || 'export.csv';
+      case 'export-workbook-pdf.js':
+        return 'workbook-export.pdf';
+      default:
+        return 'download';
+    }
+  };
+
+  const getDownloadContentType = (fileName: string) => {
+    switch (fileName) {
+      case 'export-workbook-element-csv.js':
+        return 'text/csv';
+      case 'export-workbook-pdf.js':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
+  };
+
+  const createBlobFromContent = (content: string, contentType: string) => {
+    // All content from DOWNLOAD_RESULT protocol is base64 encoded
+    try {
+      const byteCharacters = atob(content);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      return new Blob([byteArray], { type: contentType });
+    } catch (error) {
+      // Fallback for non-base64 content (shouldn't happen with new protocol)
+      console.warn('Failed to decode base64 content, treating as text:', error);
+      return new Blob([content], { type: contentType });
+    }
+  };
+
+  const handleStreamingDownload = async (filePath: string, envVariables: Record<string, string>, filename: string, contentType: string) => {
+    try {
+      const response = await fetch('/api/download-stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filePath,
+          envVariables,
+          filename,
+          contentType
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start download stream');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      let outputMessages: string[] = [];
+      let jsonBuffer = ''; // Persistent buffer for handling split JSON messages
+      
+      // Initialize with starting message
+      const startingMessage = `${new Date().toLocaleTimeString()} - Starting export process...`;
+      outputMessages.push(startingMessage);
+      
+      setExecutionResult({
+        output: startingMessage + '\n',
+        error: '',
+        success: null, // null indicates "in progress"
+        timestamp: new Date().toISOString()
+      });
+
+      const decoder = new TextDecoder();
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ') && line.trim() !== 'data: ') {
+            const jsonPart = line.substring(6);
+            jsonBuffer += jsonPart;
+            
+            // Try to parse the accumulated JSON
+            try {
+              const data = JSON.parse(jsonBuffer);
+              // Success! Reset buffer and process the data
+              jsonBuffer = '';
+              const timestamp = new Date(data.timestamp).toLocaleTimeString();
+              
+              // Add message to beginning of array (newest first)
+              // Show debug messages during development
+              const prefix = '';
+              const newMessage = `${timestamp} - ${prefix}${data.message}`;
+              outputMessages.unshift(newMessage);
+              
+              // Keep only last 100 messages to see debug info
+              if (outputMessages.length > 100) {
+                outputMessages = outputMessages.slice(0, 100);
+              }
+              
+              // Update the execution result with progressive output (newest first)
+              setExecutionResult({
+                output: outputMessages.join('\n') + '\n',
+                error: '',
+                success: null, // Keep as "in progress" until completion
+                timestamp: data.timestamp
+              });
+              
+              // Handle download completion with folder link
+              if (data.type === 'success' && data.data && data.data.filename) {
+                // Create clickable message to open downloads folder
+                const folderMessage = `${timestamp} - 📁 File saved! Click here to open downloads folder`;
+                const fileInfo = `${timestamp} - ✅ ${data.data.filename} (${Math.round(data.data.size / 1024)}KB) saved to downloaded-files/`;
+                outputMessages.unshift(folderMessage);
+                outputMessages.unshift(fileInfo);
+                
+                setExecutionResult({
+                  output: outputMessages.join('\n') + '\n',
+                  error: '',
+                  success: true,
+                  timestamp: data.timestamp,
+                  downloadInfo: {
+                    filename: data.data.filename,
+                    localPath: data.data.localPath,
+                    size: data.data.size
+                  }
+                });
+                
+                // Switch to Response tab to show the completion message
+                setActiveTab('run');
+              }
+              
+              // Handle errors
+              if (data.type === 'error') {
+                setExecutionResult({
+                  output: outputMessages.join('\n') + '\n',
+                  error: data.message,
+                  success: false,
+                  timestamp: data.timestamp
+                });
+                break;
+              }
+              
+            } catch (e) {
+              // JSON parsing failed - this might be a partial message
+              // Keep the buffer and wait for more data, but limit buffer size to prevent memory issues
+              if (jsonBuffer.length > 500000) { // 500KB limit
+                console.error('JSON buffer too large, discarding:', jsonBuffer.substring(0, 100) + '...');
+                jsonBuffer = '';
+              }
+              // Don't log every parse error as they're expected for partial messages
+            }
+          } else if (line.trim() === '' && jsonBuffer) {
+            // Empty line might indicate end of an SSE message - try to parse what we have
+            try {
+              const data = JSON.parse(jsonBuffer);
+              jsonBuffer = ''; // Reset on successful parse
+              
+              const timestamp = new Date(data.timestamp).toLocaleTimeString();
+              const newMessage = `${timestamp} - ${data.message}`;
+              outputMessages.unshift(newMessage);
+              
+              if (outputMessages.length > 100) {
+                outputMessages = outputMessages.slice(0, 100);
+              }
+              
+              setExecutionResult({
+                output: outputMessages.join('\n') + '\n',
+                error: '',
+                success: null,
+                timestamp: data.timestamp
+              });
+              
+              // Handle download completion (same logic as above)
+              if (data.type === 'success' && data.data && data.data.filename) {
+                const folderMessage = `${timestamp} - 📁 File saved! Click here to open downloads folder`;
+                const fileInfo = `${timestamp} - ✅ ${data.data.filename} (${Math.round(data.data.size / 1024)}KB) saved to downloaded-files/`;
+                outputMessages.unshift(folderMessage);
+                outputMessages.unshift(fileInfo);
+                
+                setExecutionResult({
+                  output: outputMessages.join('\n') + '\n',
+                  error: '',
+                  success: true,
+                  timestamp: data.timestamp,
+                  downloadInfo: {
+                    filename: data.data.filename,
+                    localPath: data.data.localPath,
+                    size: data.data.size
+                  }
+                });
+                
+                setActiveTab('run');
+              }
+              
+              if (data.type === 'error') {
+                setExecutionResult({
+                  output: outputMessages.join('\n') + '\n',
+                  error: data.message,
+                  success: false,
+                  timestamp: data.timestamp
+                });
+                return; // Exit the stream processing
+              }
+              
+            } catch (e) {
+              // Still couldn't parse - keep waiting for more data
+            }
+          }
+        }
+      }
+      
+    } catch (error) {
+      setExecutionResult({
+        output: '',
+        error: error instanceof Error ? error.message : 'Unknown streaming error',
+        success: false,
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
+
   const executeScript = async () => {
+    console.log('executeScript called');
     setExecuting(true);
     setExecutionResult(null);
     
@@ -156,10 +587,12 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
       };
       
       // Validate that required auth credentials are provided (for auth script only)
+      console.log('Validating auth credentials:', { fileName, coreAuthVars });
       if (fileName === 'get-access-token.js' && (!coreAuthVars.CLIENT_ID || !coreAuthVars.SECRET)) {
+        console.log('Validation failed - missing credentials');
         setExecutionResult({
           output: '',
-          error: 'Authentication required: Please provide CLIENT_ID and SECRET credentials in the Parameters tab.',
+          error: 'Authentication required: Please provide CLIENT_ID and SECRET credentials in the Config tab.',
           success: false,
           timestamp: new Date().toISOString(),
           httpStatus: 401,
@@ -169,25 +602,94 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
         return;
       }
       
+      console.log('Validation passed, continuing execution...');
+      
       const allEnvVariables = { ...coreAuthVars, ...currentEnvValues };
+      console.log('About to make API request with variables:', Object.keys(allEnvVariables));
+      
+      
 
-      const response = await fetch('/api/execute', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filePath,
-          envVariables: allEnvVariables
-        })
-      });
+      // Check if this is a download recipe
+      const isDownloadRecipe = ['export-workbook-element-csv.js', 'export-workbook-pdf.js'].includes(fileName);
       
-      const result = await response.json();
-      setExecutionResult(result);
+      let result;
+      let response;
       
-      // If this is an auth script and execution was successful, notify parent
+      if (isDownloadRecipe) {
+        // Handle download recipes with streaming progress
+        await handleStreamingDownload(filePath, allEnvVariables, getDownloadFilename(fileName, currentEnvValues), getDownloadContentType(fileName));
+        return; // Exit early since streaming handles everything
+      } else {
+        // Handle regular recipes
+        response = await fetch('/api/execute', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            filePath,
+            envVariables: allEnvVariables
+          })
+        });
+        
+        console.log('API response received:', response.status, response.statusText);
+        
+        result = await response.json();
+        console.log('API result:', result);
+        setExecutionResult(result);
+        console.log('ExecutionResult set, switching to run tab');
+        setActiveTab('run');
+      }
+      
+      // If this is an auth script and execution was successful, notify parent and refresh token
       if (result.success && fileName === 'get-access-token.js' && onTokenObtained) {
         onTokenObtained();
+        
+        // Switch to Response tab to show authentication result
+        setActiveTab('run');
+        
+        // Store complete config (credentials + server settings) if user checked the box
+        if (storeKeysLocally && allEnvVariables['CLIENT_ID'] && allEnvVariables['SECRET']) {
+          try {
+            const setName = credentialSetName.trim();
+            if (!setName) {
+              console.warn('Cannot save credentials without a name during authentication');
+              // Continue with authentication but don't save
+              setTimeout(() => checkAuthToken(), 1000);
+              return;
+            }
+            await fetch('/api/keys', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                clientId: allEnvVariables['CLIENT_ID'],
+                clientSecret: allEnvVariables['SECRET'],
+                baseURL: allEnvVariables['baseURL'],
+                authURL: allEnvVariables['authURL'],
+                name: setName,
+                setAsDefault: setAsDefault
+              })
+            });
+            setHasStoredKeys(true);
+            setCurrentFormIsStored(true); // Mark current form as stored
+            
+            // Show success notification for auto-save during authentication
+            showSaveNotification(`Config "${setName}" saved during authentication!`);
+            
+            // Update available sets
+            const updatedResponse = await fetch('/api/keys?list=true');
+            if (updatedResponse.ok) {
+              const updatedData = await updatedResponse.json();
+              setAvailableCredentialSets(updatedData.credentialSets || []);
+              setDefaultCredentialSet(updatedData.defaultSet || null);
+            }
+          } catch (error) {
+            console.error('Failed to store credentials:', error);
+          }
+        }
+        
+        // Refresh the auth token for smart parameter dropdowns
+        setTimeout(() => checkAuthToken(), 1000);
       }
       
       if (!response.ok) {
@@ -205,11 +707,74 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
     }
   };
 
+  const loadCredentialSet = async (setName: string) => {
+    try {
+      const response = await fetch(`/api/keys?retrieve=true&set=${encodeURIComponent(setName)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.credentials) {
+          // Load complete config: credentials + server settings
+          handleEnvChange('CLIENT_ID', data.credentials.clientId);
+          handleEnvChange('SECRET', data.credentials.clientSecret);
+          handleEnvChange('baseURL', data.credentials.baseURL);
+          handleEnvChange('authURL', data.credentials.authURL);
+          setCredentialSetName(setName);
+          setCurrentFormIsStored(true); // Mark current form as representing stored data
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load credential set:', error);
+    }
+  };
+
   const handleEnvChange = (key: string, value: string) => {
     setEnvValues(prev => ({
       ...prev,
       [key]: value
     }));
+    
+    // Mark form as unsaved when credentials or server settings change
+    if (['CLIENT_ID', 'SECRET', 'baseURL', 'authURL'].includes(key)) {
+      setCurrentFormIsStored(false);
+    }
+  };
+
+  const showSaveNotification = (message: string) => {
+    setSaveNotification(message);
+    setTimeout(() => setSaveNotification(null), 3000); // Auto-hide after 3 seconds
+  };
+
+  const deleteConfig = async (configName: string) => {
+    try {
+      await fetch(`/api/keys?config=${encodeURIComponent(configName)}`, {
+        method: 'DELETE'
+      });
+      
+      // Clear form if we deleted the currently selected config
+      if (selectedCredentialSet === configName) {
+        setSelectedCredentialSet('');
+        setCredentialSetName('');
+        handleEnvChange('CLIENT_ID', '');
+        handleEnvChange('SECRET', '');
+        handleEnvChange('baseURL', 'https://aws-api.sigmacomputing.com/v2');
+        handleEnvChange('authURL', 'https://aws-api.sigmacomputing.com/v2/auth/token');
+        setCurrentFormIsStored(false);
+      }
+      
+      // Update available sets
+      const updatedResponse = await fetch('/api/keys?list=true');
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        setAvailableCredentialSets(updatedData.credentialSets || []);
+        setDefaultCredentialSet(updatedData.defaultSet || null);
+        setHasStoredKeys(updatedData.credentialSets?.length > 0);
+      }
+      
+      showSaveNotification(`Config "${configName}" deleted successfully!`);
+    } catch (error) {
+      console.error('Failed to delete config:', error);
+      showSaveNotification('Failed to delete config. Please try again.');
+    }
   };
 
   if (!isOpen) return null;
@@ -221,7 +786,6 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">{fileName}</h3>
-            <p className="text-sm text-gray-500 font-mono">{filePath}</p>
           </div>
           <button
             onClick={onClose}
@@ -234,7 +798,7 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
         {/* Tabs */}
         <div className="flex border-b border-gray-200">
           {fileName === 'get-access-token.js' ? (
-            // Auth script tab order: README → Parameters
+            // Auth script tab order: README → Config
             <>
               <button
                 onClick={() => setActiveTab('readme')}
@@ -244,7 +808,7 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                📖 README
+                README
               </button>
               <button
                 onClick={() => setActiveTab('params')}
@@ -254,7 +818,7 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                ⚙️ Parameters
+                Request
               </button>
               <button
                 onClick={() => setActiveTab('run')}
@@ -274,14 +838,14 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                📄 View Recipe
+                View Recipe
               </button>
             </>
           ) : (
-            // Regular recipe tab order: Parameters → Response → README → View Recipe (if params exist)
+            // Regular recipe tab order: Config → Response → README → View Recipe (if params exist)
             // Or: Response → README → View Recipe (if no params)
             <>
-              {detectedParameters.length > 0 && (
+              {smartParameters.length > 0 && (
                 <button
                   onClick={() => setActiveTab('params')}
                   className={`px-4 py-2 text-sm font-medium ${
@@ -290,7 +854,7 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  ⚙️ Parameters
+                  Request
                 </button>
               )}
               <button
@@ -301,7 +865,7 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                📊 Response
+                Response
               </button>
               <button
                 onClick={() => setActiveTab('readme')}
@@ -311,7 +875,7 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                📖 README
+                README
               </button>
               <button
                 onClick={() => setActiveTab('code')}
@@ -321,7 +885,7 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                📄 View Recipe
+                View Recipe
               </button>
             </>
           )}
@@ -381,35 +945,215 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-800">Recipe Information</h3>
-                  <p className="text-gray-600">
-                    This recipe demonstrates how to use the Sigma API for specific use cases.
-                    Refer to the code and run the script to see the results.
-                  </p>
+                  {readmeLoading ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                      <p className="text-gray-600">Loading README...</p>
+                    </div>
+                  ) : customReadme ? (
+                    <div className="prose max-w-none">
+                      <div 
+                        className="markdown-content"
+                        dangerouslySetInnerHTML={{ 
+                          __html: (() => {
+                            let html = customReadme;
+                            
+                            // Handle headers
+                            html = html.replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-200">$1</h1>');
+                            html = html.replace(/^## (.+)$/gm, '<h2 class="text-xl font-semibold text-gray-700 mt-6 mb-3">$1</h2>');
+                            html = html.replace(/^### (.+)$/gm, '<h3 class="text-lg font-medium text-gray-600 mt-4 mb-2">$1</h3>');
+                            
+                            // Handle inline code
+                            html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>');
+                            
+                            // Handle bold text
+                            html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>');
+                            
+                            // Handle links
+                            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-blue-600 hover:text-blue-800 underline">$1</a>');
+                            
+                            // Process lists line by line
+                            const lines = html.split('\n');
+                            const processed = [];
+                            let inBulletList = false;
+                            let inNumberList = false;
+                            
+                            for (let i = 0; i < lines.length; i++) {
+                              const line = lines[i];
+                              const trimmed = line.trim();
+                              
+                              if (trimmed.startsWith('- ')) {
+                                if (!inBulletList) {
+                                  processed.push('<ul class="list-disc list-inside mb-3 space-y-0">');
+                                  inBulletList = true;
+                                }
+                                if (inNumberList) {
+                                  processed.push('</ol>');
+                                  inNumberList = false;
+                                }
+                                processed.push(`<li>${trimmed.substring(2)}</li>`);
+                              } else if (/^\d+\. /.test(trimmed)) {
+                                if (!inNumberList) {
+                                  processed.push('<ol class="list-decimal list-inside mb-3 space-y-0">');
+                                  inNumberList = true;
+                                }
+                                if (inBulletList) {
+                                  processed.push('</ul>');
+                                  inBulletList = false;
+                                }
+                                processed.push(`<li>${trimmed.replace(/^\d+\. /, '')}</li>`);
+                              } else {
+                                if (inBulletList) {
+                                  processed.push('</ul>');
+                                  inBulletList = false;
+                                }
+                                if (inNumberList) {
+                                  processed.push('</ol>');
+                                  inNumberList = false;
+                                }
+                                if (trimmed === '') {
+                                  // Only add break if we're not between sections
+                                  const nextLine = lines[i + 1]?.trim();
+                                  if (nextLine && !nextLine.startsWith('#')) {
+                                    processed.push('<div class="mb-3"></div>');
+                                  }
+                                } else if (trimmed.startsWith('#')) {
+                                  // Headers are already processed, just add the line
+                                  processed.push(line);
+                                } else {
+                                  // Regular text - just add it with minimal spacing
+                                  processed.push(`<div class="mb-1">${line}</div>`);
+                                }
+                              }
+                            }
+                            
+                            // Close any open lists
+                            if (inBulletList) processed.push('</ul>');
+                            if (inNumberList) processed.push('</ol>');
+                            
+                            return processed.join('\n');
+                          })()
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-gray-800">Recipe Information</h3>
+                      <p className="text-gray-600">
+                        This recipe demonstrates how to use the Sigma API for specific use cases.
+                        Refer to the code and run the script to see the results.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           ) : activeTab === 'params' ? (
             <div className="p-4">
               {fileName === 'get-access-token.js' ? (
-                <div className="space-y-4">
-                  <div className="mb-4">
-                    <h4 className="text-md font-semibold text-gray-800 mb-2">🔐 Authentication Credentials</h4>
-                    <p className="text-sm text-gray-600">
-                      Enter your Sigma API credentials to authenticate
-                    </p>
+                <div className="space-y-3">
+                  {/* Header with Setup Guide in top-right corner */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-800 mb-1">🔐 Authentication Request</h4>
+                      <p className="text-sm text-gray-600 mb-1">
+                        Configure your Sigma API credentials to access the platform
+                      </p>
+                      <p className="text-xs italic text-red-600">
+                        Once authenticated, use the &quot;End Session&quot; button in the header to clear your authentication
+                      </p>
+                    </div>
+                    <a 
+                      href="https://quickstarts.sigmacomputing.com/guide/developers_api_code_samples/index.html#0"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 border border-blue-300 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-50 transition-colors flex items-center"
+                    >
+                      📚 Setup Guide
+                    </a>
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">
-                      Server Endpoint
-                      <span className="text-red-600 ml-1">*</span>
+
+                  {/* Load Existing Config - FIRST thing user does */}
+                  {availableCredentialSets.length > 0 && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <h5 className="text-sm font-medium text-green-900 mb-2">⚡ Quick Start - Load Saved Config</h5>
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1 max-w-sm">
+                          <label className="block text-xs font-medium text-green-800 mb-1">
+                            Select Config:
+                          </label>
+                          <select
+                            value={selectedCredentialSet}
+                            onChange={(e) => {
+                              const setName = e.target.value;
+                              setSelectedCredentialSet(setName);
+                              if (setName) {
+                                loadCredentialSet(setName);
+                              }
+                            }}
+                            className="w-full px-3 py-2 border border-green-300 rounded-md text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
+                          >
+                            <option value="">Choose a saved config...</option>
+                            {availableCredentialSets.map(name => (
+                              <option key={name} value={name}>
+                                {name}{defaultCredentialSet === name ? ' (Default)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {selectedCredentialSet && (
+                          <button
+                            onClick={() => deleteConfig(selectedCredentialSet)}
+                            className="px-2 py-2 text-xs bg-red-50 border border-red-300 text-red-700 rounded-md hover:bg-red-100 transition-colors"
+                            title={`Delete "${selectedCredentialSet}" config`}
+                          >
+                            🗑️
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            // Clear form for new config
+                            setSelectedCredentialSet('');
+                            setCredentialSetName('');
+                            handleEnvChange('CLIENT_ID', '');
+                            handleEnvChange('SECRET', '');
+                            handleEnvChange('baseURL', 'https://aws-api.sigmacomputing.com/v2');
+                            handleEnvChange('authURL', 'https://aws-api.sigmacomputing.com/v2/auth/token');
+                            setStoreKeysLocally(false);
+                            setCurrentFormIsStored(false); // Reset stored indicator
+                          }}
+                          className="px-3 py-2 text-xs bg-white border border-green-300 text-green-700 rounded-md hover:bg-green-50 transition-colors"
+                        >
+                          ✨ New Config
+                        </button>
+                        <button
+                          onClick={() => {
+                            console.log('Authenticate Now clicked', { executing, envValues: { CLIENT_ID: envValues['CLIENT_ID'], SECRET: envValues['SECRET'] } });
+                            if (!executing) {
+                              executeScript();
+                            }
+                          }}
+                          className="px-3 py-2 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors ml-2"
+                          disabled={!envValues['CLIENT_ID'] || !envValues['SECRET']}
+                        >
+                          🔐 Authenticate Now
+                        </button>
+                      </div>
+                      <p className="text-xs text-green-700 mt-1">
+                        {availableCredentialSets.length} saved config{availableCredentialSets.length !== 1 ? 's' : ''} available
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Server Endpoint - Manual Configuration */}
+                  <div className="max-w-lg">
+                    <label className="block text-sm font-medium mb-2 text-gray-700">
+                      Server Endpoint <span className="text-red-600">*</span>
                     </label>
                     <select
                       value={envValues['baseURL'] || 'https://aws-api.sigmacomputing.com/v2'}
                       onChange={(e) => {
                         const baseURL = e.target.value;
-                        // Handle different URL patterns for auth endpoints
                         let authURL;
                         if (baseURL === 'https://api.sigmacomputing.com') {
                           authURL = baseURL + '/v2/auth/token';
@@ -421,117 +1165,178 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="https://api.sigmacomputing.com">
-                        https://api.sigmacomputing.com - GCP hosted organizations
-                      </option>
-                      <option value="https://aws-api.sigmacomputing.com/v2">
-                        https://aws-api.sigmacomputing.com/v2 - AWS US (West) hosted organizations
-                      </option>
-                      <option value="https://api.us-a.aws.sigmacomputing.com">
-                        https://api.us-a.aws.sigmacomputing.com - AWS US (East) hosted organizations  
-                      </option>
-                      <option value="https://api.ca.aws.sigmacomputing.com">
-                        https://api.ca.aws.sigmacomputing.com - AWS Canada hosted organizations
-                      </option>
-                      <option value="https://api.eu.aws.sigmacomputing.com">
-                        https://api.eu.aws.sigmacomputing.com - AWS Europe hosted organizations
-                      </option>
-                      <option value="https://api.au.aws.sigmacomputing.com">
-                        https://api.au.aws.sigmacomputing.com - AWS Australia and APAC hosted organizations
-                      </option>
-                      <option value="https://api.uk.aws.sigmacomputing.com">
-                        https://api.uk.aws.sigmacomputing.com - AWS UK hosted organizations
-                      </option>
-                      <option value="https://api.us.azure.sigmacomputing.com">
-                        https://api.us.azure.sigmacomputing.com - Azure US hosted organizations
-                      </option>
-                      <option value="https://api.eu.azure.sigmacomputing.com">
-                        https://api.eu.azure.sigmacomputing.com - Azure Europe hosted organizations
-                      </option>
-                      <option value="https://api.ca.azure.sigmacomputing.com">
-                        https://api.ca.azure.sigmacomputing.com - Azure Canada hosted organizations
-                      </option>
-                      <option value="https://api.uk.azure.sigmacomputing.com">
-                        https://api.uk.azure.sigmacomputing.com - Azure United Kingdom hosted organizations
-                      </option>
+                      <option value="https://api.sigmacomputing.com">GCP hosted organizations</option>
+                      <option value="https://aws-api.sigmacomputing.com/v2">AWS US (West) hosted organizations</option>
+                      <option value="https://api.us-a.aws.sigmacomputing.com">AWS US (East) hosted organizations</option>
+                      <option value="https://api.ca.aws.sigmacomputing.com">AWS Canada hosted organizations</option>
+                      <option value="https://api.eu.aws.sigmacomputing.com">AWS Europe hosted organizations</option>
+                      <option value="https://api.au.aws.sigmacomputing.com">AWS Australia hosted organizations</option>
+                      <option value="https://api.uk.aws.sigmacomputing.com">AWS UK hosted organizations</option>
+                      <option value="https://api.us.azure.sigmacomputing.com">Azure US hosted organizations</option>
+                      <option value="https://api.eu.azure.sigmacomputing.com">Azure Europe hosted organizations</option>
+                      <option value="https://api.ca.azure.sigmacomputing.com">Azure Canada hosted organizations</option>
+                      <option value="https://api.uk.azure.sigmacomputing.com">Azure UK hosted organizations</option>
                     </select>
-                    <p className="mt-1 text-xs text-gray-600">
-                      Auth URL: {envValues['authURL'] || 'https://aws-api.sigmacomputing.com/v2/auth/token'}
-                    </p>
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">
-                      Client ID
-                      <span className="text-red-600 ml-1">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={envValues['CLIENT_ID'] || ''}
-                      onChange={(e) => handleEnvChange('CLIENT_ID', e.target.value)}
-                      placeholder="Enter your Sigma Client ID"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">
-                      Client Secret
-                      <span className="text-red-600 ml-1">*</span>
-                    </label>
-                    <input
-                      type="password"
-                      value={envValues['SECRET'] || ''}
-                      onChange={(e) => handleEnvChange('SECRET', e.target.value)}
-                      placeholder="Enter your Sigma Client Secret"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  
-                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex">
-                      <div className="flex-shrink-0">
-                        <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                        </svg>
+
+                  {/* API Credentials and Storage - Combined intelligently */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <h5 className="text-sm font-medium text-blue-900 mb-2">🔐 API Credentials</h5>
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <label className="block text-xs font-medium text-blue-800 mb-1">
+                          Client ID <span className="text-red-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={envValues['CLIENT_ID'] || ''}
+                          onChange={(e) => handleEnvChange('CLIENT_ID', e.target.value)}
+                          placeholder="Enter Client ID"
+                          className="w-full px-2 py-1 border border-blue-300 rounded text-sm font-mono focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
+                        />
                       </div>
-                      <div className="ml-3">
-                        <p className="text-sm text-blue-800">
-                          <strong>Don&rsquo;t have credentials?</strong>{' '}
-                          <a 
-                            href="https://quickstarts.sigmacomputing.com/guide/developers_api_code_samples/index.html#0"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="underline hover:text-blue-900"
-                          >
-                            Follow the setup instructions →
-                          </a>
-                        </p>
+                      <div>
+                        <label className="block text-xs font-medium text-blue-800 mb-1">
+                          Client Secret <span className="text-red-600">*</span>
+                        </label>
+                        <input
+                          type="password"
+                          value={envValues['SECRET'] || ''}
+                          onChange={(e) => handleEnvChange('SECRET', e.target.value)}
+                          placeholder="Enter Client Secret"
+                          className="w-full px-2 py-1 border border-blue-300 rounded text-sm font-mono focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
+                        />
                       </div>
                     </div>
+
+                    {/* Storage Options - Integrated into credentials section */}
+                    <div className="border-t border-blue-200 pt-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id="storeKeysLocally"
+                            checked={storeKeysLocally}
+                            onChange={(e) => setStoreKeysLocally(e.target.checked)}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor="storeKeysLocally" className="ml-2 text-sm font-medium text-blue-800">
+                            Store locally (encrypted)
+                          </label>
+                        </div>
+                        {currentFormIsStored && (
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                            ✓ Stored
+                          </span>
+                        )}
+                      </div>
+
+                      {storeKeysLocally && (
+                        <div className="space-y-2">
+                          {/* Save notification */}
+                          {saveNotification && (
+                            <div className="bg-green-100 border border-green-400 text-green-700 px-3 py-2 rounded text-xs animate-pulse">
+                              {saveNotification}
+                            </div>
+                          )}
+                          
+                          <div className="grid grid-cols-3 gap-3 items-end max-w-lg">
+                            <div className="col-span-2">
+                              <label className="block text-xs font-medium text-blue-800 mb-1">
+                                Config Name (optional):
+                              </label>
+                              <input
+                                type="text"
+                                value={credentialSetName}
+                                onChange={(e) => {
+                                  setCredentialSetName(e.target.value);
+                                  setCurrentFormIsStored(false); // Mark as unsaved when name changes
+                                  // Reset default checkbox when changing config name
+                                  setSetAsDefault(false);
+                                }}
+                                placeholder="e.g., Production, Staging"
+                                className="w-full px-2 py-1 border border-blue-300 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
+                              />
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id="setAsDefault"
+                                checked={setAsDefault}
+                                onChange={(e) => setSetAsDefault(e.target.checked)}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-blue-300 rounded"
+                              />
+                              <label htmlFor="setAsDefault" className="text-xs text-blue-700 select-none cursor-pointer">
+                                Set as default config
+                              </label>
+                              {setAsDefault && (
+                                <span className="text-xs text-blue-600">⭐</span>
+                              )}
+                            </div>
+                            
+                            <button
+                              onClick={async () => {
+                                // Save config immediately
+                                if (envValues['CLIENT_ID'] && envValues['SECRET']) {
+                                  try {
+                                    const setName = credentialSetName.trim();
+                                    if (!setName) {
+                                      showSaveNotification('Please enter a config name before saving.');
+                                      return;
+                                    }
+                                    await fetch('/api/keys', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        clientId: envValues['CLIENT_ID'],
+                                        clientSecret: envValues['SECRET'],
+                                        baseURL: envValues['baseURL'],
+                                        authURL: envValues['authURL'],
+                                        name: setName,
+                                        setAsDefault: setAsDefault
+                                      })
+                                    });
+                                    setCurrentFormIsStored(true);
+                                    setHasStoredKeys(true);
+                                    
+                                    // Update available sets
+                                    const updatedResponse = await fetch('/api/keys?list=true');
+                                    if (updatedResponse.ok) {
+                                      const updatedData = await updatedResponse.json();
+                                      setAvailableCredentialSets(updatedData.credentialSets || []);
+                                      setDefaultCredentialSet(updatedData.defaultSet || null);
+                                    }
+                                    
+                                    // Show success notification
+                                    showSaveNotification(`Config "${setName}" saved successfully!`);
+                                  } catch (error) {
+                                    console.error('Failed to save config:', error);
+                                    showSaveNotification('Failed to save config. Please try again.');
+                                  }
+                                }
+                              }}
+                              disabled={!envValues['CLIENT_ID'] || !envValues['SECRET']}
+                              className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
+                            >
+                              💾 Save
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  
-                  <div className="mt-6 pt-4 border-t border-gray-200">
-                    <button
-                      onClick={() => {
-                        setActiveTab('run');
-                        // Auto-execute after switching tabs
-                        setTimeout(() => {
-                          if (!executing) {
-                            executeScript();
-                          }
-                        }, 100);
-                      }}
-                      className="w-full bg-green-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center"
-                      disabled={!envValues['CLIENT_ID'] || !envValues['SECRET']}
-                    >
-                      <span className="mr-2">🔐</span>
-                      Authenticate Now
-                    </button>
-                    <p className="mt-2 text-xs text-gray-600 text-center">
-                      This will switch to Run Script tab and execute authentication
-                    </p>
-                  </div>
+
+                  {/* Authentication Status */}
+                  {(authToken || hasValidToken) && (
+                    <div className="pt-3 border-t border-gray-200">
+                      <div className="flex items-center">
+                        <span className="text-green-600 text-lg mr-2">✅</span>
+                        <span className="text-sm font-medium text-green-800">Currently Authenticated</span>
+                      </div>
+                    </div>
+                  )}
 
                   {useEnvFile && (
                     <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -542,61 +1347,22 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                   )}
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="mb-4">
-                    <h4 className="text-md font-semibold text-gray-800 mb-2">📋 Recipe Parameters</h4>
-                    <p className="text-sm text-gray-600">
-                      Configure the environment variables for this recipe
-                    </p>
-                  </div>
-                  
-                  {detectedParameters.map((paramName) => (
-                    <div key={paramName}>
-                      <label className="block text-sm font-medium mb-1 text-gray-700">
-                        {paramName.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
-                        <span className="text-red-600 ml-1">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={envValues[paramName] || ''}
-                        onChange={(e) => handleEnvChange(paramName, e.target.value)}
-                        placeholder={`Enter ${paramName.toLowerCase()}...`}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                  ))}
-                  
-                  <div className="mt-6 pt-4 border-t border-gray-200">
-                    <button
-                      onClick={() => {
-                        setActiveTab('run');
-                        setTimeout(() => {
-                          if (!executing) {
-                            executeScript();
-                          }
-                        }, 100);
-                      }}
-                      disabled={executing}
-                      className={`w-full px-6 py-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center ${
-                        executing
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-green-600 text-white hover:bg-green-700'
-                      }`}
-                    >
-                      {executing ? (
-                        <>
-                          <span className="animate-spin rounded-full h-4 w-4 border-b border-white inline-block mr-2"></span>
-                          Executing...
-                        </>
-                      ) : (
-                        <>
-                          <span className="mr-2">▶️</span>
-                          Run Script
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
+                <SmartParameterForm
+                  parameters={smartParameters}
+                  values={envValues}
+                  onChange={setEnvValues}
+                  authToken={authToken}
+                  onRunScript={() => {
+                    console.log('SmartParameterForm authToken:', authToken);
+                    // Switch to Response tab immediately so user can see progress
+                    setActiveTab('run');
+                    if (!executing) {
+                      executeScript();
+                    }
+                  }}
+                  executing={executing}
+                  onShowReadme={() => setActiveTab('readme')}
+                />
               )}
             </div>
           ) : activeTab === 'run' ? (
@@ -630,22 +1396,55 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                 </button>
               </div>
 
+              {/* Parameter Summary */}
+              {Object.keys(envValues).length > 0 && Object.values(envValues).some(v => v && v.trim()) && (
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="text-sm font-semibold text-blue-800 mb-2">Request Parameters</h4>
+                  <div className="space-y-1">
+                    {smartParameters.map(param => {
+                      const value = envValues[param.name];
+                      if (!value || !value.trim()) return null;
+                      
+                      return (
+                        <div key={param.name} className="text-xs text-blue-700">
+                          <span className="font-medium">{param.friendlyName}:</span> <span className="font-mono">{value}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Execution Results */}
               {executionResult && (
                 <div className="border rounded-lg bg-gray-50">
                   {/* Header with Status and Response Code */}
                   <div className={`px-4 py-3 border-b ${
-                    executionResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                    executionResult.success === true ? 'bg-green-50 border-green-200' :
+                    executionResult.success === false ? 'bg-red-50 border-red-200' :
+                    'bg-blue-50 border-blue-200'
                   }`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <span className={`text-lg mr-2 ${executionResult.success ? 'text-green-600' : 'text-red-600'}`}>
-                          {executionResult.success ? '✅' : '❌'}
+                        <span className={`text-lg mr-2 ${
+                          executionResult.success === true ? 'text-green-600' :
+                          executionResult.success === false ? 'text-red-600' :
+                          'text-blue-600'
+                        }`}>
+                          {executionResult.success === true ? '✅' : 
+                           executionResult.success === false ? '❌' : 
+                           '⏳'}
                         </span>
-                        <span className={`font-semibold ${executionResult.success ? 'text-green-800' : 'text-red-800'}`}>
-                          {executionResult.success 
+                        <span className={`font-semibold ${
+                          executionResult.success === true ? 'text-green-800' :
+                          executionResult.success === false ? 'text-red-800' :
+                          'text-blue-800'
+                        }`}>
+                          {executionResult.success === true
                             ? `Success${executionResult.httpStatus ? ` (${executionResult.httpStatus})` : ''}`
-                            : `Error${executionResult.httpStatus ? ` (${executionResult.httpStatus})` : ''}`
+                            : executionResult.success === false
+                            ? `Error${executionResult.httpStatus ? ` (${executionResult.httpStatus})` : ''}`
+                            : 'Processing...'
                           }
                         </span>
                       </div>
@@ -662,15 +1461,35 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-sm font-semibold text-gray-700">Console Output:</p>
                           <button
-                            onClick={() => navigator.clipboard.writeText(executionResult.output)}
+                            onClick={async () => {
+                              await navigator.clipboard.writeText(executionResult.output);
+                              setCopyButtonText('Copied!');
+                              setTimeout(() => setCopyButtonText('Copy Output'), 2000);
+                            }}
                             className="text-xs text-blue-600 hover:text-blue-800 underline"
                           >
-                            Copy Output
+                            {copyButtonText}
                           </button>
                         </div>
-                        <pre className="bg-white border p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-auto max-h-64 border-gray-300">
-                          {executionResult.output}
-                        </pre>
+                        <div className="bg-white border p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-auto max-h-96 border-gray-300">
+                          {executionResult.output.split('\n').map((line, index) => (
+                            <div key={index}>
+                              {line.includes('📁 File saved! Click here to open downloads folder') ? (
+                                <span>
+                                  {line.split('📁 File saved! Click here to open downloads folder')[0]}
+                                  <button
+                                    onClick={openDownloadsFolder}
+                                    className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                  >
+                                    📁 File saved! Click here to open downloads folder
+                                  </button>
+                                </span>
+                              ) : (
+                                line
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                     {executionResult.error && (
@@ -684,7 +1503,7 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                             Copy Error
                           </button>
                         </div>
-                        <pre className="bg-red-50 border border-red-200 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-auto max-h-64">
+                        <pre className="bg-red-50 border border-red-200 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-auto max-h-96">
                           {executionResult.error}
                         </pre>
                       </div>
