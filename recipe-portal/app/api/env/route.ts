@@ -4,7 +4,7 @@ import path from 'path';
 
 export async function GET() {
   try {
-    const envFilePath = path.join(process.cwd(), '..', 'sigma-api-recipes', '.env');
+    const envFilePath = path.join(process.cwd(), 'recipes', '.env');
     
     if (!fs.existsSync(envFilePath)) {
       return NextResponse.json({

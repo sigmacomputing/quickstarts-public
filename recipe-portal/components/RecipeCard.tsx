@@ -10,15 +10,30 @@ interface RecipeCardProps {
 }
 
 function getStatusBadge(recipe: Recipe, hasValidToken: boolean) {
-  // Only show "Ready to Run" if recipe has no variables AND (doesn't need auth OR has valid token)
-  if (recipe.envVariables.length === 0 && (!recipe.isAuthRequired || hasValidToken)) {
-    return {
-      text: 'Ready to Run',
-      className: 'bg-green-100 text-green-800'
-    };
+  const badges = [];
+  
+  // Check if this is a download recipe
+  const downloadRecipes = ['export-workbook-element-csv.js', 'export-workbook-pdf.js'];
+  const isDownloadRecipe = downloadRecipes.some(downloadFileName => 
+    recipe.filePath.endsWith(downloadFileName)
+  );
+  
+  if (isDownloadRecipe) {
+    badges.push({
+      text: '⬇️ Download',
+      className: 'bg-blue-100 text-blue-800'
+    });
   }
   
-  return null; // No badge otherwise
+  // Only show "Ready to Run" if recipe has no variables AND (doesn't need auth OR has valid token)
+  if (recipe.envVariables.length === 0 && (!recipe.isAuthRequired || hasValidToken)) {
+    badges.push({
+      text: 'Ready to Run',
+      className: 'bg-green-100 text-green-800'
+    });
+  }
+  
+  return badges.length > 0 ? badges : null;
 }
 
 function getCategoryIcon(category: string) {
@@ -36,24 +51,32 @@ function getCategoryIcon(category: string) {
 
 export function RecipeCard({ recipe, hasValidToken = false }: RecipeCardProps) {
   const [showCodeViewer, setShowCodeViewer] = useState(false);
-  const status = getStatusBadge(recipe, hasValidToken);
+  const badges = getStatusBadge(recipe, hasValidToken);
   const icon = getCategoryIcon(recipe.category);
   
   return (
     <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6 border border-gray-300">
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center">
-          <span className="text-xl mr-3">{icon}</span>
-          <h3 className="text-lg font-semibold text-gray-800 leading-tight">
-            {recipe.name}
-          </h3>
+      <div className="flex items-start justify-between mb-4 gap-3">
+        <div className="flex items-start flex-wrap gap-2 flex-1 min-w-0">
+          <div className="flex items-center">
+            <span className="text-xl mr-3">{icon}</span>
+            <h3 className="text-lg font-semibold text-gray-800 leading-tight">
+              {recipe.name}
+            </h3>
+          </div>
+          {badges && badges.map((badge, index) => (
+            <span key={index} className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${badge.className} shrink-0`}>
+              {badge.text}
+            </span>
+          ))}
         </div>
-        {status && (
-          <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${status.className} shrink-0 ml-2`}>
-            {status.text}
-          </span>
-        )}
+        <button 
+          className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-700 transition-colors shrink-0"
+          onClick={() => setShowCodeViewer(true)}
+        >
+          View Recipe
+        </button>
       </div>
       
       {/* Description */}
@@ -63,7 +86,7 @@ export function RecipeCard({ recipe, hasValidToken = false }: RecipeCardProps) {
       
       {/* Environment Variables */}
       {recipe.envVariables.length > 0 && (
-        <div className="mb-4">
+        <div className="mb-3">
           <p className="text-xs font-medium text-gray-700 mb-2">Required Variables:</p>
           <div className="flex flex-wrap gap-1">
             {recipe.envVariables.slice(0, 3).map((envVar) => (
@@ -83,31 +106,6 @@ export function RecipeCard({ recipe, hasValidToken = false }: RecipeCardProps) {
         </div>
       )}
       
-      {/* Actions */}
-      <div className="flex items-center justify-end pt-4 border-t border-gray-100">
-        <div className="flex space-x-2">
-          <button 
-            className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
-            onClick={() => setShowCodeViewer(true)}
-          >
-            View Recipe
-          </button>
-        </div>
-      </div>
-      
-      {/* Recipe-specific Instructions */}
-      {recipe.category !== 'authentication' && recipe.readmePath && (
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <a 
-            href={`/api/readme?path=${encodeURIComponent(recipe.readmePath)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:text-blue-800 text-xs underline"
-          >
-            Instructions →
-          </a>
-        </div>
-      )}
       
       <CodeViewer
         isOpen={showCodeViewer}
@@ -117,6 +115,7 @@ export function RecipeCard({ recipe, hasValidToken = false }: RecipeCardProps) {
         envVariables={recipe.envVariables}
         useEnvFile={false}
         defaultTab="run"
+        readmePath={recipe.readmePath}
       />
     </div>
   );
