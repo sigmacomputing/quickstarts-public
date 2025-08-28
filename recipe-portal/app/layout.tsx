@@ -2,8 +2,13 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Sigma API Recipe Portal',
-  description: 'Interactive portal for Sigma API recipes and examples',
+  title: 'QuickStarts API Toolkit',
+  description: 'Experiment with Sigma API calls and learn common request flows',
+  icons: {
+    icon: '/crane.png',
+    shortcut: '/crane.png',
+    apple: '/crane.png',
+  },
 }
 
 export default function RootLayout({

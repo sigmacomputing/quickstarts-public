@@ -14,14 +14,14 @@ export async function GET(request: Request) {
       );
     }
 
-    // Security check: ensure the file is within the sigma-api-recipes directory
-    const recipesPath = path.join(process.cwd(), '..', 'sigma-api-recipes');
+    // Security check: ensure the file is within the recipes directory
+    const recipesPath = path.join(process.cwd(), 'recipes');
     const resolvedPath = path.resolve(filePath);
     const resolvedRecipesPath = path.resolve(recipesPath);
     
     if (!resolvedPath.startsWith(resolvedRecipesPath)) {
       return NextResponse.json(
-        { error: 'Access denied: File must be within sigma-api-recipes directory' },
+        { error: 'Access denied: File must be within recipes directory' },
         { status: 403 }
       );
     }

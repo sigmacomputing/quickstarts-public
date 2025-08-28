@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { RecipeCard } from '../components/RecipeCard';
 import { CodeViewer } from '../components/CodeViewer';
+import { QuickApiExplorer } from '../components/QuickApiExplorer';
 
 interface Recipe {
   id: string;
@@ -29,9 +30,36 @@ export default function Home() {
   const [recipeData, setRecipeData] = useState<RecipeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTopTab, setActiveTopTab] = useState<'recipes' | 'quickapi'>('recipes');
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>('');
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const [hasValidToken, setHasValidToken] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [clearingToken, setClearingToken] = useState(false);
+  const [quickApiKey, setQuickApiKey] = useState(0);
+
+  // Function to check auth status (reusable)
+  const checkAuthStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/token');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.hasValidToken) {
+          setHasValidToken(true);
+          setAuthToken(data.token);
+        } else {
+          setHasValidToken(false);
+          setAuthToken(null);
+        }
+      } else {
+        setHasValidToken(false);
+        setAuthToken(null);
+      }
+    } catch (error) {
+      setHasValidToken(false);
+      setAuthToken(null);
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchRecipes() {
@@ -53,23 +81,43 @@ export default function Home() {
       }
     }
 
-    async function checkAuthStatus() {
-      try {
-        const response = await fetch('/api/token');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.hasValidToken) {
-            setHasValidToken(true);
-          }
-        }
-      } catch (error) {
-        // Ignore errors - just means no token is cached
-      }
-    }
-
     fetchRecipes();
     checkAuthStatus();
-  }, []);
+  }, [checkAuthStatus]);
+
+  // Periodically check auth status every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(checkAuthStatus, 30000);
+    return () => clearInterval(interval);
+  }, [checkAuthStatus]);
+
+  const clearToken = async () => {
+    setClearingToken(true);
+    try {
+      const response = await fetch('/api/token/clear', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ clearAll: true })
+      });
+      
+      if (response.ok) {
+        setHasValidToken(false);
+        setAuthToken(null);
+        // If auth modal is open, close it to trigger form reset on next open
+        if (showAuthModal) {
+          setShowAuthModal(false);
+        }
+      } else {
+        console.error('Failed to clear token');
+      }
+    } catch (error) {
+      console.error('Error clearing token:', error);
+    } finally {
+      setClearingToken(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -109,74 +157,138 @@ export default function Home() {
         <header className="mb-6">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Sigma API Recipe Portal
-              </h1>
+              <div className="flex items-center mb-2">
+                <img src="/crane.png" alt="Sigma Logo" className="h-10 mr-3" />
+                <h1 className="text-3xl font-bold text-gray-900">
+            QuickStarts API Toolkit
+                </h1>
+              </div>
               
               
-              <p className="text-lg text-gray-600 whitespace-nowrap">
-                Interactive collection of JavaScript samples demonstrating how to use the Sigma API for specific use cases.
+              <p className="text-lg text-gray-600">
+                Experiment with Sigma API calls and learn common request flows
               </p>
             </div>
             
-            {/* Auth Button */}
-            <div className="ml-4">
+            {/* Action Buttons */}
+            <div className="flex gap-3 flex-shrink-0">
               <button
-                onClick={() => setShowAuthModal(true)}
-                className={`flex items-center px-4 py-2 rounded-lg border transition-colors ${
-                  hasValidToken 
-                    ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
-                    : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
-                }`}
+                onClick={() => window.open(`/api/readme?path=${encodeURIComponent('README.md')}`, '_blank')}
+                className="flex items-center px-4 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
               >
                 <span className="text-sm font-medium">
-                  🔐 Authentication {hasValidToken ? '✓' : '⚠️'}
+                  Documentation
                 </span>
               </button>
+              
+              {hasValidToken ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowAuthModal(true)}
+                    className="flex items-center px-4 py-2 rounded-lg border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
+                  >
+                    <span className="text-green-600 mr-2">✓</span>
+                    <span className="text-sm font-medium">
+                      Authenticated
+                    </span>
+                  </button>
+                  <button
+                    onClick={clearToken}
+                    disabled={clearingToken}
+                    className="flex items-center px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                  >
+                    <span className="text-sm font-medium whitespace-nowrap">
+                      {clearingToken ? 'Ending...' : 'End Session'}
+                    </span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="flex items-center px-4 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors"
+                >
+                  <span className="text-sm font-medium">
+                    Authentication Required
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </header>
 
         {/* Main Content Container */}
         <div className="bg-gray-50 rounded-lg shadow-lg overflow-hidden border border-gray-200">
-          {/* Category Tabs */}
-          <div className="border-b border-gray-300 bg-gray-100">
-            <nav className="flex flex-wrap px-6">
-              {sortedCategories.map((category) => (
-                <button
-                  key={category.name}
-                  onClick={() => setActiveCategoryTab(category.name)}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 mr-6 ${
-                    activeCategoryTab === category.name
-                      ? 'text-blue-600 border-blue-600 bg-white'
-                      : 'text-gray-600 border-transparent hover:text-gray-800 hover:border-gray-400 bg-gray-100'
-                  }`}
-                >
-                  {category.name} ({category.recipes.length})
-                </button>
-              ))}
+          {/* Top Level Tabs */}
+          <div className="border-b border-gray-300 bg-white">
+            <nav className="flex">
+              <button
+                onClick={() => setActiveTopTab('recipes')}
+                className={`px-6 py-4 text-sm font-medium border-b-2 ${
+                  activeTopTab === 'recipes'
+                    ? 'text-white border-blue-600 bg-blue-600'
+                    : 'text-gray-600 border-transparent hover:text-gray-800 hover:border-gray-300 bg-gray-100'
+                }`}
+              >
+                Recipes
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTopTab('quickapi');
+                  // Reset Quick API component to clear any previous results
+                  setQuickApiKey(prev => prev + 1);
+                }}
+                className={`px-6 py-4 text-sm font-medium border-b-2 ${
+                  activeTopTab === 'quickapi'
+                    ? 'text-white border-blue-600 bg-blue-600'
+                    : 'text-gray-600 border-transparent hover:text-gray-800 hover:border-gray-300 bg-gray-100'
+                }`}
+              >
+                Quick API
+              </button>
             </nav>
           </div>
 
-          {/* Category Content */}
-          <div className="p-6 bg-white">
-            {activeCategory && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {activeCategory.recipes.map((recipe) => (
-                  <RecipeCard key={recipe.id} recipe={recipe} hasValidToken={hasValidToken} />
-                ))}
+          {/* Tab Content */}
+          {activeTopTab === 'recipes' ? (
+            <>
+              {/* Category Tabs */}
+              <div className="border-b border-gray-300 bg-gray-100">
+                <nav className="flex flex-wrap px-6">
+                  {sortedCategories.map((category) => (
+                    <button
+                      key={category.name}
+                      onClick={() => setActiveCategoryTab(category.name)}
+                      className={`px-4 py-3 text-sm font-medium border-b-2 mr-6 ${
+                        activeCategoryTab === category.name
+                          ? 'text-white border-blue-500 bg-blue-500'
+                          : 'text-gray-700 border-transparent hover:text-gray-900 hover:border-gray-400 bg-gray-200'
+                      }`}
+                    >
+                      {category.name} ({category.recipes.length})
+                    </button>
+                  ))}
+                </nav>
               </div>
-            )}
-          </div>
+
+              {/* Category Content */}
+              <div className="p-6 bg-white">
+                {activeCategory && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {activeCategory.recipes.map((recipe) => (
+                      <RecipeCard key={recipe.id} recipe={recipe} hasValidToken={hasValidToken} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <QuickApiExplorer key={quickApiKey} hasValidToken={hasValidToken} authToken={authToken} />
+          )}
 
           {/* Footer */}
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 text-center text-gray-500 text-sm">
-            <p>
-              Last updated: {recipeData ? new Date(recipeData.timestamp).toLocaleString() : '—'}
-            </p>
-            <p className="mt-1">
-              Recipes are automatically discovered from the sigma-api-recipes directory
-            </p>
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center text-gray-500 text-sm">
+            <p>© Sigma 2025</p>
+            <p>Last updated: {recipeData ? new Date(recipeData.timestamp).toLocaleDateString() : '—'}</p>
           </div>
         </div>
 
@@ -191,8 +303,27 @@ export default function Home() {
             useEnvFile={false}
             onTokenObtained={() => {
               setHasValidToken(true);
+              // Refresh auth status to get the token
+              setTimeout(async () => {
+                try {
+                  const response = await fetch('/api/token');
+                  if (response.ok) {
+                    const data = await response.json();
+                    if (data.hasValidToken) {
+                      setAuthToken(data.token);
+                    }
+                  }
+                } catch (error) {
+                  // Ignore errors
+                }
+              }, 1000);
+            }}
+            onTokenCleared={() => {
+              setHasValidToken(false);
+              setAuthToken(null);
             }}
             defaultTab="readme"
+            hasValidToken={hasValidToken}
           />
         )}
       </div>
