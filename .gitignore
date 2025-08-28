@@ -2,3 +2,60 @@
 /embedding_qs_series_2/node_modules
 /embedding_jwt/jwt/node_modules
 embedding_qs_series_2/.env
+
+# Node.js dependencies - prevent large file issues
+node_modules/
+**/node_modules/
+
+# Next.js build artifacts and binaries - prevent 123MB file issues  
+.next/
+.next/**
+out/
+build/
+dist/
+
+# Large Next.js native binaries that caused previous PR failures
+node_modules/@next/swc-darwin-arm64/next-swc.darwin-arm64.node
+node_modules/@next/swc-darwin-x64/next-swc.darwin-x64.node
+node_modules/@next/swc-linux-x64-gnu/next-swc.linux-x64-gnu.node
+node_modules/@next/swc-linux-x64-musl/next-swc.linux-x64-musl.node
+node_modules/@next/swc-win32-x64-msvc/next-swc.win32-x64-msvc.node
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+**/.env
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
