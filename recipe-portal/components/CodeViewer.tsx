@@ -953,7 +953,7 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                         Start Here
                       </span>
                       <a 
-                        href="https://quickstarts.sigmacomputing.com/guide/developers_api_code_samples/index.html#0"
+                        href="https://quickstarts.sigmacomputing.com/guide/developers_quickstarts_api_tookit/index.html?index=..%2F..index#0"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:text-blue-800 underline"
@@ -1088,7 +1088,7 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                       </p>
                     </div>
                     <a 
-                      href="https://quickstarts.sigmacomputing.com/guide/developers_api_code_samples/index.html#0"
+                      href="https://quickstarts.sigmacomputing.com/guide/developers_quickstarts_api_tookit/index.html?index=..%2F..index#0"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-3 py-1.5 border border-blue-300 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-50 transition-colors flex items-center"

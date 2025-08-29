@@ -126,4 +126,4 @@ recipe-portal/
     └── get-access-token.js # Authentication helper
 ```
 
-For setup instructions and API credential creation, visit the QuickStart: [Sigma REST API Recipes](https://quickstarts.sigmacomputing.com/guide/developers_api_code_samples/index.html?index=..%2F..index#0)
+For setup instructions and API credential creation, visit the QuickStart: [Sigma REST API Recipes](https://quickstarts.sigmacomputing.com/guide/developers_quickstarts_api_tookit/index.html?index=..%2F..index#0)
