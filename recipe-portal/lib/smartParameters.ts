@@ -12,6 +12,8 @@ export interface SmartParameter {
     pattern?: string;
     minLength?: number;
     maxLength?: number;
+    min?: number;
+    max?: number;
   };
 }
 

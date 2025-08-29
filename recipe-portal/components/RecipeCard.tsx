@@ -7,6 +7,8 @@ import { CodeViewer } from './CodeViewer';
 interface RecipeCardProps {
   recipe: Recipe;
   hasValidToken?: boolean;
+  authToken?: string | null;
+  baseURL?: string;
 }
 
 function getStatusBadge(recipe: Recipe, hasValidToken: boolean) {
@@ -49,7 +51,7 @@ function getCategoryIcon(category: string) {
   return icons[category.toLowerCase()] || '📄';
 }
 
-export function RecipeCard({ recipe, hasValidToken = false }: RecipeCardProps) {
+export function RecipeCard({ recipe, hasValidToken = false, authToken, baseURL }: RecipeCardProps) {
   const [showCodeViewer, setShowCodeViewer] = useState(false);
   const badges = getStatusBadge(recipe, hasValidToken);
   const icon = getCategoryIcon(recipe.category);
@@ -116,6 +118,8 @@ export function RecipeCard({ recipe, hasValidToken = false }: RecipeCardProps) {
         useEnvFile={false}
         defaultTab="run"
         readmePath={recipe.readmePath}
+        authToken={authToken}
+        baseURL={baseURL}
       />
     </div>
   );

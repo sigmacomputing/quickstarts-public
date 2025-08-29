@@ -8,6 +8,7 @@ interface SmartParameterFormProps {
   values: Record<string, string>;
   onChange: (values: Record<string, string>) => void;
   authToken?: string | null;
+  baseURL?: string; // Add baseURL prop to prevent race conditions
   onRunScript?: () => void;
   executing?: boolean;
   context?: 'recipe' | 'api';
@@ -26,6 +27,7 @@ export function SmartParameterForm({
   values, 
   onChange, 
   authToken,
+  baseURL = 'https://aws-api.sigmacomputing.com/v2', // Default fallback baseURL
   onRunScript,
   executing = false,
   context = 'recipe',
@@ -36,7 +38,7 @@ export function SmartParameterForm({
 
   // Fetch resource data for dropdown parameters
   useEffect(() => {
-    console.log('SmartParameterForm useEffect triggered - authToken changed:', authToken?.substring(0,20) + '...');
+    console.log('SmartParameterForm useEffect triggered - authToken:', authToken?.substring(0,20) + '...', 'baseURL:', baseURL);
     
     if (!authToken) {
       setResourceData({});
@@ -80,7 +82,7 @@ export function SmartParameterForm({
         setLoadingResources(prev => ({ ...prev, [resourceType]: true }));
         
         try {
-          let url = `/api/resources?type=${resourceType}&token=${encodeURIComponent(authToken)}`;
+          let url = `/api/resources?type=${resourceType}&token=${encodeURIComponent(authToken)}&baseURL=${encodeURIComponent(baseURL)}`;
           if (param?.dependsOn && dependentValue) {
             // Map parameter names to expected API parameter names
             const paramMapping: Record<string, string> = {
@@ -117,7 +119,7 @@ export function SmartParameterForm({
             console.warn(`Error response:`, errorText);
           }
         } catch (error) {
-          if (error.name === 'AbortError') {
+          if (error instanceof Error && error.name === 'AbortError') {
             console.log(`Fetch ${resourceType} aborted`);
           } else {
             console.warn(`Error fetching ${resourceType}:`, error);
@@ -138,7 +140,7 @@ export function SmartParameterForm({
       isCancelled = true;
       abortController.abort();
     };
-  }, [parameters, authToken, values]);
+  }, [parameters, authToken, baseURL, values]);
 
   const handleChange = (paramName: string, value: string) => {
     const newValues = { ...values, [paramName]: value };

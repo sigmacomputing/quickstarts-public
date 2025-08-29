@@ -77,23 +77,41 @@ function getStoredCredentials(configName) {
   try {
     const keysFile = path.join(getKeysDirectory(), 'encrypted-keys.json');
     
+    console.log('=== AUTH SCRIPT CONFIG SELECTION DEBUG ===');
+    console.log('Requested config name:', configName);
+    console.log('Keys file path:', keysFile);
+    
     if (!fs.existsSync(keysFile)) {
+      console.log('Keys file does not exist');
       return null;
     }
     
     const allCredentials = JSON.parse(fs.readFileSync(keysFile, 'utf-8'));
+    console.log('Available configs:', Object.keys(allCredentials).filter(k => k !== '_metadata'));
+    console.log('Default set in metadata:', allCredentials._metadata?.defaultSet);
     
     // Use provided name, or default, or first available
     let targetName = configName;
     if (!targetName) {
       targetName = allCredentials._metadata?.defaultSet || Object.keys(allCredentials).find(k => k !== '_metadata');
+      console.log('No config name provided, using:', targetName);
+    } else {
+      console.log('Using provided config name:', targetName);
     }
     
     if (!targetName || !allCredentials[targetName]) {
+      console.log('Target config not found:', targetName);
       return null;
     }
     
-    return decryptCredentials(allCredentials[targetName].encrypted);
+    const decrypted = decryptCredentials(allCredentials[targetName].encrypted);
+    if (decrypted) {
+      console.log('Successfully decrypted config for:', targetName);
+      console.log('ClientId starts with:', decrypted.clientId?.substring(0, 8));
+      console.log('BaseURL:', decrypted.baseURL);
+    }
+    
+    return decrypted;
   } catch (error) {
     console.error('Failed to retrieve stored credentials:', error);
     return null;
@@ -136,7 +154,7 @@ function getCachedToken(clientId) {
 /**
  * Cache a new token
  */
-function cacheToken(token, clientId, expiresIn = 3600) {
+function cacheToken(token, clientId, expiresIn = 3600, baseURL = null, authURL = null) {
   try {
     const tempDir = os.tmpdir();
     const configHash = clientId ? clientId.substring(0, 8) : 'default';
@@ -145,6 +163,8 @@ function cacheToken(token, clientId, expiresIn = 3600) {
     const tokenData = {
       token: token,
       clientId: clientId,
+      baseURL: baseURL, // Store baseURL with token for race condition prevention
+      authURL: authURL, // Store authURL with token for completeness
       createdAt: Date.now(),
       lastAccessed: Date.now(),
       expiresAt: Date.now() + (expiresIn * 1000) // Convert to milliseconds
@@ -160,6 +180,12 @@ function cacheToken(token, clientId, expiresIn = 3600) {
  * Get bearer token using new authentication system
  */
 async function getBearerToken(configName) {
+  // Allow configName to be passed via environment variable for portal integration
+  const envConfigName = process.env.CONFIG_NAME;
+  if (!configName && envConfigName) {
+    configName = envConfigName;
+    console.log('Using config name from environment:', configName);
+  }
   try {
     // Get stored credentials
     const credentials = getStoredCredentials(configName);
@@ -197,8 +223,8 @@ async function getBearerToken(configName) {
     
     console.log('Bearer token obtained successfully:', response.data.access_token);
     
-    // Cache the new token
-    cacheToken(token, credentials.clientId, expiresIn);
+    // Cache the new token with baseURL and authURL to prevent race conditions
+    cacheToken(token, credentials.clientId, expiresIn, credentials.baseURL, credentials.authURL);
     
     return token;
   } catch (error) {

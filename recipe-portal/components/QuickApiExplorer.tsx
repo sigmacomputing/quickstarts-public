@@ -18,6 +18,7 @@ interface QuickApiEndpoint {
 interface QuickApiExplorerProps {
   hasValidToken: boolean;
   authToken?: string | null;
+  baseURL?: string; // Add baseURL prop to prevent race conditions
 }
 
 const QUICK_ENDPOINTS: QuickApiEndpoint[] = [
@@ -155,7 +156,7 @@ const QUICK_ENDPOINTS: QuickApiEndpoint[] = [
   }
 ];
 
-export function QuickApiExplorer({ hasValidToken, authToken }: QuickApiExplorerProps) {
+export function QuickApiExplorer({ hasValidToken, authToken, baseURL = 'https://aws-api.sigmacomputing.com/v2' }: QuickApiExplorerProps) {
   const [activeCategory, setActiveCategory] = useState<'List All' | 'Get Details'>('List All');
   const [selectedEndpoint, setSelectedEndpoint] = useState<QuickApiEndpoint | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -279,6 +280,7 @@ export function QuickApiExplorer({ hasValidToken, authToken }: QuickApiExplorerP
             endpoint={selectedEndpoint}
             hasValidToken={hasValidToken}
             authToken={authToken}
+            baseURL={baseURL} // Pass baseURL to prevent race conditions
           />
         )}
       </div>

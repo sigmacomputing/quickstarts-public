@@ -33,6 +33,7 @@ export default function Home() {
   const [activeTopTab, setActiveTopTab] = useState<'recipes' | 'quickapi'>('recipes');
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>('');
   const [authToken, setAuthToken] = useState<string | null>(null);
+  const [authBaseURL, setAuthBaseURL] = useState<string>('https://aws-api.sigmacomputing.com/v2'); // Store baseURL from auth config
   const [hasValidToken, setHasValidToken] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [clearingToken, setClearingToken] = useState(false);
@@ -47,6 +48,9 @@ export default function Home() {
         if (data.hasValidToken) {
           setHasValidToken(true);
           setAuthToken(data.token);
+          if (data.baseURL) {
+            setAuthBaseURL(data.baseURL); // Store baseURL to prevent race conditions
+          }
         } else {
           setHasValidToken(false);
           setAuthToken(null);
@@ -275,14 +279,20 @@ export default function Home() {
                 {activeCategory && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {activeCategory.recipes.map((recipe) => (
-                      <RecipeCard key={recipe.id} recipe={recipe} hasValidToken={hasValidToken} />
+                      <RecipeCard 
+                        key={recipe.id} 
+                        recipe={recipe} 
+                        hasValidToken={hasValidToken}
+                        authToken={authToken}
+                        baseURL={authBaseURL}
+                      />
                     ))}
                   </div>
                 )}
               </div>
             </>
           ) : (
-            <QuickApiExplorer key={quickApiKey} hasValidToken={hasValidToken} authToken={authToken} />
+            <QuickApiExplorer key={quickApiKey} hasValidToken={hasValidToken} authToken={authToken} baseURL={authBaseURL} />
           )}
 
           {/* Footer */}
@@ -303,7 +313,7 @@ export default function Home() {
             useEnvFile={false}
             onTokenObtained={() => {
               setHasValidToken(true);
-              // Refresh auth status to get the token
+              // Refresh auth status to get the token and baseURL
               setTimeout(async () => {
                 try {
                   const response = await fetch('/api/token');
@@ -311,6 +321,9 @@ export default function Home() {
                     const data = await response.json();
                     if (data.hasValidToken) {
                       setAuthToken(data.token);
+                      if (data.baseURL) {
+                        setAuthBaseURL(data.baseURL); // Update baseURL to prevent race conditions
+                      }
                     }
                   }
                 } catch (error) {
