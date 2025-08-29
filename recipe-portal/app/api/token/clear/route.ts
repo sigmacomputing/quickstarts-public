@@ -19,25 +19,44 @@ export async function POST(request: Request) {
     if (clearAll) {
       // Clear all token cache files
       const tempDir = os.tmpdir();
+      console.log('=== CLEAR ALL TOKENS DEBUG ===');
+      console.log('Temp directory:', tempDir);
+      
       const files = fs.readdirSync(tempDir);
       const tokenFiles = files.filter(file => file.startsWith('sigma-portal-token-') && file.endsWith('.json'));
       
+      console.log('All files in temp dir that match pattern:', tokenFiles);
       console.log('Clearing all tokens:', tokenFiles);
       
       let clearedCount = 0;
+      let failedToDelete = [];
+      
       for (const file of tokenFiles) {
         try {
-          fs.unlinkSync(path.join(tempDir, file));
+          const fullPath = path.join(tempDir, file);
+          console.log(`Attempting to delete: ${fullPath}`);
+          fs.unlinkSync(fullPath);
           clearedCount++;
-          console.log(`Cleared token file: ${file}`);
+          console.log(`✓ Successfully cleared token file: ${file}`);
         } catch (err) {
-          console.warn(`Failed to delete token file ${file}:`, err);
+          console.error(`✗ Failed to delete token file ${file}:`, err);
+          failedToDelete.push({ file, error: err.message });
         }
       }
       
+      // Verify deletion by checking again
+      const filesAfterDelete = fs.readdirSync(tempDir);
+      const tokenFilesAfterDelete = filesAfterDelete.filter(file => file.startsWith('sigma-portal-token-') && file.endsWith('.json'));
+      console.log('Token files remaining after deletion attempt:', tokenFilesAfterDelete);
+      
       return NextResponse.json({
-        success: true,
-        message: `Cleared ${clearedCount} authentication token(s)`
+        success: failedToDelete.length === 0,
+        message: `Cleared ${clearedCount} authentication token(s)`,
+        details: {
+          cleared: clearedCount,
+          failed: failedToDelete,
+          remainingFiles: tokenFilesAfterDelete
+        }
       });
     } else {
       // Clear specific configuration's token

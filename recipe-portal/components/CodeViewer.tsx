@@ -618,6 +618,14 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
       console.log('Validation passed, continuing execution...');
       
       const allEnvVariables = { ...coreAuthVars, ...currentEnvValues };
+      
+      // For authentication script, always add CONFIG_NAME to debug
+      if (fileName === 'get-access-token.js') {
+        console.log('DEBUG AUTH SCRIPT - selectedCredentialSet:', selectedCredentialSet);
+        allEnvVariables['CONFIG_NAME'] = selectedCredentialSet || '';
+        console.log('Added CONFIG_NAME to env variables:', allEnvVariables['CONFIG_NAME']);
+      }
+      
       console.log('About to make API request with variables:', Object.keys(allEnvVariables));
       
       

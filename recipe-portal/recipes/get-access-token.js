@@ -77,23 +77,41 @@ function getStoredCredentials(configName) {
   try {
     const keysFile = path.join(getKeysDirectory(), 'encrypted-keys.json');
     
+    console.log('=== AUTH SCRIPT CONFIG SELECTION DEBUG ===');
+    console.log('Requested config name:', configName);
+    console.log('Keys file path:', keysFile);
+    
     if (!fs.existsSync(keysFile)) {
+      console.log('Keys file does not exist');
       return null;
     }
     
     const allCredentials = JSON.parse(fs.readFileSync(keysFile, 'utf-8'));
+    console.log('Available configs:', Object.keys(allCredentials).filter(k => k !== '_metadata'));
+    console.log('Default set in metadata:', allCredentials._metadata?.defaultSet);
     
     // Use provided name, or default, or first available
     let targetName = configName;
     if (!targetName) {
       targetName = allCredentials._metadata?.defaultSet || Object.keys(allCredentials).find(k => k !== '_metadata');
+      console.log('No config name provided, using:', targetName);
+    } else {
+      console.log('Using provided config name:', targetName);
     }
     
     if (!targetName || !allCredentials[targetName]) {
+      console.log('Target config not found:', targetName);
       return null;
     }
     
-    return decryptCredentials(allCredentials[targetName].encrypted);
+    const decrypted = decryptCredentials(allCredentials[targetName].encrypted);
+    if (decrypted) {
+      console.log('Successfully decrypted config for:', targetName);
+      console.log('ClientId starts with:', decrypted.clientId?.substring(0, 8));
+      console.log('BaseURL:', decrypted.baseURL);
+    }
+    
+    return decrypted;
   } catch (error) {
     console.error('Failed to retrieve stored credentials:', error);
     return null;
@@ -162,6 +180,12 @@ function cacheToken(token, clientId, expiresIn = 3600, baseURL = null, authURL =
  * Get bearer token using new authentication system
  */
 async function getBearerToken(configName) {
+  // Allow configName to be passed via environment variable for portal integration
+  const envConfigName = process.env.CONFIG_NAME;
+  if (!configName && envConfigName) {
+    configName = envConfigName;
+    console.log('Using config name from environment:', configName);
+  }
   try {
     // Get stored credentials
     const credentials = getStoredCredentials(configName);

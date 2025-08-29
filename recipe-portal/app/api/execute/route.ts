@@ -11,6 +11,9 @@ function getCurrentTokenInfo() {
     const files = fs.readdirSync(tempDir);
     const tokenFiles = files.filter(file => file.startsWith('sigma-portal-token-') && file.endsWith('.json'));
     
+    console.log('=== EXECUTE ROUTE TOKEN DEBUGGING ===');
+    console.log('Found token files:', tokenFiles);
+    
     let namedConfigTokens = [];
     let defaultToken = null;
     
@@ -23,6 +26,7 @@ function getCurrentTokenInfo() {
         // Check if token is still valid (not expired)
         if (tokenData.expiresAt && now < tokenData.expiresAt) {
           const lastAccessTime = tokenData.lastAccessed || tokenData.createdAt;
+          console.log(`Token ${file}: clientId=${tokenData.clientId?.substring(0,8) || 'default'}, fullLength=${tokenData.clientId?.length || 0}, createdAt=${new Date(tokenData.createdAt)}, lastAccessed=${tokenData.lastAccessed ? new Date(tokenData.lastAccessed) : 'none'}, lastAccessTime=${lastAccessTime}`);
           
           const tokenInfo = {
             hasValidToken: true,
@@ -37,28 +41,43 @@ function getCurrentTokenInfo() {
           // Use same classification logic as /api/token
           if (tokenData.clientId && tokenData.clientId.length > 8) {
             namedConfigTokens.push(tokenInfo);
+            console.log(`  -> This is a named config token (full clientId: ${tokenData.clientId.length} chars)`);
           } else {
             defaultToken = tokenInfo;
+            console.log(`  -> This is the default token (clientId: ${tokenData.clientId || 'none'})`);
           }
         } else {
+          console.log(`Token ${file} is expired, removing...`);
           // Token expired, remove file
           fs.unlinkSync(filePath);
         }
       } catch (err) {
+        console.warn(`Failed to read token file ${file}:`, err);
         // Skip invalid token files
       }
     }
     
+    console.log(`Found ${namedConfigTokens.length} named config tokens and ${defaultToken ? 1 : 0} default tokens`);
+    
     // Prioritize named config tokens over default token (same as /api/token)
     if (namedConfigTokens.length > 0) {
+      // Sort named config tokens by most recent access time
       namedConfigTokens.sort((a, b) => b.lastAccessTime - a.lastAccessTime);
+      console.log('Named config tokens sorted by lastAccessTime:');
+      namedConfigTokens.forEach((token, index) => {
+        console.log(`  ${index + 1}. ${token.clientId?.substring(0,8)}... - ${new Date(token.lastAccessTime)}`);
+      });
+      console.log(`  -> Selected most recent named config token: ${namedConfigTokens[0].clientId?.substring(0,8)}`);
       return namedConfigTokens[0];
     } else if (defaultToken) {
+      console.log(`  -> No named config tokens, using default token`);
       return defaultToken;
     }
     
+    console.log('  -> No valid tokens found');
     return null;
   } catch (error) {
+    console.error('Error in getCurrentTokenInfo:', error);
     return null;
   }
 }
