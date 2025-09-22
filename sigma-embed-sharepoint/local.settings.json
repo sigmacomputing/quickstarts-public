@@ -1,7 +1,14 @@
 {
-  "IsEncrypted": true,
+  "IsEncrypted": false,
   "Values": {
-    "FUNCTIONS_WORKER_RUNTIME": "CfDJ8C04gdgkYIZIk6tYemE73sc9GtnC+zhi+s9bYBxVbBraCRyCZI3HG1dKhwDxtcZTBryD0MKP+6UaEOV+2RsdShQEJpahK4Himy07VDrK3AkbBUwW3KunDHN4u52um/85DQ=="
-  },
-  "ConnectionStrings": {}
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "BASE_URL": "https://app.sigmacomputing.com/<org>/workbook/<name>-<workbookId>",
+    "CLIENT_ID": "<your-embed-client-id>",
+    "SECRET": "<your-embed-secret>",
+    "ACCOUNT_TYPE": "Embed",
+    "TEAM": "Embed_Users",
+    "SESSION_LENGTH": "300",
+    "DEV_EMAIL": "sharepoint@test.com"
+  }
 }
