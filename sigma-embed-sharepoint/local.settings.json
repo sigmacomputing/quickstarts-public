@@ -6,7 +6,7 @@
     "BASE_URL": "https://app.sigmacomputing.com/<org>/workbook/<name>-<workbookId>",
     "CLIENT_ID": "<your-embed-client-id>",
     "SECRET": "<your-embed-secret>",
-    "ACCOUNT_TYPE": "Embed",
+    "ACCOUNT_TYPE": "View",
     "TEAM": "Embed_Users",
     "SESSION_LENGTH": "300",
     "DEV_EMAIL": "sharepoint@test.com"
