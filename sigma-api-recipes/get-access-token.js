@@ -4,7 +4,7 @@
 // Swagger: https://help.sigmacomputing.com/reference/token
 
 // 1: Load environment variables from a specific .env file for configuration
-require('dotenv').config({ path: 'sigma-api-recipes/.env' });
+require('dotenv').config({ path: '.env' });
 
 // 2: Import Axios for making HTTP requests
 const axios = require('axios');

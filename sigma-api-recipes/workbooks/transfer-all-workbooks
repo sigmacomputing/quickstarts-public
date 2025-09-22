@@ -1,0 +1,165 @@
+// This script transfers ownership of all workbooks from one Sigma user to another using email addresses.
+
+// ---------------------------------------------
+// CONFIGURATION
+// ---------------------------------------------
+// 1: Load environment variables from a specific .env file for configuration
+require('dotenv').config({ path: '../.env' });
+
+// 2: Import the function to obtain a bearer token from the authenticate-bearer module
+const getBearerToken = require('../get-access-token');
+
+// 3: Import Axios for making HTTP requests
+const axios = require('axios');
+
+// 4: Load use-case specific variables from environment variables
+const baseURL = process.env.baseURL; // Your base URL
+
+// Old and new owners
+const OLD_OWNER_EMAIL = process.env.OLD_OWNER_EMAIL;
+const NEW_OWNER_EMAIL = process.env.NEW_OWNER_EMAIL;
+
+// ---------------------------------------------
+// MEMBER LOOKUP
+// ---------------------------------------------
+// Searches for a member by email address and returns their member ID
+async function getMemberIdByEmail(baseUrl, accessToken, email) {
+  try {
+    const url = `${baseUrl}/members?limit=120&search=${encodeURIComponent(email)}`;
+    const headers = {
+      accept: 'application/json',
+      authorization: `Bearer ${accessToken}`,
+    };
+
+    const response = await axios.get(url, { headers });
+    const data = response.data;
+    const entries = data.entries || [];
+
+    if (entries.length > 0) {
+      return entries[0].memberId; // Assuming unique email
+    } else {
+      console.error(`No member found with email: ${email}`);
+      return null;
+    }
+  } catch (error) {
+    console.error(`Failed to fetch member for ${email}`);
+    console.error(error.response ? error.response.data : error.message);
+    return null;
+  }
+}
+
+// ---------------------------------------------
+// LIST OWNED WORKBOOKS
+// ---------------------------------------------
+// Retrieves all workbooks owned by a specific member using pagination
+async function listAllOwnedWorkbooks(baseUrl, accessToken, ownerId) {
+  const ownedWorkbooks = {};
+  let page = 0;
+  const limit = 100;
+  let nextPage = true;
+
+  while (nextPage) {
+    try {
+      const url = `${baseUrl}/members/${ownerId}/files`;
+      const headers = {
+        accept: 'application/json',
+        authorization: `Bearer ${accessToken}`,
+      };
+
+      const response = await axios.get(url, {
+        headers,
+        params: { page, limit, typeFilters: 'workbook' },
+      });
+
+      const data = response.data;
+      const entries = data.entries || [];
+
+      entries.forEach((entry) => {
+        if (entry.ownerId === ownerId) {
+          ownedWorkbooks[entry.id] = {
+            name: entry.name,
+            url: entry.urlId,
+          };
+        }
+      });
+
+      if (data.nextPage) {
+        page += limit;
+      } else {
+        nextPage = false;
+      }
+    } catch (error) {
+      console.error('Failed to fetch workbooks');
+      console.error(error.response ? error.response.data : error.message);
+      break;
+    }
+  }
+
+  return ownedWorkbooks;
+}
+
+// ---------------------------------------------
+// TRANSFER OWNERSHIP
+// ---------------------------------------------
+// Main function that transfers all workbooks from old owner to new owner
+async function transferAllWorkbookOwnership(baseUrl, oldOwnerEmail, newOwnerEmail) {
+  // Get authentication token for API requests
+  const accessToken = await getBearerToken();
+
+
+  if (!accessToken) {
+    throw new Error('Could not obtain access token');
+  }
+
+
+  // Look up member IDs for both email addresses
+  const oldOwnerId = await getMemberIdByEmail(baseUrl, accessToken, oldOwnerEmail);
+  const newOwnerId = await getMemberIdByEmail(baseUrl, accessToken, newOwnerEmail);
+
+  if (!oldOwnerId || !newOwnerId) {
+    throw new Error('Could not obtain member IDs for provided email addresses');
+  }
+
+  // Get all workbooks owned by the old owner
+  const workbooksMap = await listAllOwnedWorkbooks(baseUrl, accessToken, oldOwnerId);
+
+  console.log(workbooksMap);
+  // Transfer ownership of each workbook to the new owner
+  for (const [workbookId, data] of Object.entries(workbooksMap)) {
+    console.log(`Transferring ownership : ${data.name} - ${data.url}`);
+
+    const url = `${baseUrl}/files/${workbookId}`;
+    const payload = { ownerId: newOwnerId };
+    const headers = {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      authorization: `Bearer ${accessToken}`,
+    };
+
+    try {
+      const response = await axios.patch(url, payload, { headers });
+      if ([200, 201].includes(response.status)) {
+        console.log('Done');
+      } else {
+        console.error('Failed to transfer ownership');
+        console.error('Status Code:', response.status);
+        console.error('Response:', response.data);
+      }
+    } catch (error) {
+      console.error('Failed to transfer ownership');
+      console.error(error.response ? error.response.data : error.message);
+    }
+  }
+}
+
+// ---------------------------------------------
+// MAIN
+// ---------------------------------------------
+if (require.main === module) {
+  transferAllWorkbookOwnership(baseURL, OLD_OWNER_EMAIL, NEW_OWNER_EMAIL)
+  .then(() => console.log('\nBulk transfer complete.'))
+  .catch((err) => console.error('Script failed:', err.message));
+}
+
+// Export the main function for reuse in other modules
+module.exports = transferAllWorkbookOwnership;
