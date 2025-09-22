@@ -1,18 +1,25 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-
-        {
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Sigma API Recipe",
       "type": "node",
       "request": "launch",
-      "name": "Run Server",
-      "program": "${workspaceFolder}/server/server.js",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}/sigma-api-recipes",
       "env": {
-        "DEBUG": "true"
-}
-
-    ]
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Debug Recipe Portal",
+      "type": "node",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}/recipe-portal",
+      "console": "integratedTerminal"
+    }
+  ]
 }
