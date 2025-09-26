@@ -29,7 +29,7 @@
         const userEmail = this.props.context.pageContext.user.email || 'test@example.com';
 
         // Your Azure Function URL
-        const functionUrl = `https://sigma-jwt-function-cybrd3gxdnbmd6c2.centralus-01.azurewebsites.net/api/HttpTrigger1?code=-jYVplgdnT0YBfXnYCS4hE_ZOPSfsrjxyfWubYNxUgOxAzFulpT1VQ==&user=${encodeURIComponent(userEmail)}`;
+        const functionUrl = `https://YOUR_FUNCTION_NAME.azurewebsites.net/api/HttpTrigger1?code=YOUR_FUNCTION_KEY&user=${encodeURIComponent(userEmail)}`;
         const response = await fetch(functionUrl);
         const data = await response.json();
 
