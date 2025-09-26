@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "sigma-sharepoint-webpart-client-side-solution",
+    "id": "633aaad6-dd50-4b32-a29f-bbaa79972ad7",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.21.1"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "sigma-sharepoint-webpart description"
+      },
+      "longDescription": {
+        "default": "sigma-sharepoint-webpart description"
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "sigma-sharepoint-webpart Feature",
+        "description": "The feature that activates elements of the sigma-sharepoint-webpart solution.",
+        "id": "f42e4137-ca65-4a11-b01b-5ffa0aaf509e",
+        "version": "1.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/sigma-sharepoint-webpart.sppkg"
+  }
+}
