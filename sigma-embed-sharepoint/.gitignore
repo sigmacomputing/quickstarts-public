@@ -54,3 +54,6 @@ CLAUDE.md
 # Temporary files
 *.tmp
 *.temp
+
+# Setup notes
+SETUP_NOTES.md
