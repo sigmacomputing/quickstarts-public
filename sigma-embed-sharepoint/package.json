@@ -38,5 +38,8 @@
     "@types/react-dom": "17.0.17",
     "eslint-plugin-react-hooks": "4.3.0",
     "@microsoft/sp-module-interfaces": "1.21.1"
+  },
+  "overrides": {
+    "jszip": "3.10.1"
   }
 }
