@@ -1,0 +1,22 @@
+/* Layout */
+@use "assets/styles/layout.scss";
+
+/* PrimeNG */
+@use "../node_modules/primeflex/primeflex.scss";
+@use "../node_modules/primeicons/primeicons.css";
+
+/* you can add global styles to this file, and also import other style files */
+$gutter: 1rem; //for primeflex grid system
+
+// override PrimeNg breakpoints
+$sm: 480px;
+$md: 768px;
+$lg: 1024px;
+$xl: 1800px;
+
+:root {
+    --sm: #{$sm};  /* default 576 */
+    --md: #{$md};  /* default 768 */
+    --lg: #{$lg}; /* default 992 */
+    --xl: #{$xl}; /* default 1200 */
+}
