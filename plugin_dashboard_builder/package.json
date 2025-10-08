@@ -1,49 +1,71 @@
-{
-    "name": "dashboard-builder",
-    "version": "1.0.0",
-    "scripts": {
-        "ng": "ng",
-        "start": "ng serve",
-        "build": "ng build",
-        "build:prod": "ng build --configuration production",
-        "watch": "ng build --watch --configuration development",
-        "test": "ng test",
-        "lint": "ng lint"
-    },
-    "private": true,
-    "dependencies": {
-        "@angular/animations": "^20.1.0",
-        "@angular/cdk": "^20.1.0",
-        "@angular/common": "^20.1.0",
-        "@angular/compiler": "^20.1.0",
-        "@angular/core": "^20.1.0",
-        "@angular/forms": "^20.1.0",
-        "@angular/platform-browser": "^20.1.0",
-        "@angular/platform-browser-dynamic": "^20.1.0",
-        "@angular/router": "^20.1.0",
-        "@primeng/themes": "^20.0.1",
-        "@sigmacomputing/plugin": "^1.0.6",
-        "primeflex": "^4.0.0",
-        "primeicons": "^7.0.0",
-        "primeng": "^20.0.1",
-        "quill": "^1.3.7",
-        "rxjs": "~7.8.0",
-        "tslib": "^2.3.0",
-        "zone.js": "~0.15.0"
-    },
-    "devDependencies": {
-        "@angular-devkit/build-angular": "^20.1.4",
-        "@angular/build": "^20.1.4",
-        "@angular/cli": "^20.1.4",
-        "@angular/compiler-cli": "^20.1.0",
-        "@types/jasmine": "~5.1.0",
-        "@types/react": "^19.1.4",
-        "jasmine-core": "~5.8.0",
-        "karma": "~6.4.0",
-        "karma-chrome-launcher": "~3.2.0",
-        "karma-coverage": "~2.2.0",
-        "karma-jasmine": "~5.1.0",
-        "karma-jasmine-html-reporter": "~2.1.0",
-        "typescript": "~5.8.2"
-    }
-}
+Before starting, you'll need to install:
+1. **Node.js 22.12.0 or higher**
+   - Download from [nodejs.org](https://nodejs.org/)
+   - Or use Node Version Manager (nvm): `nvm install 22.12.0`
+2. **Yarn package manager**
+   - Install globally: `npm install -g yarn`
+3. **VSCode** (recommended)
+   - Download from [code.visualstudio.com](https://code.visualstudio.com/)
+
+### Project Setup
+Open `VSCode` and start a new `Terminal` session.
+
+Create a new directory in your preferred location:
+```bash
+mkdir sigma_quickstarts
+```
+
+Change to the new directory:
+```bash
+cd sigma_quickstarts
+```
+
+Execute the terminal command:
+```bash
+git init
+```
+
+Add the remote repository as the origin:
+```bash
+git remote add -f origin https://github.com/sigmacomputing/quickstarts-public.git
+```
+
+Enable sparse checkout:
+```bash
+git config core.sparseCheckout true
+```
+
+Specify the folder you want to clone:
+```bash
+echo "plugin_dashboard_builder" >> .git/info/sparse-checkout
+```
+
+Pull the specified folder from the repository:
+```bash
+git pull origin main
+```
+
+Change directory to the new folder:
+```bash
+cd plugin_dashboard_builder
+```
+
+### Version Management (Optional but Recommended)
+If using Node Version Manager (nvm):
+```bash
+nvm use
+```
+This reads the Node.js version (22.12.0) from the `.nvmrc` file.
+
+### Install Dependencies and Start
+Install project dependencies:
+```bash
+yarn install
+```
+
+Start the local development server:
+```bash
+yarn start
+```
+
+Open browser to `http://localhost:4200` (default Angular port)
