@@ -1,0 +1,19 @@
+<div class="flex flex-column h-full w-full" style="position: absolute">
+    <div *ngIf="!vizLoaded" class="flex align-items-center justify-content-center sigma-loader" [class.no-animation]="!vizUrlControlValue">
+        <div class="flex align-items-end gap-2">
+            <p-skeleton size="2rem"/>
+            <p-skeleton size="3rem"/>
+            <p-skeleton size="4rem"/>
+            <p-skeleton width="5rem" height="15rem"/>
+        </div>
+    </div>
+    
+    <!-- height of the div containing the iframe is set to 0px when loading and 100% when loaded -->
+    <div *ngIf="vizUrlControlValue" class="iframe-container" [class.iframe-container-loaded]="vizLoaded" [class.iframe-container-loading]="!vizLoaded">
+        <iframe *ngIf="vizUrlControlValue" 
+            id="sigmaViz" [hidden]="!vizLoaded" [src]="vizUrlControlValue | safe" 
+            class="sigma-iframe"
+            frameBorder="0" (load)="registerEvent()">
+        </iframe>
+    </div>
+</div>
