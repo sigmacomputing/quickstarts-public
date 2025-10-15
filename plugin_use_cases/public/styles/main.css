@@ -1,0 +1,1556 @@
+/* ============================================================================
+   MAIN.CSS - Centralized Styles for Sigma Embed Application
+   
+   This file consolidates all common styles previously scattered across 
+   individual HTML files. It uses CSS custom properties for easy theming
+   and maintenance.
+   
+   Updated: 2025 - Consolidated from inline styles and layout.css
+   ============================================================================ */
+
+/* ============================================================================
+   CSS CUSTOM PROPERTIES (VARIABLES)
+   ============================================================================ */
+:root {
+  /* Colors */
+  --primary-color: #f57c00;
+  --export-primary: #1976d2;
+  --export-primary-hover: #1565c0;
+  --secondary-color: #333;
+  --background-color: #ffffff;
+  --sidebar-bg: #f4f4f4;
+  --border-color: #ddd;
+  --border-light: #ccc;
+  --footer-bg: lightgray;
+  --panel-bg: #f5f5f5;
+  --text-color: black;
+  --text-muted: gray;
+  --warning-color: red;
+  --delete-color: #b00020;
+  --hover-bg: #555;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+
+  /* Layout */
+  --sidebar-width: 280px;
+  --footer-height: 34px;
+  --border-radius: 6px;
+  --border-radius-sm: 4px;
+
+  /* Typography */
+  --font-family: sans-serif;
+  --font-size-xs: 13px;
+  --font-size-sm: 14px;
+  --font-size-base: 1rem;
+  --font-size-lg: 20px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-md: -2px 0 8px rgba(0, 0, 0, 0.2);
+
+  /* Transitions */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slide: 0.3s ease-in-out;
+}
+
+/* ============================================================================
+   BASE STYLES
+   ============================================================================ */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  margin: 0;
+  font-family: var(--font-family);
+  background-color: var(--background-color);
+}
+
+/* ============================================================================
+   LAYOUT COMPONENTS
+   ============================================================================ */
+
+/* Top Bar */
+.layout-topbar {
+  background: var(--primary-color);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 1rem;
+  gap: 0.5rem;
+}
+
+.layout-topbar .header-title {
+  font-size: var(--font-size-base);
+  margin-left: auto;
+  white-space: nowrap;
+  font-weight: bold;
+}
+
+/* Main Content Area */
+.main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Content Area */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 1.5rem;
+  background: var(--background-color);
+}
+
+/* Footer */
+.layout-footer {
+  background: var(--footer-bg);
+  text-align: center;
+  line-height: 35px;
+  height: var(--footer-height);
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 900;
+}
+
+/* ============================================================================
+   CONTROL PANEL
+   ============================================================================ */
+.control-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.control-group label {
+  font-weight: bold;
+  font-size: var(--font-size-xs);
+  display: block;
+  margin-bottom: var(--spacing-xs);
+}
+
+.control-group select {
+  font-size: var(--font-size-xs);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-light);
+  padding: var(--spacing-xs);
+  min-width: 150px;
+  background-color: white;
+}
+
+.control-group input[type="text"] {
+  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-light);
+  font-size: var(--font-size-xs);
+}
+
+.control-group button {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-light);
+  background: var(--secondary-color);
+  color: white;
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  transition: background var(--transition-fast);
+}
+
+.control-group button:hover {
+  background: var(--hover-bg);
+}
+
+.control-group button:disabled {
+  background: var(--border-light);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Toggle Info Button */
+#collapse-info {
+  width: fit-content;
+  margin-top: var(--spacing-xs);
+  margin-left: 0;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-light);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: white;
+}
+
+/* Home Button */
+.home-button {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--border-radius-sm);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  transition: background var(--transition-fast);
+}
+
+.home-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================================================
+   SIDEBAR
+   ============================================================================ */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--sidebar-bg);
+  padding: 1.5rem;
+  border-right: 1px solid var(--border-color);
+  overflow-y: auto;
+  transition: width var(--transition-normal), padding var(--transition-normal);
+}
+
+.sidebar.collapsed {
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.sidebar h2 {
+  margin-top: 0;
+  font-size: var(--font-size-lg);
+  color: var(--text-color);
+}
+
+.sidebar h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-color);
+}
+
+.sidebar p {
+  line-height: 1.4;
+  color: var(--secondary-color);
+}
+
+.sidebar code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-sm);
+  font-family: monospace;
+  font-size: var(--font-size-xs);
+}
+
+.sidebar pre {
+  background: rgba(0, 0, 0, 0.05);
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-family: monospace;
+  font-size: var(--font-size-xs);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* ============================================================================
+   IFRAME EMBED
+   ============================================================================ */
+iframe {
+  flex: 1 0 auto;
+  min-height: 500px;
+  border: none;
+  border-radius: var(--border-radius);
+  width: 100%;
+}
+
+/* ============================================================================
+   BOOKMARK TOGGLE BUTTON
+   ============================================================================ */
+#bookmarkToggle {
+  position: fixed;
+  top: 45px;
+  right: var(--spacing-md);
+  z-index: 1100;
+  background: var(--secondary-color);
+  color: white;
+  border: none;
+  padding: var(--spacing-xs) 10px;
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+
+#bookmarkToggle:hover {
+  background: var(--hover-bg);
+}
+
+#bookmarkToggle:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   SLIDE PANEL (GENERIC)
+   ============================================================================ */
+.slide-panel {
+  position: fixed;
+  top: 0;
+  right: -800px;
+  width: 400px;
+  height: 100vh;
+  background-color: white;
+  box-shadow: var(--shadow-md);
+  transition: right var(--transition-slide);
+  z-index: 1000;
+  padding: var(--spacing-xl);
+  overflow-y: auto;
+  border-left: 1px solid var(--border-light);
+}
+
+.slide-panel.open {
+  right: 0;
+}
+
+.slide-panel .close-btn {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  font-size: var(--font-size-lg);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.slide-panel .close-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================================================
+   BOOKMARK PANEL SPECIFIC
+   ============================================================================ */
+#bookmarkPanel {
+  background-color: var(--panel-bg);
+}
+
+#bookmarkPanel h2 {
+  margin-top: 0;
+  font-size: var(--font-size-lg);
+  color: var(--text-color);
+}
+
+#bookmarkPanel label {
+  display: block;
+  margin: var(--spacing-md) 0 var(--spacing-xs);
+  font-weight: bold;
+  color: var(--text-color);
+  font-size: var(--font-size-sm);
+}
+
+#bookmarkPanel input[type="text"],
+#bookmarkPanel textarea {
+  width: 100%;
+  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  resize: vertical;
+}
+
+#bookmarkPanel input[type="text"]:focus,
+#bookmarkPanel textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(245, 124, 0, 0.2);
+}
+
+#bookmarkPanel .radio-group {
+  margin: var(--spacing-sm) 0 var(--spacing-lg);
+}
+
+#bookmarkPanel .radio-group label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-xs) 0;
+  font-weight: normal;
+  cursor: pointer;
+}
+
+#bookmarkPanel .radio-group input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+#bookmarkPanel .checkbox-group {
+  margin-bottom: var(--spacing-lg);
+}
+
+#bookmarkPanel .checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-xs) 0;
+  font-weight: normal;
+  cursor: pointer;
+}
+
+#bookmarkPanel .checkbox-group input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+#bookmarkPanel .checkbox-group input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
+#bookmarkPanel button[type="submit"] {
+  width: 100%;
+  padding: 10px;
+  background-color: var(--secondary-color);
+  color: #fff;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: bold;
+  transition: background var(--transition-fast);
+}
+
+#bookmarkPanel button[type="submit"]:hover {
+  background-color: var(--hover-bg);
+}
+
+#bookmarkPanel button[type="submit"]:disabled {
+  background-color: var(--border-light);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+#bookmarkPanel .warning {
+  color: var(--warning-color);
+  font-weight: bold;
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-sm);
+  border-left: 3px solid var(--warning-color);
+  background: rgba(255, 0, 0, 0.05);
+  border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0;
+}
+
+/* Delete Button */
+#delete-bookmark-btn {
+  margin-top: var(--spacing-md);
+  background-color: var(--delete-color);
+  color: white;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: bold;
+  transition: background var(--transition-fast);
+}
+
+#delete-bookmark-btn:hover {
+  background-color: #8f0016;
+}
+
+/* ============================================================================
+   FORM STYLES
+   ============================================================================ */
+.form-row {
+  margin-bottom: var(--spacing-lg);
+}
+
+.form-group {
+  margin-bottom: var(--spacing-md);
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: var(--spacing-lg) 0;
+}
+
+/* ============================================================================
+   MODAL STYLES
+   ============================================================================ */
+
+/* Export Modal Button */
+#exportModalBtn {
+  position: fixed;
+  top: 45px;
+  right: var(--spacing-md);
+  z-index: 1100;
+  background: var(--export-primary);
+  color: white;
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-lg);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+
+#exportModalBtn:hover {
+  background: var(--export-primary-hover);
+}
+
+#exportModalBtn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Manage Exports Button */
+#manageExportsBtn {
+  position: fixed;
+  top: 45px;
+  right: 170px; /* Position to left of export button */
+  z-index: 1100;
+  background: var(--secondary-color);
+  color: white;
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-lg);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+
+#manageExportsBtn:hover {
+  background: var(--hover-bg);
+}
+
+#manageExportsBtn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Export Modal Overlay */
+#exportModal,
+#manageExportsModal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  justify-content: center;
+  align-items: center;
+}
+
+#exportModal.open,
+#manageExportsModal.open {
+  display: flex;
+}
+
+/* Export Modal Content */
+.modal-content {
+  background: white;
+  border-radius: var(--spacing-sm);
+  padding: var(--spacing-xl);
+  width: 500px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--text-color);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: var(--spacing-xl);
+  cursor: pointer;
+  color: #666;
+  margin-left: auto;
+}
+
+.modal-close:hover {
+  color: var(--text-color);
+}
+
+/* Form Sections */
+.form-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.form-section h3 {
+  margin: 0 0 var(--spacing-md) 0;
+  font-size: var(--font-size-base);
+  color: var(--text-color);
+}
+
+.form-group {
+  margin-bottom: var(--spacing-md);
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: var(--spacing-xs);
+  font-weight: 500;
+  color: var(--secondary-color);
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  box-sizing: border-box;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.form-row {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+/* Modal Actions */
+.modal-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
+  margin-top: var(--spacing-xl);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--border-color);
+}
+
+.btn {
+  padding: 10px var(--spacing-lg);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.btn-primary {
+  background: var(--export-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--export-primary-hover);
+}
+
+.btn-primary:disabled {
+  background: var(--border-light);
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--panel-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: #e0e0e0;
+}
+
+/* Hide modal overlay when closed */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* Exports List Styles */
+.export-item {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+  background: var(--background-color);
+}
+
+.export-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-sm);
+}
+
+.export-item-title {
+  font-weight: bold;
+  color: var(--text-color);
+  margin: 0;
+}
+
+.export-item-schedule {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin: var(--spacing-xs) 0;
+}
+
+.export-item-recipients {
+  font-size: var(--font-size-xs);
+  color: var(--secondary-color);
+  margin-bottom: var(--spacing-md);
+}
+
+.export-item-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.btn-small {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  border-radius: var(--border-radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.btn-edit {
+  background: var(--export-primary);
+  color: white;
+}
+
+.btn-edit:hover {
+  background: var(--export-primary-hover);
+}
+
+.btn-run {
+  background: #28a745;
+  color: white;
+}
+
+.btn-run:hover {
+  background: #218838;
+}
+
+.btn-delete {
+  background: var(--delete-color);
+  color: white;
+}
+
+.btn-delete:hover {
+  background: #8f0016;
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.loading-state {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--text-muted);
+}
+
+/* ============================================================================
+   UTILITY CLASSES
+   ============================================================================ */
+.hidden {
+  display: none !important;
+}
+
+.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.text-muted {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ============================================================================
+   LOADING STATES
+   ============================================================================ */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.loading::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  margin-right: var(--spacing-sm);
+  border: 2px solid var(--border-light);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================================
+   CENTRALIZED LOADING INDICATORS
+   ============================================================================ */
+
+/* Loading Overlay for Embeds */
+.embed-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  border-radius: var(--border-radius);
+}
+
+/* Loading Spinner Container */
+.loading-spinner {
+  background: white;
+  padding: 2rem;
+  border-radius: var(--spacing-sm);
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e0e0e0;
+}
+
+/* Animated Spinner */
+.loading-spinner .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-light);
+  border-top: 4px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem auto;
+}
+
+/* Loading Text */
+.loading-spinner .loading-text {
+  color: var(--secondary-color);
+  font-size: 16px;
+  font-weight: 500;
+  font-family: var(--font-family);
+}
+
+/* Iframe Translucency During Loading */
+iframe.loading {
+  opacity: 0.85;
+  transition: opacity 0.3s ease;
+}
+
+iframe:not(.loading) {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+/* Full-screen Loading Overlay (for modals, etc.) */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================ */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: -100%;
+    top: 0;
+    height: 100vh;
+    z-index: 1200;
+    transition: left var(--transition-normal);
+  }
+
+  .sidebar.open {
+    left: 0;
+  }
+
+  .control-panel {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .slide-panel {
+    width: 100%;
+    right: -100%;
+  }
+
+  #bookmarkToggle {
+    bottom: var(--spacing-lg);
+    right: var(--spacing-lg);
+    top: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .layout-topbar {
+    padding: var(--spacing-sm);
+  }
+
+  .content {
+    padding: var(--spacing-md);
+  }
+
+  .slide-panel {
+    padding: var(--spacing-md);
+  }
+}
+
+/* ============================================================================
+   WORKBOOK DESCRIPTION STYLES
+   ============================================================================ */
+
+/* Description Modal Button */
+#descriptionModalBtn {
+  position: fixed;
+  top: 50px; /* Default position: under title when no description */
+  right: var(--spacing-md);
+  z-index: 1100;
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-lg);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, top 0.2s;
+}
+
+/* Button position when description is shown */
+#descriptionModalBtn.below-description {
+  top: 65px; /* Position closer to description when description exists */
+}
+
+#descriptionModalBtn:hover {
+  background: #1d4ed8;
+}
+
+#descriptionModalBtn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Description Modal Overlay */
+#descriptionModal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  justify-content: center;
+  align-items: center;
+}
+
+#descriptionModal.open {
+  display: flex;
+}
+
+/* Content container positioning */
+.content {
+  position: relative;
+}
+
+/* Description display below title, left-aligned with title */
+#workbookDescription {
+  font-size: var(--font-size-base);
+  margin-left: auto;
+  white-space: nowrap;
+  font-weight: bold;
+  display: none; /* Hidden by default */
+}
+
+#workbookDescription.has-description {
+  display: block; /* Show when there's a description */
+  font-style: italic;
+  color: #000;
+  font-weight: normal;
+}
+
+/* ============================================================================
+   BOOKMARK DATABASE STYLES
+   ============================================================================ */
+
+/* Bookmark Toggle Button */
+#bookmarkToggle {
+  position: fixed;
+  top: 45px;
+  right: var(--spacing-md);
+  z-index: 1100;
+  background: var(--secondary-color);
+  color: white;
+  border: none;
+  padding: var(--spacing-xs) 10px;
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+#bookmarkToggle:hover {
+  background: var(--hover-bg);
+}
+
+#bookmarkToggle:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Bookmark Panel */
+#bookmarkPanel {
+  background-color: var(--panel-bg);
+  padding: var(--spacing-xl);
+  border-left: 1px solid var(--border-light);
+  font-family: var(--font-family);
+}
+
+#bookmarkPanel h2 {
+  margin-top: 0;
+  font-size: var(--font-size-lg);
+}
+
+#bookmarkPanel label {
+  display: block;
+  margin: var(--spacing-md) 0 var(--spacing-xs);
+  font-weight: bold;
+  color: var(--text-color);
+}
+
+#bookmarkPanel input[type="text"],
+#bookmarkPanel textarea {
+  width: 100%;
+  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  box-sizing: border-box;
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-sm);
+}
+
+#bookmarkPanel .radio-group {
+  margin: var(--spacing-sm) 0 var(--spacing-lg);
+}
+
+#bookmarkPanel .checkbox-group {
+  margin-bottom: var(--spacing-lg);
+}
+
+#bookmarkPanel button[type="submit"] {
+  width: 100%;
+  padding: 10px;
+  background-color: #444;
+  color: #fff;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+}
+
+#bookmarkPanel button[type="submit"]:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+#bookmarkPanel .warning {
+  color: var(--warning-color);
+  font-weight: bold;
+  margin-bottom: var(--spacing-md);
+}
+
+/* Slide Panel */
+.slide-panel {
+  position: fixed;
+  top: 0;
+  right: -800px;
+  width: 400px;
+  background-color: white;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
+  transition: right 0.3s ease-in-out;
+  z-index: 1000;
+  padding: var(--spacing-xl);
+  overflow-y: auto;
+  border-left: 1px solid var(--border-light);
+}
+
+.slide-panel.open {
+  right: 0;
+}
+
+.close-btn {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  font-size: var(--font-size-lg);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Hide fixed buttons when bookmark panel is open */
+.slide-panel.open ~ #bookmarkToggle {
+  display: none;
+}
+
+/* Hide Clear All button when panel is open (use class-based approach) */
+body.panel-open #clearAllBookmarks {
+  display: none !important;
+}
+
+/* Hide Clear All button for View Users */
+#clearAllBookmarks.hidden-for-view-user {
+  display: none !important;
+}
+
+/* ============================================================================
+   WORKBOOK COPY & CREATE STYLES
+   ============================================================================ */
+
+/* Copy & Create Workbook Buttons */
+#copyWorkbookBtn,
+#createWorkbookBtn {
+  position: fixed;
+  top: 45px;
+  right: var(--spacing-md);
+  z-index: 1100;
+  background: #16a34a;
+  color: white;
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-lg);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+#createWorkbookBtn {
+  right: 180px; /* Position to left of copy button */
+  background: #dc2626;
+}
+
+#copyWorkbookBtn:hover {
+  background: #15803d;
+}
+
+#createWorkbookBtn:hover {
+  background: #b91c1c;
+}
+
+#copyWorkbookBtn:disabled,
+#createWorkbookBtn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Copy & Create Workbook Modals */
+#copyWorkbookModal,
+#createWorkbookModal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  justify-content: center;
+  align-items: center;
+}
+
+#copyWorkbookModal.open,
+#createWorkbookModal.open {
+  display: flex;
+}
+
+/* Radio Group Styling for Modals */
+.radio-group {
+  margin: var(--spacing-sm) 0 var(--spacing-lg);
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-xs) 0;
+  font-weight: normal;
+  cursor: pointer;
+  color: var(--text-color);
+}
+
+.radio-group input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Force correct radio button alignment in modals */
+#copyWorkbookModal .radio-group label,
+#createWorkbookModal .radio-group label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin: 10px 0 !important;
+  padding: 5px 0 !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  width: 100% !important;
+  justify-content: flex-start !important;
+}
+
+#copyWorkbookModal .radio-group input[type="radio"],
+#createWorkbookModal .radio-group input[type="radio"] {
+  margin: 0 !important;
+  margin-right: 10px !important;
+  position: relative !important;
+  top: 0 !important;
+  left: 0 !important;
+  flex-shrink: 0 !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+/* ============================================================================
+   CAROUSEL COMPONENT STYLES
+   ============================================================================ */
+
+/* Carousel Toggle Button */
+.carousel-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chevron-only-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chevron-only-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chevron-only-btn:hover:not(:disabled) {
+  background: #e9ecef;
+  border-color: #007bff;
+}
+
+.selected-workbook-name {
+  font-size: 0.9rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.selected-workbook-name.has-selection {
+  color: #495057;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.chevron-icon {
+  transition: transform 0.3s ease;
+}
+
+/* Carousel Container */
+.carousel-container {
+  position: fixed;
+  top: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+  padding: 2rem;
+  margin-top: 0.5rem;
+  animation: slideDown 0.3s ease;
+}
+
+.control-group {
+  position: relative;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Swiper Carousel Styles */
+.workbook-swiper {
+  width: 100%;
+  height: 400px;
+  padding-top: 50px;
+  padding-bottom: 50px;
+  background-color: #f8f9fa; /* Light gray background - customize as needed */
+  border-radius: 12px;
+}
+
+.workbook-swiper .swiper-slide {
+  background-position: center;
+  background-size: cover;
+  width: 300px;
+  height: 250px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Workbook Card */
+.workbook-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  padding: 1rem;
+  border-radius: 8px;
+  transition: transform 0.2s ease;
+  height: 100%;
+}
+
+.workbook-card:hover {
+  transform: scale(1.05);
+}
+
+.workbook-card.selected {
+  transform: scale(1.1);
+  position: relative;
+}
+
+.workbook-card.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: #007bff;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(0,123,255,0.4);
+  z-index: 10;
+}
+
+.workbook-card.selected .workbook-thumbnail {
+  border: 3px solid #007bff;
+  box-shadow: 0 8px 25px rgba(0,123,255,0.3);
+}
+
+.workbook-thumbnail {
+  width: 240px;
+  height: 140px;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  background: #f5f5f5;
+  border: 2px solid #fff;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  margin-bottom: 0.8rem;
+  /* Force new stacking context and layout isolation */
+  transform: translateZ(0);
+  contain: layout style;
+}
+
+.workbook-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+
+.thumbnail-fallback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+  color: #6c757d;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.workbook-title {
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: center;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #333;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* Swiper Pagination */
+.workbook-swiper .swiper-pagination-bullet {
+  background: #007bff;
+  opacity: 0.3;
+}
+
+.workbook-swiper .swiper-pagination-bullet-active {
+  opacity: 1;
+}
+
+/* Simple Custom Carousel */
+.simple-carousel {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.carousel-nav {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.carousel-nav:hover {
+  background: #0056b3;
+}
+
+.carousel-nav:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.carousel-viewport {
+  overflow: hidden;
+  width: 600px;
+  height: 280px;
+}
+
+.carousel-track {
+  display: flex;
+  transition: transform 0.3s ease;
+  gap: 20px;
+}
+
+.carousel-item {
+  flex-shrink: 0;
+  width: 280px;
+}
+

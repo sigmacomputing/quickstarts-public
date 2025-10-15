@@ -1,0 +1,2428 @@
+<!DOCTYPE html>
+<!--
+═══════════════════════════════════════════════════════════════════════════════
+                        SIGMA DASHBOARD BUILDER HOST
+                       Multi-Area KPI Placement System
+═══════════════════════════════════════════════════════════════════════════════
+
+OVERVIEW:
+This application hosts Sigma's Dashboard Builder plugin across three independent
+areas, enabling users to place different KPIs in each area and save/restore
+complete multi-area dashboard configurations.
+
+ARCHITECTURE:
+- Host Application: Orchestrates multiple plugin instances and manages state
+- Dual Storage: Sigma bookmarks (exploreKey) + LowDB (multi-area configurations)
+- API Layer: RESTful endpoints for bookmark management and JWT authentication
+- Message System: Bidirectional communication between host and plugin instances
+
+KEY FEATURES:
+✓ Multi-area KPI placement (3 independent dashboard areas)
+✓ Bookmark management with incremental building support
+✓ ExploreKey synchronization and JWT authentication
+✓ Cross-contamination prevention between areas
+✓ Persistent local storage with LowDB
+✓ Production-ready error handling and validation
+
+WORKFLOW:
+1. Users place KPIs in any combination of the 3 areas
+2. Save creates dual storage: Sigma bookmark + LowDB multi-area config
+3. Load restores both exploreKey (from Sigma) and all areas (from LowDB)
+4. Delete removes local config while preserving Sigma bookmark history
+
+TECHNICAL NOTES:
+- Sigma's plugin system is single-state focused (one exploreKey per bookmark)
+- This system works WITH that limitation using intelligent dual storage
+- LowDB provides local persistence without external database dependencies
+- Message filtering prevents duplicate KPI restoration across areas
+
+AUTHORS: Development team with Claude Code assistance
+LAST UPDATED: 2025-10-15
+═══════════════════════════════════════════════════════════════════════════════
+-->
+<html lang="en">
+  <head>
+    <!-- Page metadata and layout styles -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Builder Plugin Host</title>
+    <link rel="stylesheet" href="/styles/main.css" />
+    <link rel="icon" href="data:," />
+    <style>
+      /* Plugin-specific styles */
+      .plugin-controls {
+        background: #f5f5f5;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+      }
+      
+      .dashboard-gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+        padding: 1rem;
+        background: #fafafa;
+        border-radius: 8px;
+      }
+      
+      .dashboard-element {
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: white;
+      }
+      
+      .dashboard-element:hover {
+        border-color: #007acc;
+        box-shadow: 0 2px 8px rgba(0, 122, 204, 0.2);
+      }
+      
+      .dashboard-element.selected {
+        border-color: #007acc;
+        background: #e6f3ff;
+      }
+      
+      .element-preview {
+        width: 100%;
+        height: 120px;
+        background: #f0f0f0;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.5rem;
+        color: #666;
+      }
+      
+      .plugin-status {
+        padding: 0.5rem;
+        margin: 1rem 0;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      
+      .plugin-status.connected {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      
+      .plugin-status.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      
+      @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- === Topbar === -->
+    <header class="layout-topbar">
+      <!-- Navigation and title -->
+      <div style="display: flex; align-items: center; gap: 0.5rem">
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+        <span class="header-title">Dashboard Builder Plugin Host</span>
+      </div>
+
+
+      <!-- Bookmark Controls and Panel Toggle -->
+      <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+        
+        <!-- Bookmark Controls (hidden until plugin connected) -->
+        <div id="bookmark-controls" style="display: none; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.1); padding: 0.5rem; border-radius: 4px; flex-wrap: wrap;">
+          <select id="bookmarkSelect" style="min-width: 150px; padding: 0.25rem;">
+            <option value="">Original Workbook</option>
+          </select>
+          
+          <input 
+            type="text" 
+            id="bookmarkName" 
+            placeholder="Bookmark name..." 
+            style="min-width: 120px; padding: 0.25rem 0.5rem;"
+          />
+          <button id="save-bookmark-btn" style="padding: 0.25rem 0.5rem; background: #28a745; color: #ffffff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            Save Bookmark
+          </button>
+          <button id="delete-bookmark-btn" style="padding: 0.25rem 0.5rem; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 0; width: auto; display: inline-block;">
+            Delete Bookmark
+          </button>
+        </div>
+        
+        <!-- Info Panel and README -->
+        <div style="white-space: nowrap;">
+          <button id="collapse-info" style="display: inline-block;">Toggle Info Panel</button>
+          <button onclick="window.open('/dashboard-builder/README.md', '_blank')" style="display: inline-block; margin-left: 8px;">README</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- === Main Layout === -->
+    <div class="main">
+      <!-- === Sidebar Info Panel === -->
+      <aside class="sidebar">
+        <h2>Plugin Information:</h2>
+        
+        <div id="plugin-status" class="plugin-status">
+          <p>Plugin Status: Not Connected</p>
+        </div>
+        
+        <div id="jwt-decoded" style="margin-top: 1rem">
+          <h3>Decoded JWT:</h3>
+          <div id="jwt-decode-content"><p>Connect plugin to view JWT...</p></div>
+        </div>
+
+        <h3>JWT:</h3>
+        <p>The token is below:</p>
+        <pre id="jwt-display" class="token-display">Connect plugin to generate JWT...</pre>
+      </aside>
+
+      <!-- === Right-hand Content Area === -->
+      <main class="content">
+        <div id="plugin-container" style="height: 100%; display: flex; flex-direction: column;">
+          <iframe id="sigma-embed" src="" style="display: none; flex: 1; width: 100%; border: none;"></iframe>
+          <div id="plugin-placeholder" style="padding: 2rem; text-align: center; color: #666; flex: 1; display: flex; flex-direction: column; justify-content: center;">
+            <h3>Dashboard Builder Plugin</h3>
+            <p>Configure your settings above and click "Connect Plugin" to begin building your dashboard.</p>
+            <p>The plugin will communicate with this host application to enable element selection and dashboard building.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- === Footer === -->
+    <footer class="layout-footer">Sigma Plugin Host &copy; 2025</footer>
+  </body>
+  
+  <script>
+    /*
+    ═══════════════════════════════════════════════════════════════════════════════
+                              DASHBOARD BUILDER JAVASCRIPT
+                             Multi-Area State Management
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    CORE ARCHITECTURE:
+    
+    1. DUAL STORAGE SYSTEM:
+       - Sigma Bookmarks: Store exploreKey and workbook state (single-state)
+       - LowDB Database: Store multi-area configurations (all node IDs)
+       - Combined: Complete multi-area bookmark restoration capability
+    
+    2. AREA MANAGEMENT:
+       - Area 1: viz1_url, viz1_nodeid controls + independent iframe
+       - Area 2: viz2_url, viz2_nodeid controls + independent iframe 
+       - Area 3: viz3_url, viz3_nodeid controls + independent iframe
+       - Cross-contamination prevention between areas
+    
+    3. STATE SYNCHRONIZATION:
+       - exploreKey: Common control for Sigma bookmark compatibility
+       - areaNodeIdMap: Local tracking for URL regeneration and validation
+       - currentExploreKey: Runtime tracking for JWT matching and updates
+    
+    4. MESSAGE HANDLING:
+       - Plugin → Host: exploreKey changes, node selections, restoration requests
+       - Host → Plugin: variable updates, URL regeneration, atomic restoration
+       - Duplicate filtering prevents multi-area contamination
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    */
+    
+    // ============================================================================
+    // GLOBAL STATE VARIABLES
+    // ============================================================================
+    let DEBUG = false;
+    let env = {};
+    let currentSelectedNodeId = null;     // Currently selected node in workbook
+    let selectedKpiNodeId = null;         // KPI element selected for placement
+    let currentExploreKey = null;         // Current explore key for bookmark restoration
+    
+    // API Bookmark Management Variables
+    let workbookUrlId = null;             // Current workbook URL ID
+    let availableBookmarks = [];          // List of available bookmarks
+    let currentBookmarkId = null;         // Currently loaded bookmark ID
+    let lastSavedBookmark = null;         // Track the most recently saved bookmark for exploreKey updates
+    let isInSaveProcess = false;          // Flag to prevent URL regeneration during save process
+
+    // ============================================================================
+    // ENVIRONMENT & CONFIGURATION
+    // ============================================================================
+    
+    /**
+     * Loads environment configuration from the server
+     * Sets DEBUG flag and populates global env object with .env variables
+     */
+    async function loadEnv() {
+      try {
+        if (DEBUG) console.log("Loading environment config from /env.json");
+        const res = await fetch("/env.json");
+        env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("Environment loaded:", env);
+      } catch (err) {
+        console.error("Failed to load /env.json config:", err);
+        updateHeaderStatus("error", "Config Load Failed");
+      }
+    }
+
+    // ============================================================================
+    // UI INTERACTIONS
+    // ============================================================================
+    function initializeUI() {
+      const sidebar = document.querySelector(".sidebar");
+      const collapseButton = document.getElementById("collapse-info");
+      
+      if (collapseButton && sidebar) {
+        collapseButton.addEventListener("click", () => {
+          sidebar.classList.toggle("collapsed");
+        });
+      }
+      
+      // Add bookmark control event listeners
+      const saveBookmarkBtn = document.getElementById("save-bookmark-btn");
+      const deleteBookmarkBtn = document.getElementById("delete-bookmark-btn");
+      const bookmarkSelect = document.getElementById("bookmarkSelect");
+      
+      if (saveBookmarkBtn) {
+        saveBookmarkBtn.addEventListener("click", saveBookmark);
+      }
+      
+      if (deleteBookmarkBtn) {
+        deleteBookmarkBtn.addEventListener("click", deleteSelectedBookmark);
+        if (DEBUG) console.log("✅ Delete bookmark button found and event listener added");
+      } else {
+        if (DEBUG) console.error("❌ Delete bookmark button not found!");
+      }
+      
+      if (bookmarkSelect) {
+        bookmarkSelect.addEventListener("change", loadSelectedBookmark);
+      }
+      
+      if (DEBUG) console.log("UI and bookmark controls initialized");
+    }
+
+
+    // ============================================================================
+    // PLUGIN COMMUNICATION
+    // ============================================================================
+    
+    /**
+     * Send message to the Sigma workbook iframe
+     * Used for updating controls via Sigma's inbound event API
+     */
+    function sendToPlugin(message) {
+      const iframe = document.getElementById("sigma-embed");
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage(message, "*");
+        if (DEBUG) console.log("✅ Sent to Sigma:", message);
+      } else {
+        if (DEBUG) console.log("❌ Could not send to Sigma iframe:", {
+          iframe: !!iframe,
+          contentWindow: !!iframe?.contentWindow,
+          message
+        });
+      }
+    }
+
+    /**
+     * Listen for messages from the embedded plugin
+     */
+    window.addEventListener("message", (event) => {
+      if (DEBUG) console.log("Received from plugin:", event.data);
+      
+      const { type, data } = event.data;
+      
+      switch (type) {
+        // Core Sigma workbook events for Dashboard Builder workflow
+        case "workbook:selectednodeid:onchange":
+          handleNodeSelectionChange(event.data);
+          break;
+          
+        case "workbook:chart:onvalueselect":
+          handleChartValueSelect(event.data);
+          break;
+          
+        case "action:outbound":
+          handleActionOutbound(event.data);
+          break;
+          
+        case "workbook:bookmark:oncreate":
+          handleSigmaBookmarkCreate(event.data);
+          break;
+          
+        case "workbook:bookmark:onchange":
+          handleSigmaBookmarkChange(event.data);
+          break;
+          
+        // Variables change handling removed - using API bookmarks
+          
+        case "workbook:exploreKey:onchange":
+          handleExploreKeyChange(event.data);
+          break;
+          
+        case "workbook:loaded":
+          handleWorkbookLoaded(event.data);
+          break;
+          
+        default:
+          if (DEBUG) console.log("Unknown message type:", type);
+      }
+    });
+
+
+    /**
+     * Handles initial workbook load
+     */
+    function handleWorkbookLoaded(data) {
+      if (DEBUG) console.log("Workbook loaded - ready for KPI placement");
+      updatePluginStatus("connected", "Plugin Connected");
+      
+      // Extract workbook URL ID for API operations
+      if (data.workbook && data.workbook.urlId) {
+        workbookUrlId = data.workbook.urlId;
+        if (DEBUG) console.log("Workbook URL ID from event:", workbookUrlId);
+      } else {
+        // Fallback: extract from workbook name in environment
+        workbookUrlId = extractWorkbookUrlId();
+        if (DEBUG) console.log("Workbook URL ID from fallback:", workbookUrlId);
+      }
+      
+      if (workbookUrlId) {
+        // Show bookmark controls and load existing bookmarks
+        showBookmarkControls();
+        
+        // Only load bookmarks if this is the initial workbook load (not a bookmark switch)
+        // OR if we just switched back to original workbook
+        const shouldLoadBookmarks = !currentBookmarkId || 
+          (currentBookmarkId === null && availableBookmarks.length === 0);
+          
+        if (shouldLoadBookmarks) {
+          loadBookmarks();
+        } else {
+          if (DEBUG) console.log("Skipping bookmark reload during bookmark switch to:", currentBookmarkId);
+        }
+      }
+      
+      // Check for bookmark restoration after a delay (only if not manually loading a bookmark)
+      if (!currentBookmarkId) {
+        setTimeout(() => {
+          checkForBookmarkRestoration();
+        }, 1000);
+      } else {
+        if (DEBUG) console.log("Skipping restoration check - bookmark manually selected:", currentBookmarkId);
+      }
+      
+      // Don't clear controls if we might be in a bookmark scenario
+      // Let the restoration check handle it
+    }
+
+    /**
+     * Extracts workbook URL ID from iframe URL or other sources
+     */
+    function extractWorkbookUrlId() {
+      try {
+        // Try to get from iframe src
+        const iframe = document.getElementById("sigma-embed");
+        if (iframe && iframe.src) {
+          const url = new URL(iframe.src);
+          const pathParts = url.pathname.split('/');
+          const workbookIndex = pathParts.indexOf('workbook');
+          if (workbookIndex !== -1 && pathParts[workbookIndex + 1]) {
+            const workbookPart = pathParts[workbookIndex + 1];
+            // Extract URL ID from "WorkbookName-UrlId" format
+            const lastDashIndex = workbookPart.lastIndexOf('-');
+            if (lastDashIndex !== -1) {
+              return workbookPart.substring(lastDashIndex + 1);
+            }
+          }
+        }
+        
+        if (DEBUG) console.log("Could not extract workbook URL ID");
+        return null;
+      } catch (error) {
+        console.error("Error extracting workbook URL ID:", error);
+        return null;
+      }
+    }
+
+    /**
+     * Immediately restores URLs for all areas with node IDs (for bookmark loading)
+     */
+    async function restoreUrlsImmediately() {
+      if (DEBUG) console.log("Starting immediate URL restoration...");
+      
+      const iframe = document.getElementById("sigma-embed");
+      if (!iframe || !iframe.contentWindow) {
+        if (DEBUG) console.error("No iframe available for immediate restoration");
+        return;
+      }
+
+      const urlsToRestore = {};
+      
+      // Restore URLs for all areas that have node IDs
+      for (const [nodeIdControl, nodeId] of Object.entries(areaNodeIdMap)) {
+        if (nodeId) {
+          const areaControl = nodeIdControl.replace('_nodeid', '_url');
+          try {
+            const embedUrl = await generateKpiEmbedUrl(nodeId);
+            urlsToRestore[areaControl] = embedUrl;
+            if (DEBUG) console.log(`Generated URL for ${areaControl}: ${embedUrl.substring(0, 100)}...`);
+          } catch (error) {
+            if (DEBUG) console.error(`Failed to generate URL for ${areaControl}:`, error);
+          }
+        }
+      }
+      
+      // Update all URLs at once
+      if (Object.keys(urlsToRestore).length > 0) {
+        iframe.contentWindow.postMessage({
+          type: "workbook:variables:update",
+          variables: urlsToRestore
+        }, "*");
+        
+        if (DEBUG) console.log("All URLs restored immediately:", Object.keys(urlsToRestore));
+      }
+    }
+
+    /**
+     * Clears all dashboard builder controls on initial load
+     */
+    function clearAllControls() {
+      const iframe = document.getElementById("sigma-embed");
+      if (iframe && iframe.contentWindow) {
+        const variablesToClear = {
+          // Context control
+          "vizUrlControl": "",
+          
+          // Area 1 controls
+          "viz1_url": "",
+          "viz1_nodeid": "",
+          
+          // Area 2 controls
+          "viz2_url": "",
+          "viz2_nodeid": "",
+          
+          // Area 3 controls
+          "viz3_url": "",
+          "viz3_nodeid": ""
+        };
+        
+        iframe.contentWindow.postMessage({
+          type: "workbook:variables:update",
+          variables: variablesToClear
+        }, "*");
+        
+        // Also clear our internal node mapping
+        areaNodeIdMap = {
+          "viz1_nodeid": null,
+          "viz2_nodeid": null, 
+          "viz3_nodeid": null
+        };
+        
+        if (DEBUG) console.log("All dashboard controls cleared");
+      }
+    }
+
+    /**
+     * Handles when user selects elements in the Sigma workbook
+     * Tracks the selected element for potential KPI placement
+     */
+    function handleNodeSelectionChange(data) {
+      if (DEBUG) console.log("Node selection changed:", data);
+      
+      // Track the currently selected node for general reference
+      currentSelectedNodeId = data.selectedNodeId;
+      
+      // Update UI to show what's selected
+      updatePluginStatus("", `Selected: ${data.nodeType} (${data.selectedNodeId})`);
+      
+      // Store element selection for KPI placement workflow
+      if (data.nodeType === 'element') {
+        selectedKpiNodeId = data.selectedNodeId;
+        if (DEBUG) console.log("Element selected for potential KPI placement:", data.selectedNodeId);
+      }
+    }
+
+    /**
+     * Handles chart value selection events from Sigma workbook
+     * Currently used for status display, could be extended for advanced interactions
+     */
+    function handleChartValueSelect(data) {
+      if (DEBUG) console.log("Chart value selected:", data);
+      updatePluginStatus("", `Chart interaction: ${data.title || 'Unknown'}`);
+    }
+
+    /**
+     * Handles outbound actions from Sigma workbook
+     * Main entry point for Dashboard Builder workflow
+     */
+    function handleActionOutbound(data) {
+      if (DEBUG) console.log("Action outbound:", data);
+      
+      // Handle KPI selection workflow (initial placement)
+      if (data.name === 'vizComponentSelected') {
+        handleVizComponentSelected(data.values);
+      }
+      
+      // Handle KPI restoration workflow (bookmark loads with exploreKey)
+      if (data.name === 'vizOnLoad') {
+        handleVizOnLoad(data.values);
+      }
+    }
+
+    // ============================================================================
+    // SIGMA BOOKMARK EVENT HANDLERS (Basic)
+    // ============================================================================
+    
+    /**
+     * Handles Sigma's built-in bookmark creation events
+     * We ignore these since we use API-based bookmarking
+     */
+    function handleSigmaBookmarkCreate(data) {
+      if (DEBUG) console.log("Sigma bookmark created (ignored):", data.bookmarkId);
+      // We don't use Sigma's built-in bookmarking - just acknowledge the event
+    }
+    
+    /**
+     * Handles Sigma's built-in bookmark change events  
+     * We ignore these since we use API-based bookmarking
+     */
+    function handleSigmaBookmarkChange(data) {
+      if (DEBUG) console.log("Sigma bookmark changed (ignored):", data.bookmarkId);
+      // We don't use Sigma's built-in bookmarking - just acknowledge the event
+    }
+
+    // ============================================================================
+    // API-BASED BOOKMARK MANAGEMENT
+    // ============================================================================
+    
+    /**
+     * Shows bookmark controls in the header
+     */
+    function showBookmarkControls() {
+      const controls = document.getElementById("bookmark-controls");
+      if (controls) {
+        controls.style.display = "flex";
+        if (DEBUG) console.log("✅ Bookmark controls shown");
+      } else {
+        if (DEBUG) console.error("❌ Bookmark controls element not found!");
+      }
+    }
+    
+    /**
+     * Loads available bookmarks from the API
+     */
+    async function loadBookmarks() {
+      if (!workbookUrlId) {
+        if (DEBUG) console.log("No workbook URL ID available for bookmark loading");
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/multi-area-bookmarks/list?workbookUrlId=${encodeURIComponent(workbookUrlId)}`);
+        const result = await response.json();
+        
+        if (response.ok) {
+          availableBookmarks = result.entries || [];
+          updateBookmarkDropdown();
+          if (DEBUG) console.log("Loaded multi-area bookmarks:", availableBookmarks);
+        } else {
+          console.error("Failed to load multi-area bookmarks:", result.error);
+        }
+      } catch (error) {
+        console.error("Error loading multi-area bookmarks:", error);
+      }
+    }
+    
+    /**
+     * Updates the bookmark dropdown with available bookmarks
+     */
+    function updateBookmarkDropdown() {
+      const select = document.getElementById("bookmarkSelect");
+      if (!select) return;
+      
+      // Remember the current selection
+      const currentSelection = select.value;
+      
+      // Clear existing options except the first one
+      select.innerHTML = '<option value="">Original Workbook</option>';
+      
+      // Add bookmark options
+      availableBookmarks.forEach(bookmark => {
+        const option = document.createElement("option");
+        // Use localBookmarkId for multi-area bookmarks
+        option.value = bookmark.localBookmarkId;
+        option.textContent = bookmark.name;
+        select.appendChild(option);
+        if (DEBUG) console.log("Added bookmark option:", bookmark.name, "with value:", option.value);
+      });
+      
+      // Restore the previous selection if it still exists
+      if (currentSelection && availableBookmarks.find(b => b.localBookmarkId === currentSelection)) {
+        select.value = currentSelection;
+        if (DEBUG) console.log("Restored dropdown selection to:", currentSelection);
+      } else if (currentBookmarkId && availableBookmarks.find(b => b.localBookmarkId === currentBookmarkId)) {
+        // Or set to current bookmark ID if available
+        select.value = currentBookmarkId;
+        if (DEBUG) console.log("Set dropdown to current bookmark:", currentBookmarkId);
+      }
+    }
+    
+    /**
+     * Gets exploreKey from the current area that has the active KPI
+     * Simplified to use tracked value for reliability
+     */
+    async function getCurrentAreaExploreKey() {
+      if (DEBUG) console.log("🔍 ===== GETTING EXPLOREKEY FOR BOOKMARK SAVE =====");
+      
+      // Use tracked exploreKey directly for reliability
+      if (currentExploreKey) {
+        if (DEBUG) console.log("✅ Using tracked currentExploreKey:", currentExploreKey);
+        return currentExploreKey;
+      }
+      
+      if (DEBUG) console.log("❌ No currentExploreKey available");
+      return null;
+    }
+    
+    /**
+     * Gets exploreKey from visible controls on the page
+     */
+    function getExploreKeyFromVisibleControls(controlName) {
+      if (DEBUG) console.log("🔍 Looking for visible controls, target:", controlName);
+      
+      // Debug: log all input elements and other form elements
+      const allInputs = document.querySelectorAll('input');
+      const allTextareas = document.querySelectorAll('textarea');
+      const allSelects = document.querySelectorAll('select');
+      const allDivs = document.querySelectorAll('div[contenteditable], div[data-value], div[value]');
+      
+      if (DEBUG) {
+        console.log("📋 All inputs found:", allInputs.length);
+        console.log("📋 All textareas found:", allTextareas.length);
+        console.log("📋 All selects found:", allSelects.length);
+        console.log("📋 All editable divs found:", allDivs.length);
+        
+        // Check inputs
+        allInputs.forEach((input, i) => {
+          console.log(`Input ${i}: id="${input.id}" class="${input.className}" value="${input.value}"`);
+        });
+        
+        // Check textareas
+        allTextareas.forEach((textarea, i) => {
+          if (textarea.value && textarea.value.length > 10) {
+            console.log(`Textarea ${i}: id="${textarea.id}" value="${textarea.value.substring(0, 50)}..."`);
+          }
+        });
+        
+        // Look for any element containing the exploreKey pattern
+        const allElements = document.querySelectorAll('*');
+        let foundElements = [];
+        allElements.forEach(el => {
+          if (el.textContent && el.textContent.includes('296565c3-238f-44f7-ba02-6f5b550d889d')) {
+            foundElements.push(el);
+          }
+        });
+        console.log("🎯 Elements containing the exploreKey:", foundElements.length);
+        foundElements.forEach((el, i) => {
+          console.log(`ExploreKey element ${i}:`, el.tagName, el.id, el.className);
+        });
+      }
+      
+      // Try to find an input with the control name containing an exploreKey-like value
+      const inputs = document.querySelectorAll('input');
+      for (const input of inputs) {
+        if (input.id && input.id.includes(controlName.replace('_', '-'))) {
+          if (DEBUG) console.log("🎯 Found matching control:", input.id, input.value);
+          if (input.value && input.value.length > 30 && input.value.includes('-')) {
+            // Looks like an exploreKey (UUID format)
+            return input.value;
+          }
+        }
+      }
+      
+      // Also try looking for any input with explorekey in the ID
+      for (const input of inputs) {
+        if (input.id && input.id.toLowerCase().includes('explorekey') && input.id.includes('1')) {
+          if (DEBUG) console.log("🎯 Found explorekey control:", input.id, input.value);
+          if (input.value && input.value.length > 30 && input.value.includes('-')) {
+            return input.value;
+          }
+        }
+      }
+      
+      // Fallback: look for any UUID-like value in area 1 controls
+      const area1Inputs = document.querySelectorAll('input[id*="area-1"], input[id*="Area-1"]');
+      if (DEBUG) console.log("🔍 Area 1 inputs:", area1Inputs.length);
+      for (const input of area1Inputs) {
+        if (DEBUG) console.log("🎯 Area 1 input:", input.id, input.value);
+        if (input.value && input.value.length > 30 && input.value.includes('-') && !input.value.includes('http')) {
+          return input.value;
+        }
+      }
+      
+      if (DEBUG) console.log("❌ No exploreKey found in visible controls");
+      return null;
+    }
+    
+    /**
+     * Gets the current value of a control
+     * Falls back to tracked values for better reliability
+     */
+    async function getControlValue(controlName) {
+      // For explorekey, use our tracked value if available
+      if (controlName === "explorekey" && currentExploreKey) {
+        if (DEBUG) console.log(`🔑 Returning tracked exploreKey: ${currentExploreKey}`);
+        return currentExploreKey;
+      }
+      
+      return new Promise((resolve) => {
+        const iframe = document.getElementById("sigma-embed");
+        if (!iframe || !iframe.contentWindow) {
+          resolve(null);
+          return;
+        }
+        
+        // Set up listener for the response
+        const valueListener = (event) => {
+          if (event.data && event.data.type === "workbook:variables:onchange") {
+            const variables = event.data.variables || {};
+            if (variables[controlName] !== undefined) {
+              window.removeEventListener("message", valueListener);
+              resolve(variables[controlName]);
+            }
+          }
+        };
+        
+        window.addEventListener("message", valueListener);
+        
+        // Request the specific control value
+        iframe.contentWindow.postMessage({
+          type: "workbook:variables:get",
+          variables: [controlName]
+        }, "*");
+        
+        // Timeout fallback - for explorekey, use tracked value
+        setTimeout(() => {
+          window.removeEventListener("message", valueListener);
+          if (controlName === "explorekey" && currentExploreKey) {
+            resolve(currentExploreKey);
+          } else {
+            resolve(null);
+          }
+        }, 1000); // Reduced timeout
+      });
+    }
+    
+    /**
+     * Gets current exploreKey from Sigma if not already available (legacy)
+     */
+    function getCurrentExploreKey() {
+      return new Promise((resolve) => {
+        if (currentExploreKey) {
+          resolve(currentExploreKey);
+          return;
+        }
+        
+        // Request current exploreKey from Sigma
+        const iframe = document.getElementById("sigma-embed");
+        if (!iframe || !iframe.contentWindow) {
+          resolve(null);
+          return;
+        }
+        
+        // Set up one-time listener for exploreKey response
+        const exploreKeyListener = (event) => {
+          if (event.data && event.data.type === "workbook:exploreKey:onchange") {
+            window.removeEventListener("message", exploreKeyListener);
+            currentExploreKey = event.data.exploreKey;
+            resolve(event.data.exploreKey);
+          }
+        };
+        
+        window.addEventListener("message", exploreKeyListener);
+        
+        // Request current exploreKey
+        iframe.contentWindow.postMessage({
+          type: "workbook:exploreKey:get"
+        }, "*");
+        
+        // Fallback timeout
+        setTimeout(() => {
+          window.removeEventListener("message", exploreKeyListener);
+          resolve(currentExploreKey);
+        }, 2000);
+      });
+    }
+    
+    
+    /**
+     * Aggressively clears all areas except current before bookmark save
+     */
+    async function clearOtherAreaNodeIds() {
+      if (DEBUG) console.log("🧹 Aggressively clearing ALL controls from non-current areas before bookmark save...");
+      
+      const iframe = document.getElementById("sigma-embed");
+      if (!iframe || !iframe.contentWindow) return;
+      
+      const areas = ["viz1", "viz2", "viz3"];
+      const clearUpdates = {};
+      
+      // Clear ALL controls from all areas except the current one
+      for (const area of areas) {
+        const urlControl = `${area}_url`;
+        const nodeControl = `${area}_nodeid`;
+        const exploreControl = `${area}_explorekey`;
+        
+        // Skip the current area context
+        if (currentAreaContext && urlControl === currentAreaContext) {
+          if (DEBUG) console.log(`✅ Keeping current area: ${area}`);
+          continue;
+        }
+        
+        // Clear ALL controls for non-current areas
+        clearUpdates[urlControl] = "";
+        clearUpdates[nodeControl] = "";
+        clearUpdates[exploreControl] = "";
+        if (DEBUG) console.log(`🧹 Clearing ALL controls for ${area}`);
+      }
+      
+      // Send the clear updates
+      if (Object.keys(clearUpdates).length > 0) {
+        iframe.contentWindow.postMessage({
+          type: "workbook:variables:update",
+          variables: clearUpdates
+        }, "*");
+        
+        if (DEBUG) console.log("🧹 Aggressively cleared all non-current areas");
+        
+        // Wait for clearing to take effect
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        if (DEBUG) console.log("🧹 Clear operation completed");
+      } else {
+        if (DEBUG) console.log("🧹 No areas to clear (only current area has content)");
+      }
+    }
+    
+    
+    /**
+     * Saves a new bookmark using the API with improved user feedback
+     */
+    async function saveBookmark() {
+      const nameInput = document.getElementById("bookmarkName");
+      const saveButton = document.getElementById("save-bookmark-btn");
+      const bookmarkName = nameInput.value.trim();
+      
+      if (!bookmarkName) {
+        alert("Please enter a bookmark name");
+        return;
+      }
+      
+      // Disable button and show loading state
+      const originalButtonText = saveButton.textContent;
+      saveButton.disabled = true;
+      saveButton.textContent = "Saving...";
+      saveButton.style.opacity = "0.6";
+      
+      try {
+      
+        // Get exploreKey from the current area
+        if (DEBUG) console.log("💾 ===== STARTING BOOKMARK SAVE PROCESS =====");
+        if (DEBUG) console.log("💾 Bookmark name:", bookmarkName);
+      
+        // Wait a moment to ensure any recent exploreKey changes have propagated
+        if (DEBUG) console.log("💾 Waiting 500ms for exploreKey propagation...");
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        const exploreKey = await getCurrentAreaExploreKey();
+        if (DEBUG) console.log("💾 Retrieved exploreKey for bookmark save:", exploreKey);
+        if (!exploreKey) {
+          if (DEBUG) console.log("💾 ❌ BOOKMARK SAVE FAILED - No exploreKey available");
+          
+          // Show error feedback
+          saveButton.textContent = "❌ No exploreKey";
+          saveButton.style.background = "#dc3545";
+          
+          alert("Unable to get current exploreKey. Please wait for the workbook to fully load and try again.");
+          
+          // Reset button
+          setTimeout(() => {
+            saveButton.textContent = originalButtonText;
+            saveButton.style.background = "";
+            saveButton.disabled = false;
+            saveButton.style.opacity = "";
+          }, 3000);
+          
+          return;
+        }
+        if (DEBUG) console.log("💾 ✅ Using exploreKey for bookmark:", exploreKey);
+        
+        if (!workbookUrlId) {
+          // Show error feedback
+          saveButton.textContent = "❌ No workbook";
+          saveButton.style.background = "#dc3545";
+          
+          alert("No workbook loaded");
+          
+          // Reset button
+          setTimeout(() => {
+            saveButton.textContent = originalButtonText;
+            saveButton.style.background = "";
+            saveButton.disabled = false;
+            saveButton.style.opacity = "";
+          }, 3000);
+          
+          return;
+        }
+        
+        // Set flag to prevent URL regeneration during save process
+        isInSaveProcess = true;
+        
+          // For multi-area support: Keep all areas during bookmark save
+          if (DEBUG) console.log("🚀 Starting bookmark save - preserving all areas...");
+          if (DEBUG) console.log("📝 Current area context during save:", currentAreaContext);
+          if (DEBUG) console.log("📝 Current areaNodeIdMap during save:", areaNodeIdMap);
+          
+          // Small wait for any pending exploreKey changes to settle
+          if (DEBUG) console.log("💾 Brief wait for exploreKey to settle...");
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Get the final stabilized exploreKey after area restoration
+          const finalExploreKey = await getCurrentAreaExploreKey();
+          if (DEBUG) console.log("💾 Final stabilized exploreKey for bookmark save:", finalExploreKey);
+          
+          // Use new multi-area bookmark system
+          const multiAreaPayload = {
+            userEmail: env.VIEW_EMAIL,
+            workbookUrlId: workbookUrlId,
+            exploreKey: finalExploreKey,
+            name: bookmarkName,
+            areas: areaNodeIdMap // Include all area configurations
+          };
+          if (DEBUG) console.log("💾 Sending multi-area bookmark creation payload:", multiAreaPayload);
+          
+          const response = await fetch("/api/multi-area-bookmarks/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(multiAreaPayload)
+          });
+          
+          const result = await response.json();
+          
+          if (response.ok) {
+            if (DEBUG) console.log("Multi-area bookmark created:", result);
+            
+            // Track the saved bookmark for potential exploreKey updates
+            lastSavedBookmark = {
+              localBookmarkId: result.localBookmarkId,
+              sigmaBookmarkId: result.sigmaBookmarkId,
+              name: result.name || bookmarkName,
+              exploreKey: finalExploreKey,
+              savedAt: Date.now()
+            };
+            if (DEBUG) console.log("💾 Tracking saved multi-area bookmark for updates:", lastSavedBookmark);
+            
+            // Update current bookmark ID to the newly created local bookmark
+            currentBookmarkId = result.localBookmarkId;
+          
+          nameInput.value = "";
+          await loadBookmarks(); // Reload bookmark list
+          
+          // Ensure dropdown shows the newly saved bookmark
+          const bookmarkSelect = document.getElementById("bookmarkSelect");
+          if (bookmarkSelect) {
+            bookmarkSelect.value = currentBookmarkId;
+            if (DEBUG) console.log("💾 Set dropdown to newly saved bookmark:", currentBookmarkId);
+          }
+          
+          // Show success feedback
+          saveButton.textContent = "✓ Saved!";
+          saveButton.style.background = "#28a745";
+          
+          // Reset button after delay
+          setTimeout(() => {
+            saveButton.textContent = originalButtonText;
+            saveButton.style.background = "";
+            saveButton.disabled = false;
+            saveButton.style.opacity = "";
+          }, 2000);
+        } else {
+          console.error("Failed to create bookmark:", result.error);
+          
+          // Show error feedback
+          saveButton.textContent = "❌ Failed";
+          saveButton.style.background = "#dc3545";
+          
+          alert("Failed to save bookmark: " + (result.error || "Unknown error"));
+        }
+      } catch (error) {
+        console.error("Error creating bookmark:", error);
+        
+        // Show error feedback
+        saveButton.textContent = "❌ Error";
+        saveButton.style.background = "#dc3545";
+        
+        alert("Error saving bookmark: " + error.message);
+      } finally {
+        // Reset button if there was an error
+        if (saveButton.disabled) {
+          setTimeout(() => {
+            saveButton.textContent = originalButtonText;
+            saveButton.style.background = "";
+            saveButton.disabled = false;
+            saveButton.style.opacity = "";
+          }, 3000);
+        }
+        // Clear flag after save process completes
+        setTimeout(() => {
+          isInSaveProcess = false;
+          if (DEBUG) console.log("💾 Save process completed, URL regeneration re-enabled");
+          if (DEBUG) console.log("💾 KPI should already be loaded correctly - no forced reload needed");
+        }, 1000); // Reduced wait time
+      }
+    }
+    
+    /**
+     * Forces a reload of the current area KPI after bookmark save
+     * Uses the saved exploreKey to ensure proper JWT matching
+     */
+    async function forceReloadCurrentArea() {
+      if (!currentAreaContext || !selectedKpiNodeId) {
+        if (DEBUG) console.log("💾 No current area to reload after save");
+        return;
+      }
+      
+      if (DEBUG) console.log(`💾 Force reloading ${currentAreaContext} after bookmark save`);
+      
+      try {
+        const iframe = document.getElementById("sigma-embed");
+        if (!iframe || !iframe.contentWindow) return;
+        
+        // Use the saved exploreKey for JWT matching
+        const savedExploreKey = lastSavedBookmark ? lastSavedBookmark.exploreKey : currentExploreKey;
+        if (DEBUG) console.log(`💾 Using saved exploreKey for reload: ${savedExploreKey}`);
+        
+        // Step 1: Clear the current area to force a clean reload
+        const clearUpdates = {};
+        clearUpdates[currentAreaContext] = "";
+        
+        iframe.contentWindow.postMessage({
+          type: "workbook:variables:update",
+          variables: clearUpdates
+        }, "*");
+        
+        if (DEBUG) console.log("💾 Cleared current area for reload");
+        
+        // Step 2: Wait a moment then restore with URL using saved exploreKey
+        setTimeout(async () => {
+          try {
+            const embedUrl = await generateKpiEmbedUrl(selectedKpiNodeId, savedExploreKey);
+            const restoreUpdates = {};
+            restoreUpdates[currentAreaContext] = embedUrl;
+            
+            iframe.contentWindow.postMessage({
+              type: "workbook:variables:update",
+              variables: restoreUpdates
+            }, "*");
+            
+            if (DEBUG) console.log("💾 Restored current area with URL matching saved exploreKey");
+          } catch (error) {
+            if (DEBUG) console.error("💾 Failed to restore current area:", error);
+          }
+        }, 500);
+        
+      } catch (error) {
+        if (DEBUG) console.error("💾 Failed to force reload current area:", error);
+      }
+    }
+
+    /**
+     * Deletes the currently selected bookmark
+     */
+    async function deleteSelectedBookmark() {
+      const select = document.getElementById("bookmarkSelect");
+      const selectedBookmarkId = select.value;
+      
+      if (!selectedBookmarkId) {
+        alert("Please select a bookmark to delete");
+        return;
+      }
+      
+      const bookmark = availableBookmarks.find(b => b.localBookmarkId === selectedBookmarkId);
+      if (!bookmark) {
+        alert("Selected bookmark not found");
+        return;
+      }
+      
+      if (!confirm(`Are you sure you want to delete the bookmark "${bookmark.name}"?`)) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/multi-area-bookmarks/delete/${selectedBookmarkId}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" }
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+          if (DEBUG) console.log("Bookmark deleted successfully:", bookmark.name);
+          
+          // Reset to original workbook if we just deleted the current bookmark
+          if (currentBookmarkId === selectedBookmarkId) {
+            currentBookmarkId = null;
+            await reloadWorkbook();
+          }
+          
+          // Reload the bookmark list and refresh dropdown
+          await loadBookmarks();
+          
+          alert("Bookmark deleted successfully!");
+        } else {
+          console.error("Failed to delete bookmark:", result.error);
+          alert(`Failed to delete bookmark: ${result.error}`);
+        }
+      } catch (error) {
+        console.error("Error deleting bookmark:", error);
+        alert("Error deleting bookmark. Please try again.");
+      }
+    }
+    
+    /**
+     * Loads a selected bookmark by reloading the iframe
+     */
+    async function loadSelectedBookmark() {
+      const select = document.getElementById("bookmarkSelect");
+      const selectedBookmarkId = select.value;
+      
+      if (DEBUG) console.log("Loading selected bookmark:", selectedBookmarkId);
+      
+      if (!selectedBookmarkId) {
+        // Load original workbook
+        if (DEBUG) console.log("Loading original workbook - resetting currentBookmarkId");
+        currentBookmarkId = null;
+        await reloadWorkbook();
+        return;
+      }
+      
+      // Find the bookmark details - use localBookmarkId for multi-area bookmarks
+      const bookmark = availableBookmarks.find(b => b.localBookmarkId === selectedBookmarkId);
+      if (!bookmark) {
+        console.error("Bookmark not found:", selectedBookmarkId);
+        if (DEBUG) console.log("Available bookmarks:", availableBookmarks.map(b => ({name: b.name, localBookmarkId: b.localBookmarkId})));
+        // Reset dropdown to original workbook on error
+        select.value = "";
+        return;
+      }
+      
+      if (DEBUG) console.log("Found bookmark:", bookmark);
+      currentBookmarkId = selectedBookmarkId;
+      
+      // For multi-area bookmarks, reload workbook with Sigma bookmark ID
+      await reloadWorkbook(bookmark.sigmaBookmarkId);
+      
+      // After workbook reloads, restore multi-area state
+      setTimeout(async () => {
+        if (DEBUG) console.log("Attempting direct KPI restoration for bookmark:", currentBookmarkId);
+        
+        // Clear the restoration tracking for this new bookmark load
+        restoredNodeIds.clear();
+        nodeIdToAreaMap.clear();
+        
+        // Clear area context to prevent exploreKey contamination
+        currentAreaContext = null;
+        if (DEBUG) console.log("🔄 Cleared all restoration tracking and area context for new bookmark load");
+        
+        // Debug: Check what's in our local tracking
+        if (DEBUG) console.log("🔍 Current areaNodeIdMap before restoration:", areaNodeIdMap);
+        
+        // New approach: Load multi-area configuration and restore all areas
+        await restoreMultiAreaState(currentBookmarkId);
+      }, 3000);
+    }
+    
+    
+    
+    /**
+     * Reloads the workbook iframe with optional bookmark
+     */
+    async function reloadWorkbook(bookmarkId = null) {
+      if (DEBUG) console.log("Reloading workbook", bookmarkId ? `with bookmark: ${bookmarkId}` : "");
+      
+      try {
+        // Generate new embed URL
+        const params = new URLSearchParams();
+        if (bookmarkId) {
+          params.append("bookmarkId", bookmarkId);
+        }
+        
+        const response = await fetch("/api/jwt/view?" + params.toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sub: env.VIEW_EMAIL })
+        });
+        
+        const result = await response.json();
+        if (response.ok) {
+          // Reload iframe with new URL
+          const iframe = document.getElementById("sigma-embed");
+          if (iframe) {
+            iframe.src = result.embedUrl;
+            if (DEBUG) console.log("Iframe reloaded with:", bookmarkId ? "bookmark" : "original workbook");
+          }
+        } else {
+          console.error("Failed to generate embed URL:", result.error);
+          alert("Failed to load " + (bookmarkId ? "bookmark" : "workbook"));
+        }
+      } catch (error) {
+        console.error("Error reloading workbook:", error);
+        alert("Error loading " + (bookmarkId ? "bookmark" : "workbook"));
+      }
+    }
+
+    /**
+     * Checks if bookmark restoration is needed after workbook load
+     * Detects when we have node IDs but missing URLs (bookmark scenario)
+     */
+    function checkForBookmarkRestoration() {
+      if (DEBUG) console.log("Checking for bookmark restoration needs...");
+      
+      const iframe = document.getElementById("sigma-embed");
+      if (!iframe || !iframe.contentWindow) return;
+      
+      // Set up listener to capture current workbook state
+      let checkCompleted = false;
+      
+      const checkListener = (event) => {
+        if (checkCompleted) return;
+        
+        if (event.data && event.data.type === "workbook:variables:onchange") {
+          checkCompleted = true;
+          window.removeEventListener("message", checkListener);
+          
+          const variables = event.data.workbook?.variables || {};
+          
+          if (DEBUG) console.log("Bookmark restoration check - variables:", {
+            viz1_url: variables["viz1_url"],
+            viz1_nodeid: variables["viz1_nodeid"],
+            viz2_nodeid: variables["viz2_nodeid"],
+            viz3_nodeid: variables["viz3_nodeid"]
+          });
+          
+          // Check for areas that have node IDs but missing URLs (bookmark restoration needed)
+          // Only restore the FIRST area found to prevent multi-area loading from old bookmarks
+          let areaToRestore = null;
+          
+          if (variables["viz1_nodeid"] && !variables["viz1_url"]) {
+            areaToRestore = { area: "viz1_url", nodeId: variables["viz1_nodeid"] };
+          } else if (variables["viz2_nodeid"] && !variables["viz2_url"]) {
+            areaToRestore = { area: "viz2_url", nodeId: variables["viz2_nodeid"] };
+          } else if (variables["viz3_nodeid"] && !variables["viz3_url"]) {
+            areaToRestore = { area: "viz3_url", nodeId: variables["viz3_nodeid"] };
+          }
+          
+          const areasToRestore = areaToRestore ? [areaToRestore] : [];
+          
+          if (areasToRestore.length > 0) {
+            if (DEBUG) console.log("🔄 Bookmark restoration needed for areas:", areasToRestore);
+            restoreBookmarkKpis(areasToRestore);
+          } else {
+            if (DEBUG) console.log("✅ No bookmark restoration needed");
+          }
+        }
+      };
+      
+      window.addEventListener("message", checkListener);
+      
+      // Request current variable state
+      iframe.contentWindow.postMessage({
+        type: "workbook:variables:get"
+      }, "*");
+      
+      // Clean up listener after timeout
+      setTimeout(() => {
+        if (!checkCompleted) {
+          window.removeEventListener("message", checkListener);
+          if (DEBUG) console.log("Bookmark restoration check timed out");
+        }
+      }, 3000);
+    }
+    
+    /**
+     * Restores KPI URLs for bookmark-loaded areas
+     */
+    async function restoreBookmarkKpis(areasToRestore) {
+      if (DEBUG) console.log("🔧 Restoring KPI URLs for bookmark...");
+      
+      for (const areaData of areasToRestore) {
+        try {
+          // Generate the KPI URL (no exploreKey needed for basic restoration)
+          const embedUrl = await generateKpiEmbedUrl(areaData.nodeId);
+          
+          // Update the control
+          const iframe = document.getElementById("sigma-embed");
+          if (iframe && iframe.contentWindow) {
+            const variablesUpdate = {};
+            variablesUpdate[areaData.area] = embedUrl;
+            
+            iframe.contentWindow.postMessage({
+              type: "workbook:variables:update",
+              variables: variablesUpdate
+            }, "*");
+            
+            if (DEBUG) console.log(`✅ Restored ${areaData.area} for node ${areaData.nodeId}`);
+          }
+        } catch (error) {
+          console.error(`Failed to restore ${areaData.area}:`, error);
+        }
+      }
+    }
+
+    /**
+     * Restores URLs for multiple areas using the bookmark's Common Explore Key
+     */
+    async function restoreAreasWithExploreKey(areas) {
+      // Get the bookmark's exploreKey from the Common Explore Key control
+      const bookmarkExploreKey = await getControlValue("explorekey");
+      if (DEBUG) console.log("🔑 Using bookmark exploreKey for all areas:", bookmarkExploreKey);
+      
+      for (const areaData of areas) {
+        try {
+          if (DEBUG) console.log(`🔧 Restoring ${areaData.area} with nodeId: ${areaData.nodeId}`);
+          
+          // Generate URL using the bookmark's exploreKey (not area-specific)
+          const embedUrl = await generateKpiEmbedUrl(areaData.nodeId, bookmarkExploreKey);
+          
+          // Update the control
+          const iframe = document.getElementById("sigma-embed");
+          if (iframe && iframe.contentWindow) {
+            const variablesUpdate = {};
+            variablesUpdate[areaData.area] = embedUrl;
+            
+            iframe.contentWindow.postMessage({
+              type: "workbook:variables:update",
+              variables: variablesUpdate
+            }, "*");
+            
+            if (DEBUG) console.log(`✅ Restored ${areaData.area}`);
+          }
+        } catch (error) {
+          console.error(`Failed to restore ${areaData.area}:`, error);
+        }
+      }
+    }
+
+    /**
+     * Updates the single bookmarkId control for the entire workbook
+     */
+    function updateBookmarkId(bookmarkId) {
+      const iframe = document.getElementById("sigma-embed");
+      if (iframe && iframe.contentWindow) {
+        const variablesUpdate = {
+          "bookmarkId": bookmarkId
+        };
+        
+        iframe.contentWindow.postMessage({
+          type: "workbook:variables:update",
+          variables: variablesUpdate
+        }, "*");
+        
+        if (DEBUG) console.log(`Bookmark ID updated:`, bookmarkId);
+      }
+    }
+
+    /**
+     * Restores multi-area state from local database
+     * This is the new primary restoration method for multi-area bookmarks
+     */
+    async function restoreMultiAreaState(localBookmarkId) {
+      if (DEBUG) console.log("🎯 Starting multi-area state restoration for:", localBookmarkId);
+      
+      try {
+        // Get the multi-area bookmark configuration
+        const response = await fetch(`/api/multi-area-bookmarks/get/${localBookmarkId}`);
+        const bookmark = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(`Failed to load bookmark: ${bookmark.error}`);
+        }
+        
+        if (DEBUG) console.log("📋 Retrieved multi-area bookmark:", bookmark);
+        
+        // Clear and rebuild areaNodeIdMap from bookmark data
+        Object.keys(areaNodeIdMap).forEach(key => {
+          areaNodeIdMap[key] = null;
+        });
+        
+        // Restore all areas from bookmark configuration
+        const areas = bookmark.areas || {};
+        const iframe = document.getElementById("sigma-embed");
+        const allVariables = {};
+        let restoredAreas = [];
+        
+        for (const [areaKey, nodeId] of Object.entries(areas)) {
+          if (nodeId) {
+            try {
+              if (DEBUG) console.log(`🔧 Restoring ${areaKey} with nodeId: ${nodeId}`);
+              
+              // Generate URL for this area
+              const embedUrl = await generateKpiEmbedUrl(nodeId);
+              const urlControl = areaKey.replace('_nodeid', '_url');
+              const nodeIdControl = areaKey;
+              
+              // Add to variables update
+              allVariables[urlControl] = embedUrl;
+              allVariables[nodeIdControl] = nodeId;
+              
+              // Update local tracking
+              areaNodeIdMap[nodeIdControl] = nodeId;
+              
+              restoredAreas.push(areaKey);
+              
+              if (DEBUG) console.log(`✅ Prepared ${areaKey}: nodeId=${nodeId}, URL=${embedUrl.substring(0, 100)}...`);
+            } catch (error) {
+              console.error(`❌ Failed to restore ${areaKey}:`, error);
+            }
+          }
+        }
+        
+        if (restoredAreas.length > 0 && iframe && iframe.contentWindow) {
+          // Set the viz control to the first restored area (for plugin context)
+          const firstAreaUrl = `${restoredAreas[0]}_url`;
+          allVariables["vizUrlControl"] = firstAreaUrl;
+          
+          // Send all updates at once
+          iframe.contentWindow.postMessage({
+            type: "workbook:variables:update",
+            variables: allVariables
+          }, "*");
+          
+          setCurrentAreaContext(firstAreaUrl);
+          
+          if (DEBUG) console.log(`🎉 Successfully restored ${restoredAreas.length} areas: ${restoredAreas.join(', ')}`);
+        } else {
+          if (DEBUG) console.log("⚠️ No areas to restore from bookmark");
+        }
+        
+      } catch (error) {
+        console.error("❌ Multi-area restoration failed:", error);
+        // Fallback to original restoration method
+        if (DEBUG) console.log("🔄 Falling back to original restoration method");
+        await rebuildFromBookmarkControls();
+      }
+    }
+
+    /**
+     * Rebuilds dashboard from bookmark by reading node IDs from Sigma controls
+     * and regenerating URLs with fresh JWTs
+     */
+    async function rebuildFromBookmarkControls() {
+      if (DEBUG) console.log("Starting bookmark rebuild process...");
+      
+      // Listen for control values from the plugin
+      const iframe = document.getElementById("sigma-embed");
+      if (!iframe || !iframe.contentWindow) {
+        if (DEBUG) console.error("No iframe available for bookmark rebuild");
+        return;
+      }
+
+      // Request current control values from the plugin
+      iframe.contentWindow.postMessage({
+        type: "workbook:variables:get",
+        variables: ["viz1_nodeid", "viz2_nodeid", "viz3_nodeid"]
+      }, "*");
+      
+      // Set up listener to capture bookmark data and restore correctly
+      const restoreListener = (event) => {
+        if (event.data && event.data.type === "workbook:variables:onchange") {
+          window.removeEventListener("message", restoreListener);
+          
+          const variables = event.data.variables || {};
+          if (DEBUG) console.log("Bookmark restoration - got variables:", {
+            viz1_nodeid: variables["viz1_nodeid"],
+            viz2_nodeid: variables["viz2_nodeid"], 
+            viz3_nodeid: variables["viz3_nodeid"]
+          });
+          
+          // Find all areas that have content and restore all of them
+          restoreAllAreasFromBookmark(variables);
+        }
+      };
+      
+      window.addEventListener("message", restoreListener);
+      
+      // Cleanup listener after timeout
+      setTimeout(() => {
+        window.removeEventListener("message", restoreListener);
+      }, 3000);
+    }
+
+    /**
+     * Restores ALL areas that have node IDs from bookmark data
+     * Multi-area support: restores all areas with content
+     */
+    async function restoreAllAreasFromBookmark(variables) {
+      if (DEBUG) console.log("🎯 Restoring ALL areas from bookmark data...");
+      
+      const iframe = document.getElementById("sigma-embed");
+      if (!iframe || !iframe.contentWindow) return;
+      
+      const areas = ["viz1", "viz2", "viz3"];
+      const allVariables = {};
+      let restoredAreas = [];
+      
+      // First pass: identify all areas with content and generate URLs
+      for (const area of areas) {
+        const nodeIdControl = `${area}_nodeid`;
+        const nodeId = variables[nodeIdControl];
+        
+        if (DEBUG) console.log(`🔍 Checking ${area}: nodeId = ${nodeId}`);
+        
+        if (nodeId && nodeId.trim() !== "") {
+          try {
+            if (DEBUG) console.log(`🎯 Generating URL for ${area} with nodeId: ${nodeId}`);
+            const embedUrl = await generateKpiEmbedUrl(nodeId);
+            const urlControl = `${area}_url`;
+            
+            // Add to variables update
+            allVariables[urlControl] = embedUrl;
+            allVariables[nodeIdControl] = nodeId;
+            
+            // Update local tracking
+            areaNodeIdMap[nodeIdControl] = nodeId;
+            
+            restoredAreas.push(area);
+            
+            if (DEBUG) console.log(`✅ Successfully prepared ${area}:`);
+            if (DEBUG) console.log(`   - nodeId: ${nodeId}`);
+            if (DEBUG) console.log(`   - URL: ${embedUrl.substring(0, 100)}...`);
+          } catch (error) {
+            console.error(`❌ Failed to generate URL for ${area}:`, error);
+          }
+        } else {
+          if (DEBUG) console.log(`⏭️  Skipping ${area} - no nodeId in bookmark`);
+        }
+      }
+      
+      if (restoredAreas.length > 0) {
+        // Set the viz control to the first restored area (for plugin context)
+        const firstAreaUrl = `${restoredAreas[0]}_url`;
+        allVariables["vizUrlControl"] = firstAreaUrl;
+        
+        // Send all updates at once
+        iframe.contentWindow.postMessage({
+          type: "workbook:variables:update",
+          variables: allVariables
+        }, "*");
+        
+        setCurrentAreaContext(firstAreaUrl);
+        
+        if (DEBUG) console.log(`✅ Restored ${restoredAreas.length} areas from bookmark: ${restoredAreas.join(', ')}`);
+      } else {
+        if (DEBUG) console.log("❌ No areas with node IDs found in bookmark data");
+      }
+    }
+
+    /**
+     * Restores a specific area based on bookmark data
+     * Ensures the KPI loads in the correct area
+     */
+    async function restoreSpecificArea(variables) {
+      if (DEBUG) console.log("🎯 Restoring specific area from bookmark data...");
+      
+      const iframe = document.getElementById("sigma-embed");
+      if (!iframe || !iframe.contentWindow) return;
+      
+      // Find which area has actual content (prioritize viz1)
+      // BUT force only the first area with content to prevent multi-area loading from old bookmarks
+      let targetArea = null;
+      let targetNodeId = null;
+      
+      if (DEBUG) console.log("🔍 DEBUGGING BOOKMARK RESTORATION:");
+      if (DEBUG) console.log("Available nodeIds in restored workbook:", {
+        viz1: variables["viz1_nodeid"],
+        viz2: variables["viz2_nodeid"],
+        viz3: variables["viz3_nodeid"]
+      });
+      if (DEBUG) console.log("Available URLs in restored workbook:", {
+        viz1: variables["viz1_url"] ? "HAS_URL" : "empty",
+        viz2: variables["viz2_url"] ? "HAS_URL" : "empty",
+        viz3: variables["viz3_url"] ? "HAS_URL" : "empty"
+      });
+      
+      // ALWAYS prioritize viz1 if it has content, regardless of other areas
+      if (variables["viz1_nodeid"] && variables["viz1_nodeid"].trim() !== "") {
+        targetArea = "viz1";
+        targetNodeId = variables["viz1_nodeid"];
+        if (DEBUG) console.log("📍 Selected viz1 as target (priority)");
+      } else if (variables["viz2_nodeid"] && variables["viz2_nodeid"].trim() !== "") {
+        targetArea = "viz2";
+        targetNodeId = variables["viz2_nodeid"];
+        if (DEBUG) console.log("📍 Selected viz2 as target (fallback)");
+      } else if (variables["viz3_nodeid"] && variables["viz3_nodeid"].trim() !== "") {
+        targetArea = "viz3";
+        targetNodeId = variables["viz3_nodeid"];
+        if (DEBUG) console.log("📍 Selected viz3 as target (fallback)");
+      }
+      
+      if (!targetArea || !targetNodeId) {
+        if (DEBUG) console.log("No valid area found for restoration");
+        return;
+      }
+      
+      if (DEBUG) console.log(`🎯 Found content in ${targetArea} with nodeId: ${targetNodeId}`);
+      
+      // Check if this is a legacy bookmark with multi-area contamination
+      const hasMultipleAreas = [
+        variables["viz1_nodeid"] && variables["viz1_nodeid"].trim() !== "",
+        variables["viz2_nodeid"] && variables["viz2_nodeid"].trim() !== "",
+        variables["viz3_nodeid"] && variables["viz3_nodeid"].trim() !== ""
+      ].filter(Boolean).length > 1;
+      
+      if (hasMultipleAreas) {
+        if (DEBUG) console.log("⚠️ Legacy bookmark detected with multi-area data - will clean restore to single area");
+      }
+      
+      try {
+        // Generate URL for the specific area
+        const embedUrl = await generateKpiEmbedUrl(targetNodeId);
+        const urlControl = `${targetArea}_url`;
+        const nodeIdControl = `${targetArea}_nodeid`;
+        
+        // Clear ALL areas first, then set only the target
+        const restoreVariables = {
+          // Clear all areas completely
+          "viz1_url": "",
+          "viz2_url": "",
+          "viz3_url": "",
+          "viz1_nodeid": "",
+          "viz2_nodeid": "",
+          "viz3_nodeid": "",
+          // Set only the target area
+          [urlControl]: embedUrl,
+          [nodeIdControl]: targetNodeId,
+          "vizUrlControl": urlControl
+        };
+        
+        iframe.contentWindow.postMessage({
+          type: "workbook:variables:update",
+          variables: restoreVariables
+        }, "*");
+        
+        // Update local tracking
+        setCurrentAreaContext(urlControl);
+        Object.keys(areaNodeIdMap).forEach(key => areaNodeIdMap[key] = null);
+        areaNodeIdMap[nodeIdControl] = targetNodeId;
+        
+        if (DEBUG) console.log(`✅ Restored ${targetArea} with nodeId: ${targetNodeId}, cleared all others`);
+        
+      } catch (error) {
+        console.error(`Failed to restore ${targetArea}:`, error);
+      }
+    }
+    
+    /**
+     * Rebuilds the node ID mapping by listening to workbook variable changes
+     * The bookmark should have restored the node ID values to the controls
+     */
+    async function rebuildNodeMapping() {
+      return new Promise((resolve) => {
+        if (DEBUG) console.log("Attempting to rebuild node mapping from bookmark controls...");
+        
+        // Add a temporary listener to capture the current workbook state
+        let variableData = null;
+        
+        const tempListener = (event) => {
+          if (event.data && event.data.type === "workbook:variables:onchange") {
+            variableData = event.data.workbook?.variables || {};
+            if (DEBUG) console.log("Captured variables from bookmark:", variableData);
+          }
+        };
+        
+        window.addEventListener("message", tempListener);
+        
+        // Request a variable update to trigger the listener
+        const iframe = document.getElementById("sigma-embed");
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({
+            type: "workbook:variables:trigger"
+          }, "*");
+        }
+        
+        // Wait a moment for the response, then process
+        setTimeout(() => {
+          window.removeEventListener("message", tempListener);
+          
+          // IMPORTANT: Clear the entire areaNodeIdMap first to prevent contamination from previous bookmarks
+          Object.keys(areaNodeIdMap).forEach(key => {
+            areaNodeIdMap[key] = null;
+          });
+          if (DEBUG) console.log("🧹 Cleared areaNodeIdMap before rebuilding from bookmark");
+          
+          // Process any captured variable data
+          if (variableData) {
+            ["viz1_nodeid", "viz2_nodeid", "viz3_nodeid"].forEach(nodeIdControl => {
+              const nodeId = variableData[nodeIdControl];
+              if (nodeId && nodeId.trim() !== "") {
+                areaNodeIdMap[nodeIdControl] = nodeId.trim();
+                if (DEBUG) console.log(`Restored from bookmark: ${nodeIdControl} → ${nodeId}`);
+              }
+            });
+          } else {
+            // No variables captured - bookmark may not have node IDs stored
+            if (DEBUG) console.log("No variables captured from bookmark controls");
+          }
+          
+          if (DEBUG) console.log("Final node mapping:", areaNodeIdMap);
+          resolve(); // Signal completion
+        }, 500);
+      });
+    }
+
+
+    /**
+     * Handles explore key changes from the plugin
+     * Updates the area-specific explore key control only for areas that should have content
+     */
+    async function handleExploreKeyChange(data) {
+      if (DEBUG) console.log("🔑 Explore key changed:", data.exploreKey);
+      if (DEBUG) console.log("🔑 Previous currentExploreKey:", currentExploreKey);
+      
+      // Store the current explore key for bookmark restoration
+      currentExploreKey = data.exploreKey;
+      if (DEBUG) console.log("🔑 Updated currentExploreKey to:", currentExploreKey);
+      
+      const iframe = document.getElementById("sigma-embed");
+      if (iframe && iframe.contentWindow && data.exploreKey) {
+        const variablesUpdate = {};
+        
+        // Determine which area's explore key to update based on current context
+        const currentArea = getCurrentAreaContext();
+        const exploreKeyControl = getExploreKeyControlForArea(currentArea);
+        if (DEBUG) console.log("🔑 Current area context:", currentArea);
+        if (DEBUG) console.log("🔑 ExploreKey control for area:", exploreKeyControl);
+        
+        // Only update area-specific exploreKey if this area should have content
+        if (exploreKeyControl && shouldAreaReceiveExploreKey(currentArea)) {
+          // Update the area-specific exploreKey
+          variablesUpdate[exploreKeyControl] = data.exploreKey;
+          if (DEBUG) console.log(`🔑 Area-specific exploreKey ${exploreKeyControl} set to:`, data.exploreKey);
+        } else if (exploreKeyControl) {
+          if (DEBUG) console.log(`🔑 Skipping area-specific exploreKey update for ${exploreKeyControl} - area should be empty`);
+        }
+        
+        // ALWAYS update the Common Explore Key with the most recent exploreKey
+        variablesUpdate["explorekey"] = data.exploreKey;
+        if (DEBUG) console.log(`🔑 Common Explore Key (explorekey) set to:`, data.exploreKey);
+        
+        // Also update our tracked currentExploreKey immediately for getControlValue calls
+        currentExploreKey = data.exploreKey;
+        
+        if (DEBUG) console.log("🔑 Sending variables update:", variablesUpdate);
+        iframe.contentWindow.postMessage({
+          type: "workbook:variables:update",
+          variables: variablesUpdate
+        }, "*");
+        
+        if (DEBUG) console.log("🔑 Variables update message sent successfully");
+        
+        // Only update bookmark during actual bookmark loading (not save process)
+        if (currentBookmarkId && !isInSaveProcess) {
+          await updateBookmarkAfterSuccessfulRestoration(data.exploreKey);
+        }
+      } else {
+        if (DEBUG) console.log("🔑 ❌ Cannot update variables - iframe or exploreKey missing");
+      }
+    }
+
+
+    /**
+     * Updates bookmark with working exploreKey after successful restoration
+     * Only triggers during bookmark loading, not during save process
+     */
+    async function updateBookmarkAfterSuccessfulRestoration(newExploreKey) {
+      // Only update if we're currently loading a bookmark (not saving)
+      if (!currentBookmarkId || !newExploreKey) {
+        return;
+      }
+      
+      // Don't update during save process - only during restoration
+      // Extended cooldown to prevent feedback loops after save
+      if (lastSavedBookmark && (Date.now() - lastSavedBookmark.savedAt < 30000)) {
+        if (DEBUG) console.log("🔄 Skipping update - too close to save time (within 30s)");
+        return;
+      }
+      
+      // Find the current bookmark in our list
+      const currentBookmark = availableBookmarks.find(bm => bm.bookmarkId === currentBookmarkId);
+      if (!currentBookmark) {
+        if (DEBUG) console.log("🔄 No current bookmark found for restoration update");
+        return;
+      }
+      
+      // Only update if exploreKey actually changed and we're past initial exploreKey changes
+      if (currentBookmark.exploreKey === newExploreKey) {
+        return;
+      }
+      
+      if (DEBUG) console.log("🔄 Updating bookmark with successful restoration exploreKey:", {
+        bookmarkId: currentBookmarkId,
+        oldExploreKey: currentBookmark.exploreKey,
+        newExploreKey: newExploreKey,
+        bookmarkName: currentBookmark.name
+      });
+
+      try {
+        const response = await fetch("/api/bookmarks/update", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workbookUrlId: workbookUrlId,
+            bookmarkId: currentBookmarkId,
+            exploreKey: newExploreKey
+          })
+        });
+
+        const result = await response.json();
+        
+        if (response.ok) {
+          if (DEBUG) console.log("✅ Bookmark updated with successful restoration exploreKey");
+          // Update our local bookmark list
+          currentBookmark.exploreKey = newExploreKey;
+        } else {
+          if (DEBUG) console.error("❌ Failed to update bookmark with restoration exploreKey:", result.error);
+        }
+      } catch (error) {
+        if (DEBUG) console.error("❌ Error updating bookmark with restoration exploreKey:", error.message);
+      }
+    }
+
+
+    /**
+     * Triggers the plugin to refresh by reconstructing URLs for ALL areas with node IDs
+     * Multi-area support: restores all areas that have content
+     */
+    async function triggerPluginRefresh() {
+      if (DEBUG) console.log("🚀 Starting multi-area bookmark restoration...");
+      
+      const iframe = document.getElementById("sigma-embed");
+      if (!iframe || !iframe.contentWindow) {
+        console.error("No iframe available for plugin refresh");
+        return;
+      }
+
+      // Build URLs for ALL areas that have node IDs
+      const areas = ["viz1", "viz2", "viz3"];
+      const allVariables = {};
+      let restoredAreas = [];
+      
+      // First, generate URLs for all areas with content
+      for (const area of areas) {
+        const nodeIdControl = `${area}_nodeid`;
+        const nodeId = getStoredNodeId(nodeIdControl);
+        
+        if (DEBUG) console.log(`🔍 Checking ${area}: nodeId = ${nodeId}`);
+        
+        if (nodeId) {
+          try {
+            if (DEBUG) console.log(`🎯 Generating URL for ${area} with nodeId: ${nodeId}`);
+            const embedUrl = await generateKpiEmbedUrl(nodeId);
+            const urlControl = `${area}_url`;
+            
+            // Add to variables update
+            allVariables[urlControl] = embedUrl;
+            allVariables[nodeIdControl] = nodeId;
+            
+            restoredAreas.push(area);
+            
+            if (DEBUG) console.log(`✅ Successfully prepared ${area}:`);
+            if (DEBUG) console.log(`   - nodeId: ${nodeId}`);
+            if (DEBUG) console.log(`   - URL: ${embedUrl.substring(0, 100)}...`);
+          } catch (error) {
+            console.error(`❌ Failed to generate URL for ${area}:`, error);
+          }
+        } else {
+          if (DEBUG) console.log(`⏭️  Skipping ${area} - no nodeId stored`);
+        }
+      }
+      
+      if (restoredAreas.length > 0) {
+        // Set the viz control to the first restored area (for plugin context)
+        const firstAreaUrl = `${restoredAreas[0]}_url`;
+        allVariables["vizUrlControl"] = firstAreaUrl;
+        
+        // Send all updates at once
+        iframe.contentWindow.postMessage({
+          type: "workbook:variables:update",
+          variables: allVariables
+        }, "*");
+        
+        setCurrentAreaContext(firstAreaUrl);
+        
+        if (DEBUG) console.log(`✅ Restored ${restoredAreas.length} areas: ${restoredAreas.join(', ')}`);
+      } else {
+        if (DEBUG) console.log("No areas with stored node IDs found to restore");
+      }
+    }
+
+
+    /**
+     * Gets the current area context (viz1_url, viz2_url, etc.)
+     * This tracks which area was last selected for KPI placement
+     */
+    let currentAreaContext = null;
+    function getCurrentAreaContext() {
+      return currentAreaContext;
+    }
+    
+    function setCurrentAreaContext(context) {
+      currentAreaContext = context;
+      if (DEBUG) console.log(`Area context set to: ${context}`);
+    }
+    
+    /**
+     * Determines if an area should receive exploreKey updates
+     * Only areas with actual content (node IDs) should get exploreKeys
+     */
+    function shouldAreaReceiveExploreKey(areaUrlControl) {
+      if (!areaUrlControl) return false;
+      
+      // Extract area name from URL control (viz1_url -> viz1)
+      const areaName = areaUrlControl.replace('_url', '');
+      const nodeIdControl = `${areaName}_nodeid`;
+      
+      // Check if this area has a node ID stored
+      const hasStoredNodeId = areaNodeIdMap[nodeIdControl] && areaNodeIdMap[nodeIdControl].trim() !== "";
+      
+      if (DEBUG) console.log(`🔍 shouldAreaReceiveExploreKey check for ${areaUrlControl}:`, {
+        areaName,
+        nodeIdControl,
+        hasStoredNodeId,
+        storedNodeId: areaNodeIdMap[nodeIdControl]
+      });
+      
+      return hasStoredNodeId;
+    }
+    
+
+    /**
+     * Storage for tracking node IDs assigned to each area
+     */
+    const areaNodeIdMap = {
+      "viz1_nodeid": null,
+      "viz2_nodeid": null, 
+      "viz3_nodeid": null
+    };
+
+    function storeNodeId(nodeIdControl, nodeId) {
+      // For multi-area support: only set the target area, preserve others
+      areaNodeIdMap[nodeIdControl] = nodeId;
+      if (DEBUG) console.log(`Stored ${nodeIdControl}: ${nodeId} (preserving others)`);
+      
+      // Skip persistent mapping to avoid conflicts with exploreKey tracking
+      // updatePersistentNodeMapping();
+    }
+
+    function getStoredNodeId(nodeIdControl) {
+      return areaNodeIdMap[nodeIdControl];
+    }
+
+    /**
+     * Stores the node ID mapping in the persistent explorekey control as JSON
+     * This survives bookmark saves/loads unlike individual controls
+     */
+    function updatePersistentNodeMapping() {
+      const iframe = document.getElementById("sigma-embed");
+      if (iframe && iframe.contentWindow) {
+        // Create a mapping of only the areas that have node IDs
+        const persistentMapping = {};
+        Object.keys(areaNodeIdMap).forEach(key => {
+          if (areaNodeIdMap[key]) {
+            persistentMapping[key] = areaNodeIdMap[key];
+          }
+        });
+        
+        // Store as JSON in the explorekey control if we have any mappings
+        if (Object.keys(persistentMapping).length > 0) {
+          const jsonMapping = JSON.stringify(persistentMapping);
+          
+          iframe.contentWindow.postMessage({
+            type: "workbook:variables:update",
+            variables: {
+              "explorekey": jsonMapping
+            }
+          }, "*");
+          
+          if (DEBUG) console.log(`📝 Persistent node mapping stored in Common Explore Key:`, jsonMapping);
+        }
+      }
+    }
+
+    /**
+     * Restores node ID mapping from the persistent explorekey control
+     */
+    function restoreFromPersistentMapping(exploreKeyValue) {
+      if (!exploreKeyValue) return false;
+      
+      try {
+        // Check if exploreKeyValue looks like JSON (starts with { and ends with })
+        if (typeof exploreKeyValue === 'string' && exploreKeyValue.startsWith('{') && exploreKeyValue.endsWith('}')) {
+          const parsedMapping = JSON.parse(exploreKeyValue);
+          
+          // Restore the mapping
+          Object.keys(parsedMapping).forEach(key => {
+            areaNodeIdMap[key] = parsedMapping[key];
+          });
+          
+          if (DEBUG) console.log(`📚 Node mapping restored from explorekey:`, parsedMapping);
+          return true;
+        }
+      } catch (error) {
+        if (DEBUG) console.log("explorekey value is not JSON mapping, treating as regular explore key");
+      }
+      
+      return false;
+    }
+
+    /**
+     * Maps area controls to their corresponding explore key controls
+     */
+    function getExploreKeyControlForArea(areaControl) {
+      // Individual area exploreKey controls are no longer used with LowDB approach
+      // Only the common 'explorekey' control is used for Sigma bookmark storage
+      return null;
+    }
+
+
+    /**
+     * Core Dashboard Builder workflow function
+     * 
+     * This function is triggered when a user selects a KPI from the modal.
+     * It generates an embed URL for the selected KPI and updates the appropriate
+     * dashboard area control using Sigma's inbound event API.
+     * 
+     * Workflow:
+     * 1. Extract target area from the outbound event (e.g., "viz1_url")
+     * 2. Generate embed URL for the currently selected KPI element
+     * 3. Use Sigma's workbook:variables:update to set the control value
+     * 4. Plugin automatically renders the KPI in the dashboard area
+     */
+    async function handleVizComponentSelected(values) {
+      if (DEBUG) console.log("Dashboard Builder: KPI selection initiated", values);
+      
+      // Extract which dashboard area to update
+      const targetControl = values.vizEmbedUrlControl;
+      if (!targetControl) {
+        console.error("Dashboard Builder: No target control specified");
+        return;
+      }
+      
+      // Set the current area context for explore key tracking
+      setCurrentAreaContext(targetControl);
+      
+      // Ensure we have a KPI selected for placement
+      if (!selectedKpiNodeId) {
+        console.error("Dashboard Builder: No KPI selected for placement");
+        updatePluginStatus("error", "No KPI selected");
+        return;
+      }
+      
+      if (DEBUG) console.log(`Dashboard Builder: Generating URL for KPI ${selectedKpiNodeId} → ${targetControl}`);
+      
+      try {
+        // Generate element-specific embed URL with JWT authentication
+        const embedUrl = await generateKpiEmbedUrl(selectedKpiNodeId);
+        
+        // Update Sigma controls using official inbound event API
+        const iframe = document.getElementById("sigma-embed");
+        if (iframe && iframe.contentWindow) {
+          // First, set the context control so plugin knows which area to monitor
+          iframe.contentWindow.postMessage({
+            type: "workbook:variables:update", 
+            variables: {
+              "vizUrlControl": targetControl
+            }
+          }, "*");
+          
+          if (DEBUG) console.log(`Dashboard Builder: Context set to ${targetControl}`);
+          
+          // For multi-area support: Only update the target area, preserve others
+          setTimeout(() => {
+            const nodeIdControl = targetControl.replace('_url', '_nodeid');
+            const setTargetVariables = {
+              [targetControl]: embedUrl,
+              [nodeIdControl]: selectedKpiNodeId,
+              "vizUrlControl": targetControl
+            };
+            
+            iframe.contentWindow.postMessage({
+              type: "workbook:variables:update",
+              variables: setTargetVariables
+            }, "*");
+            
+            // Store in our local mapping for bookmark reconstruction
+            storeNodeId(nodeIdControl, selectedKpiNodeId);
+            
+            if (DEBUG) console.log(`Dashboard Builder: Set ${targetControl} with URL and nodeId: ${selectedKpiNodeId} (preserving other areas)`);
+          }, 200);
+        }
+        
+        updatePluginStatus("connected", `KPI placed in ${targetControl.replace('_', ' ').toUpperCase()}`);
+        
+      } catch (error) {
+        console.error("Dashboard Builder: URL generation failed:", error);
+        updatePluginStatus("error", `Failed: ${error.message}`);
+      }
+    }
+
+    // Track which nodeIds have already been restored to prevent multi-area loading
+    const restoredNodeIds = new Set();
+    // Track which area should receive each nodeId (for priority enforcement)
+    const nodeIdToAreaMap = new Map();
+    
+    /**
+     * Handles KPI restoration workflow for bookmark loads
+     * Uses nodeId and exploreKey from the action for proper restoration
+     * FILTERS multiple vizOnLoad events to prevent multi-area loading
+     */
+    /**
+     * Legacy KPI restoration handler - DISABLED
+     * 
+     * This function handled individual KPI restoration from Sigma bookmark data.
+     * It has been replaced by the LowDB-based multi-area restoration system
+     * which provides better state management and prevents cross-contamination.
+     * 
+     * @deprecated - Use restoreMultiAreaState() instead
+     */
+    async function handleVizOnLoad(values) {
+      if (DEBUG) console.log("Dashboard Builder: KPI restoration initiated (DISABLED - using LowDB system)", values);
+      
+      // DISABLED: Old Sigma-based restoration system replaced by LowDB multi-area restoration
+      return;
+    }
+
+
+    function updatePluginStatus(status, message) {
+      const statusEl = document.getElementById("plugin-status");
+      statusEl.className = `plugin-status ${status}`;
+      statusEl.innerHTML = `<p>${message}</p>`;
+    }
+
+    function updateHeaderStatus(status, message) {
+      // Header status element removed during UI cleanup - just log for debugging
+      if (DEBUG) console.log("Header status:", status, message);
+    }
+
+    // ============================================================================
+    // KPI URL GENERATION
+    // ============================================================================
+    
+    /**
+     * Generates an embed URL for a specific KPI element
+     * @param {string} nodeId - The node ID of the selected KPI element
+     * @returns {Promise<string>} The embed URL for the KPI
+     */
+    async function generateKpiEmbedUrl(nodeId, exploreKey) {
+      const workbookName = env.WORKBOOK_NAME;
+      const user = env.VIEW_EMAIL;
+      
+      if (!workbookName || !user) {
+        throw new Error("Missing workbook name or user email in environment");
+      }
+      
+      if (DEBUG) console.log(`Generating KPI embed URL for nodeId: ${nodeId}${exploreKey ? ' with exploreKey: ' + exploreKey.substring(0, 20) + '...' : ''}`);
+      
+      try {
+        // Build URL with optional exploreKey parameter
+        let url = `/api/jwt/view?embedType=element&workbookName=${encodeURIComponent(workbookName)}&nodeId=${encodeURIComponent(nodeId)}`;
+        if (exploreKey) {
+          url += `&exploreKey=${encodeURIComponent(exploreKey)}`;
+        }
+        
+        // Use the existing JWT API but with element-specific parameters
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sub: user }),
+        });
+        
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (parseErr) {
+          throw new Error(`Invalid JSON response: ${text.slice(0, 100)}...`);
+        }
+        
+        if (!res.ok) {
+          throw new Error(json.error || res.statusText || "Failed to generate KPI embed URL");
+        }
+        
+        const { embedUrl } = json;
+        if (DEBUG) console.log("Generated KPI embed URL:", embedUrl);
+        
+        return embedUrl;
+        
+      } catch (err) {
+        console.error("KPI URL generation failed:", err.message);
+        throw err;
+      }
+    }
+
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Decodes a base64url-encoded string (used for JWT components)
+     * @param {string} str - Base64url encoded string
+     * @returns {string} Decoded string
+     */
+    function base64UrlDecode(str) {
+      str = str.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = str.length % 4;
+      if (pad) str += "=".repeat(4 - pad);
+      return atob(str);
+    }
+
+    // ============================================================================
+    // SIGMA EMBED FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Auto-loads the Dashboard Builder plugin using configured values
+     */
+    async function loadPlugin() {
+      const user = env.VIEW_EMAIL;
+      const workbookName = env.WORKBOOK_NAME;
+
+      if (DEBUG) console.log("loadPlugin called with:", { user, workbookName, env });
+
+      if (!user || !workbookName) {
+        const errorMsg = `Missing configuration: user=${user}, workbook=${workbookName}`;
+        updatePluginStatus("error", errorMsg);
+        updateHeaderStatus("error", "Configuration Error");
+        if (DEBUG) console.error(errorMsg);
+        return;
+      }
+
+      const decodeBlock = document.getElementById("jwt-decode-content");
+      const iframe = document.getElementById("sigma-embed");
+      const placeholder = document.getElementById("plugin-placeholder");
+
+      decodeBlock.innerHTML = "<p>Loading JWT...</p>";
+      document.getElementById("jwt-display").textContent = "Loading JWT...";
+      updatePluginStatus("", "Connecting to plugin...");
+      updateHeaderStatus("", "Loading Plugin...");
+
+      try {
+        const res = await fetch(`/api/jwt/view?embedType=workbook&workbookName=${encodeURIComponent(workbookName)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sub: user }),
+        });
+
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (parseErr) {
+          throw new Error(`Invalid JSON response: ${text.slice(0, 100)}...`);
+        }
+
+        if (!res.ok) {
+          throw new Error(json.error || res.statusText || "Failed to connect to plugin");
+        }
+
+        const { jwt, embedUrl } = json;
+        if (DEBUG) console.log("Plugin embed response:", { jwt, embedUrl });
+
+        // Log the exact URL that will be loaded in the iframe
+        console.log("=== FULL IFRAME URL ===");
+        console.log(embedUrl);
+        console.log("======================");
+
+        // Show iframe and hide placeholder
+        iframe.src = embedUrl;
+        iframe.style.display = "block";
+        placeholder.style.display = "none";
+        
+        document.getElementById("jwt-display").textContent = jwt;
+
+        if (jwt && jwt.split(".").length === 3) {
+          try {
+            const [headerStr, payloadStr] = jwt.split(".").slice(0, 2);
+            const header = JSON.parse(base64UrlDecode(headerStr));
+            const payload = JSON.parse(base64UrlDecode(payloadStr));
+            decodeBlock.innerHTML = `
+            <h3>Decoded JWT Header:</h3>
+            <pre>${JSON.stringify(header, null, 2)}</pre>
+            <h3>Decoded JWT Payload:</h3>
+            <pre>${JSON.stringify(payload, null, 2)}</pre>`;
+          } catch (decodeErr) {
+            decodeBlock.innerHTML = `<p style="color:red;">JWT decoding failed.</p>`;
+          }
+        } else {
+          decodeBlock.innerHTML = `<p style="color:red;">Missing or invalid JWT format.</p>`;
+        }
+        
+        updatePluginStatus("", "Waiting for plugin to initialize...");
+        updateHeaderStatus("", "Waiting for Plugin...");
+        
+      } catch (err) {
+        if (DEBUG) console.error("loadPlugin() failed:", err.message);
+        decodeBlock.innerHTML = `<p style="color:red;">${err.message}</p>`;
+        updatePluginStatus("error", `Connection failed: ${err.message}`);
+        updateHeaderStatus("error", `Failed: ${err.message}`);
+      }
+    }
+
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Updates the display with configured user and workbook information
+     */
+    function updateDisplayInfo() {
+      const user = env.VIEW_EMAIL || "Not configured";
+      const workbook = env.WORKBOOK_NAME || "Not configured";
+      
+      // Elements no longer exist after UI cleanup - just log for debugging
+      if (DEBUG) console.log("Display info updated:", { user, workbook, env });
+    }
+
+    // ============================================================================
+    // APPLICATION INITIALIZATION
+    // ============================================================================
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        // Initialize UI elements
+        initializeUI();
+        
+        // Load environment and start plugin
+        await loadEnv();
+        updateDisplayInfo();
+        
+        // Auto-load the plugin
+        await loadPlugin();
+      } catch (error) {
+        console.error("Initialization failed:", error);
+        updateHeaderStatus("error", "Initialization Failed");
+      }
+    });
+  </script>
+</html>
