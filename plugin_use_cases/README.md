@@ -1,17 +1,17 @@
-# 🚀 Sigma Dashboard Builder - Multi-Area KPI Placement System
+# Sigma Dashboard Builder - Multi-Area KPI Placement System
 
 A sophisticated host application for Sigma's Dashboard Builder plugin that enables users to place different KPIs across three independent dashboard areas with persistent bookmark management.
 
-## ✨ Key Features
+## Key Features
 
-- **🎯 Multi-Area KPI Placement**: Place different KPIs in 3 independent dashboard areas
-- **💾 Persistent Bookmarks**: Save and restore complete multi-area configurations  
-- **🔄 Incremental Building**: Add KPIs to existing bookmarks without losing current state
-- **🛡️ Cross-Contamination Prevention**: Each area operates independently
-- **⚡ Real-time Synchronization**: ExploreKey sync across all areas
-- **🔐 Secure Authentication**: JWT-based authentication with automatic token refresh
+- **Multi-Area KPI Placement**: Place different KPIs in 3 independent dashboard areas
+- **Persistent Bookmarks**: Save and restore complete multi-area configurations  
+- **Incremental Building**: Add KPIs to existing bookmarks without losing current state
+- **Cross-Contamination Prevention**: Each area operates independently
+- **Real-time Synchronization**: ExploreKey sync across all areas
+- **Secure Authentication**: JWT-based authentication with automatic token refresh
 
-## 🏗️ Architecture
+## Architecture
 
 ### Dual Storage System
 - **Sigma Bookmarks**: Store exploreKey and workbook state (single-state, cloud)
