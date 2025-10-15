@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sigma Plugin Use Cases</title>
+    <link rel="stylesheet" href="/styles/main.css">
+    <style>
+        .use-case-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 2rem;
+        }
+        
+        .use-case-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .use-case-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .use-case-card h3 {
+            color: #007acc;
+            margin-bottom: 1rem;
+        }
+        
+        .use-case-card p {
+            color: #666;
+            margin-bottom: 1.5rem;
+        }
+        
+        .use-case-button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .use-case-button:hover {
+            background: #005a94;
+        }
+    </style>
+</head>
+<body>
+    <header class="layout-topbar">
+        <div style="display: flex; align-items: center; gap: 0.5rem">
+            <span class="header-title">Sigma Plugin Use Cases</span>
+        </div>
+        <div>
+            <button onclick="window.open('/README.md', '_blank')">Documentation</button>
+        </div>
+    </header>
+
+    <main style="padding: 2rem;">
+        <h1>Sigma Plugin Use Cases</h1>
+        <p>Explore different examples of how to integrate Sigma plugins into your applications.</p>
+        
+        <div class="use-case-grid">
+            <div class="use-case-card">
+                <h3>Dashboard Builder</h3>
+                <p>Demonstrates bidirectional communication with the Dashboard Builder plugin, including element selection and dashboard configuration.</p>
+                <a href="/dashboard-builder/" class="use-case-button">Launch Example</a>
+            </div>
+            
+            <div class="use-case-card">
+                <h3>More Coming Soon</h3>
+                <p>Additional plugin use cases will be added to demonstrate various integration patterns and communication methods.</p>
+                <button class="use-case-button" disabled style="opacity: 0.5;">Coming Soon</button>
+            </div>
+        </div>
+        
+        <div style="margin-top: 3rem; padding: 2rem; background: #f5f5f5; border-radius: 8px;">
+            <h2>Getting Started</h2>
+            <ol>
+                <li>Configure your <code>.env</code> file with Sigma credentials</li>
+                <li>Ensure your plugin is registered in Sigma</li>
+                <li>Create or identify a workbook for plugin testing</li>
+                <li>Select a use case above to begin</li>
+            </ol>
+        </div>
+    </main>
+
+    <footer class="layout-footer">Sigma Plugin Use Cases &copy; 2025</footer>
+</body>
+</html>
