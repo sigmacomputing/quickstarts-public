@@ -1,0 +1,8 @@
+{
+  "_comment": "Default empty database for multi-area bookmarks. User bookmarks will be added here at runtime.",
+  "bookmarks": {},
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2025-10-15T02:38:08.120Z"
+  }
+}

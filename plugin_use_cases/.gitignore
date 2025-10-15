@@ -4,18 +4,21 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Environment variables (contains sensitive API credentials)
-.env
+# Environment variables (sensitive ones only - .env is included as template)
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Database files (contains user data and bookmarks)
-data/
+# Database files (exclude user data, allow default template)
+data/*
+!data/multi-area-bookmarks.json
+
+# JSON files (exclude user data, allow project files)
 *.json
 !package.json
 !package-lock.json
+!data/multi-area-bookmarks.json
 
 # Logs
 logs
