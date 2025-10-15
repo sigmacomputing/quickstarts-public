@@ -1,6 +1,9 @@
 # Sigma Dashboard Builder - Multi-Area KPI Placement System
 A sample host application for Sigma's Dashboard Builder plugin that enables users to place different KPIs across three independent dashboard areas with persistent bookmark management.
 
+Please refer to the QuickStart: Use Case: Dashboard Builder Plugin for instructions. Sigma QuickStarts can be found at:
+https://quickstarts.sigmacomputing.com/
+
 ## Key Features
 - Multi-Area KPI Placement: Place different KPIs in 3 independent dashboard areas
 - Persistent Bookmarks: Save and restore complete multi-area configurations  
