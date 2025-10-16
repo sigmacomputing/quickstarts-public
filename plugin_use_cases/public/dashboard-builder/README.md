@@ -110,8 +110,8 @@ Messages received from plugin:
                │                        │                        │
                └────────────────────────┼────────────────────────┘
                                         │
-               ┌────────────────────────▼────────────────────────┐
-               │             HOST APPLICATION                    │
+               ┌────────────────────────▼───────────────────────┐
+               │             HOST APPLICATION                   │
                │            (index.html)                        │
                │                                                │
                │  ┌─────────────────────────────────────────┐   │
@@ -159,156 +159,203 @@ Messages received from plugin:
                │ ✗ Single-state    │    │ ✓ Fast access     │
                └───────────────────┘    └───────────────────┘
 
-  ┌─────────────────────────────────────────────────────────────────────────────────┐
-  │                                SAVE WORKFLOW                                    │
-  └─────────────────────────────────────────────────────────────────────────────────┘
+## SAVE WORKFLOW
 
-  USER ACTION: Save Bookmark
+```
+USER ACTION: Save Bookmark
         │
         ▼
-  [1] CAPTURE CURRENT STATE
+[1] CAPTURE CURRENT STATE
         │
-        ├─► Read viz1_nodeid control
-        ├─► Read viz2_nodeid control
-        ├─► Read viz3_nodeid control
-        └─► Get current exploreKey
-        │
-        ▼
-  [2] CREATE SIGMA BOOKMARK
-        │
-        ├─► POST /api/bookmarks/create-bookmark
-        ├─► Payload: { exploreKey, name, workbookUrlId }
-        └─► Returns: sigmaBookmarkId
+        ├─► Read areaNodeIdMap (all area node IDs)
+        ├─► Get current exploreKey
+        └─► Validate workbookUrlId
         │
         ▼
-  [3] STORE MULTI-AREA CONFIG
+[2] ATOMIC MULTI-AREA SAVE
         │
         ├─► POST /api/multi-area-bookmarks/save
         ├─► Payload: {
-        │     name, sigmaBookmarkId, workbookUrlId,
+        │     userEmail, workbookUrlId, exploreKey, name,
         │     areas: { viz1_nodeid, viz2_nodeid, viz3_nodeid }
         │   }
-        └─► Returns: localBookmarkId
+        │
+        ├─► INTERNAL: Create Sigma bookmark first
+        │   ├─► POST /api/bookmarks/create-bookmark
+        │   ├─► Payload: { exploreKey, name, workbookUrlId }
+        │   └─► Returns: sigmaBookmarkId
+        │
+        ├─► INTERNAL: Store multi-area config in LowDB
+        │   ├─► Generate localBookmarkId (UUID)
+        │   ├─► Save: { name, sigmaBookmarkId, workbookUrlId, areas }
+        │   └─► Returns: localBookmarkId
+        │
+        └─► Returns: { localBookmarkId, sigmaBookmarkId, name, areas }
         │
         ▼
-  [4] UPDATE UI
+[3] UPDATE UI & STATE
         │
+        ├─► Update currentBookmarkId
         ├─► Reload bookmark dropdown
         ├─► Set dropdown to new bookmark
         └─► Show success message
+```
 
-  ┌─────────────────────────────────────────────────────────────────────────────────┐
-  │                                LOAD WORKFLOW                                    │
-  └─────────────────────────────────────────────────────────────────────────────────┘
+## LOAD WORKFLOW
 
-  USER ACTION: Select Bookmark
+```
+USER ACTION: Select Bookmark
         │
         ▼
-  [1] FETCH BOOKMARK DATA
+[1] RELOAD WORKBOOK WITH SIGMA BOOKMARK
         │
-        ├─► GET /api/multi-area-bookmarks/get/:localBookmarkId
-        └─► Returns: { sigmaBookmarkId, areas: {...} }
-        │
-        ▼
-  [2] RELOAD WORKBOOK
-        │
+        ├─► Get selected localBookmarkId from dropdown
+        ├─► Fetch bookmark: GET /api/multi-area-bookmarks/get/:localBookmarkId
+        ├─► Extract sigmaBookmarkId from response
         ├─► Generate JWT with sigmaBookmarkId
-        ├─► Reload iframe with bookmark URL
-        └─► Wait for workbook load
+        ├─► Reload iframe with Sigma bookmark URL
+        └─► Wait for workbook:ready message
         │
         ▼
-  [3] RESTORE ALL AREAS (Atomic)
+[2] RESTORE MULTI-AREA STATE (restoreMultiAreaState)
         │
-        ├─► For each area with nodeId:
-        │   ├─► Generate embed URL with current exploreKey
-        │   ├─► Prepare variable update
-        │   └─► Add to batch update
+        ├─► Clear current areaNodeIdMap
+        ├─► Extract areas configuration from bookmark
         │
-        ├─► Send single message with all updates:
-        │   └─► { viz1_url, viz1_nodeid, viz2_url, viz2_nodeid, ... }
+        ├─► FOR EACH CONFIGURED AREA:
+        │   ├─► Generate embed URL: generateKpiEmbedUrl(nodeId)
+        │   ├─► Prepare variables: { areaKey_url, areaKey_nodeid }
+        │   └─► Update local areaNodeIdMap[areaKey] = nodeId
         │
-        └─► Update local tracking variables
+        ├─► ATOMIC UPDATE: Send all variables in single message
+        │   ├─► Type: "workbook:variables:update"
+        │   ├─► Variables: { viz1_url, viz1_nodeid, viz2_url, viz2_nodeid, ... }
+        │   └─► Plus: vizUrlControl (set to first restored area)
+        │
+        ├─► Update currentAreaContext to first area
+        └─► Update currentBookmarkId tracking
+        │
+        ▼
+[3] FALLBACK ERROR HANDLING
+        │
+        └─► If restoreMultiAreaState fails:
+            └─► Call rebuildFromBookmarkControls() as fallback
+```
 
-  ┌─────────────────────────────────────────────────────────────────────────────────┐
-  │                              MESSAGE FLOW                                       │
-  └─────────────────────────────────────────────────────────────────────────────────┘
+## MESSAGE FLOW
 
-  PLUGIN TO HOST:
-  ┌─────────────────┐         ┌─────────────────────────────────┐
-  │ Sigma Plugin    │────────▶│ Host Application                │
-  │ (iframe)        │         │                                 │
-  └─────────────────┘         │ Message Types:                  │
-                              │ • workbook:exploreKey:onchange  │
-                              │ • workbook:variables:onchange   │
-                              │ • workbook:id:onchange          │
-                              │ • workbook:bookmark:onchange    │
-                              └─────────────────────────────────┘
+### Plugin to Host Messages:
+```
+Sigma Plugin (iframe) ──────► Host Application
 
-  HOST TO PLUGIN:
-  ┌─────────────────────────────────┐         ┌─────────────────┐
-  │ Host Application                │────────▶│ Sigma Plugin    │
-  │                                 │         │ (iframe)        │
-  │ Message Types:                  │         └─────────────────┘
-  │ • workbook:variables:update     │
-  │ • workbook:variables:get        │
-  └─────────────────────────────────┘
+Message Types:
+• workbook:exploreKey:onchange  - ExploreKey updates for JWT generation
+• workbook:variables:onchange   - Variable changes from user interactions  
+• workbook:id:onchange          - Workbook state changes
+• workbook:bookmark:onchange    - Bookmark selection changes
+• workbook:ready                - Plugin fully loaded and ready
+```
 
-  ┌─────────────────────────────────────────────────────────────────────────────────┐
-  │                            ERROR HANDLING FLOW                                  │
-  └─────────────────────────────────────────────────────────────────────────────────┘
+### Host to Plugin Messages:
+```
+Host Application ──────► Sigma Plugin (iframe)
 
-  ERROR SOURCES:
-  ├─► API Failures (Network, Server Errors)
-  ├─► Database Issues (LowDB Access, Corruption)
-  ├─► JWT Expiration/Generation Failures
-  ├─► Plugin Communication Failures
-  └─► Invalid User Input/Missing Data
+Message Types:
+• workbook:variables:update     - Update plugin variables (URLs, nodeIds)
+• workbook:variables:get        - Request current variable values
+```
 
-  ERROR HANDLING:
-  ├─► Try-Catch Blocks with Detailed Logging
-  ├─► User-Friendly Error Messages
-  ├─► Graceful Degradation (Continue with Available Features)
-  ├─► Automatic Retry for Transient Failures
-  └─► Fallback to Original Workbook on Critical Failures
+## ERROR HANDLING FLOW
 
-  ┌─────────────────────────────────────────────────────────────────────────────────┐
-  │                           SECURITY & PERFORMANCE                                │
-  └─────────────────────────────────────────────────────────────────────────────────┘
+### Error Sources:
+- API Failures (Network, Server Errors)
+- Database Issues (LowDB Access, Corruption)  
+- JWT Expiration/Generation Failures
+- Plugin Communication Failures
+- Invalid User Input/Missing Data
 
-  SECURITY:
-  ├─► JWT Token Expiration (5 minutes)
-  ├─► Input Validation on All API Endpoints
-  ├─► No Sensitive Data in Client Logs
-  └─► Secure HTTP Headers and CORS
+### Error Handling Strategy:
+- Try-Catch Blocks with Detailed Logging
+- User-Friendly Error Messages  
+- Graceful Degradation (Continue with Available Features)
+- Automatic Retry for Transient Failures
+- Fallback to Original Workbook on Critical Failures
 
-  PERFORMANCE:
-  ├─► Lazy Database Initialization
-  ├─► JWT Caching for Same ExploreKey
-  ├─► Atomic Variable Updates (Single Message)
-  ├─► Efficient Message Filtering
-  └─► Background Database Operations
+## SECURITY & PERFORMANCE
 
-  ┌─────────────────────────────────────────────────────────────────────────────────┐
-  │                              DATA STRUCTURES                                    │
-  └─────────────────────────────────────────────────────────────────────────────────┘
+### Security Features:
+- JWT Token Expiration (5 minutes)
+- Input Validation on All API Endpoints
+- No Sensitive Data in Client Logs
+- Secure HTTP Headers and CORS
 
-  LOWDB BOOKMARK STRUCTURE:
-  {
-    "id": "uuid-local-bookmark-id",
-    "name": "User-Friendly Name",
-    "sigmaBookmarkId": "sigma-cloud-bookmark-id",
-    "workbookUrlId": "workbook-identifier",
-    "areas": {
-      "viz1_nodeid": "NDqnIvkXP2" | null,
-      "viz2_nodeid": "4Mv2YcqPSJ" | null,
-      "viz3_nodeid": "-j-GzZaxjj" | null
-    },
-    "created": "2025-10-15T14:31:52.604Z",
-    "updated": "2025-10-15T14:31:52.604Z"
-  }
+### Performance Optimizations:
+- Lazy Database Initialization
+- JWT Caching for Same ExploreKey
+- Atomic Variable Updates (Single Message)
+- Efficient Message Filtering
+- Background Database Operations
 
-  RUNTIME STATE TRACKING:
-  - currentExploreKey: Active exploreKey for JWT generation
-  - areaNodeIdMap: { "viz1_nodeid": "nodeId", ... }
-  - availableBookmarks: Array of bookmark objects for dropdown
-  - currentBookmarkId: Currently loaded bookmark ID
+## DATA STRUCTURES
+
+### LowDB Bookmark Structure:
+```json
+{
+  "id": "uuid-local-bookmark-id",
+  "name": "User-Friendly Name", 
+  "sigmaBookmarkId": "sigma-cloud-bookmark-id",
+  "workbookUrlId": "workbook-identifier",
+  "areas": {
+    "viz1_nodeid": "NDqnIvkXP2" | null,
+    "viz2_nodeid": "4Mv2YcqPSJ" | null, 
+    "viz3_nodeid": "-j-GzZaxjj" | null
+  },
+  "created": "2025-10-15T14:31:52.604Z",
+  "updated": "2025-10-15T14:31:52.604Z"
+}
+```
+
+### Runtime State Tracking:
+- `currentExploreKey` - Active exploreKey for JWT generation
+- `areaNodeIdMap` - Object mapping area controls to node IDs: `{ "viz1_nodeid": "nodeId", ... }`  
+- `availableBookmarks` - Array of bookmark objects for dropdown population
+- `currentBookmarkId` - Currently loaded local bookmark ID
+- `lastSavedBookmark` - Tracking object for recent save operations
+- `currentAreaContext` - Currently active area for plugin context
+
+## KEY FUNCTIONS
+
+### `restoreMultiAreaState(localBookmarkId)`
+**Purpose:** Primary function for restoring multi-area dashboard configurations from LowDB bookmarks.
+
+**Process:**
+1. Fetches bookmark configuration via `GET /api/multi-area-bookmarks/get/:localBookmarkId`
+2. Clears current `areaNodeIdMap` to prevent contamination
+3. Iterates through saved areas configuration
+4. Generates embed URLs for each configured area using `generateKpiEmbedUrl(nodeId)`
+5. Prepares atomic variable update with all area URLs and node IDs
+6. Sends single `workbook:variables:update` message to plugin
+7. Updates local state tracking and area context
+8. Falls back to `rebuildFromBookmarkControls()` on error
+
+**Key Features:**
+- Atomic restoration (all areas updated in single message)
+- Cross-contamination prevention via map clearing
+- Automatic fallback on failure
+- Comprehensive error logging
+
+### `saveBookmark()`
+**Purpose:** Creates new multi-area bookmarks with dual storage system.
+
+**Process:**
+1. Validates bookmark name and current state
+2. Captures current `areaNodeIdMap` and `exploreKey`
+3. Makes atomic API call to `/api/multi-area-bookmarks/save`
+4. Updates UI state and dropdown selection
+5. Tracks saved bookmark for potential updates
+
+**Key Features:**
+- Single API call handles both Sigma and LowDB storage
+- Preserves all area configurations during save
+- Button feedback and error handling
+- Dropdown synchronization
