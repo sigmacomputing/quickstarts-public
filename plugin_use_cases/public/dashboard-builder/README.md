@@ -1,406 +1,314 @@
-# Sigma Dashboard Builder Plugin Host
-
-A complete host application for Sigma's Dashboard Builder plugin that enables dynamic KPI selection and placement in dashboard areas without modifying the original plugin code.
-
-## Overview
-
-This application demonstrates how to build a host for Sigma plugins that enables users to:
-- Put a workbook in edit mode
-- Click edit buttons under dashboard areas  
-- Select KPIs from Sigma's Library modal
-- Dynamically place selected KPIs into dashboard areas using Sigma's official APIs
-
-## Features
-
-- **Multi-Area Support**: Supports up to 3 dashboard areas with independent KPI placement
-- **Dynamic KPI Placement**: Any KPI can be placed in any dashboard area
-- **Bookmark Persistence**: Save and restore custom dashboard configurations using Sigma bookmarks
-- **No Plugin Modifications**: Uses original plugin without changes
-- **Official Sigma APIs**: Leverages Sigma's inbound event API (`workbook:variables:update`)
-- **JWT Authentication**: Secure embedding with team provisioning
-- **Production Ready**: Error handling, debugging, responsive design
-
-## Architecture
-
-### Dynamic Workflow
-```
-1. Edit Button Clicked → Sets Context (vizUrlControl = "viz1_url")
-2. User Selects KPI → Outbound Event: {vizEmbedUrlControl: "viz1_url"}  
-3. Host Generates URL → Element embed URL + JWT authentication
-4. Host Updates Control → workbook:variables:update inbound event
-5. Plugin Renders KPI → Automatically detects control change
-```
-
-### Control Architecture
-**Hidden Controls in Sigma Workbook:**
-- `vizUrlControl` - Context switcher (which area is being updated)
-- `viz1_url`, `viz2_url`, `viz3_url` - Dashboard area URLs
-- `viz1_nodeid`, `viz2_nodeid`, `viz3_nodeid` - Element node IDs for tracking
-- `explorekey` - Single explore key control for bookmark persistence
-
-### Key Implementation Details
-
-**Host Application Functions:**
-- `handleVizComponentSelected()` - Processes KPI selection and generates embed URLs
-- `generateKpiEmbedUrl()` - Creates authenticated element embed URLs  
-- `handleBookmarkChange()` - Manages bookmark save/load operations
-- `triggerPluginRefresh()` - Implements area cycling for multi-area bookmark restoration
-- `storeNodeId()` / `getStoredNodeId()` - Node ID mapping for proper area tracking
-- `postMessage()` with `workbook:variables:update` - Updates Sigma controls
-
-**Sigma Workbook Configuration:**
-- Edit buttons trigger actions that set `vizUrlControl` to target area
-- KPI selection triggers outbound event `vizComponentSelected` with context
-- Plugin automatically re-renders when control values change
-
-## Setup
-
-### Prerequisites
-- Node.js 14+
-- Sigma organization with plugin capabilities  
-- Dashboard Builder plugin registered in Sigma
-- Sigma workbook with properly configured controls and actions
-
-### Environment Configuration
-Create `.env` file in `/plugin_use_cases/`:
-```env
-# Sigma API Configuration
-CLIENT_ID=your_client_id
-SECRET=your_secret
-ORG_SLUG=your_org_slug
-EMBED_URL_BASE=https://app.sigmacomputing.com
-
-# User Configuration
-VIEW_EMAIL=view.plugin.user@example.com
-VIEW_TEAMS=Embed_Users
-
-# Workbook Configuration  
-WORKBOOK_NAME=Custom_Dashboard
-WORKSPACE_NAME=Embed_Users
-
-# Debug Settings
-DEBUG=true
-```
-
-### Installation
-```bash
-# From the plugin_use_cases directory
-npm install
-
-# Start the server  
-npm start
-
-# Navigate to dashboard builder
-http://localhost:3000/dashboard-builder/
-```
-
-## Sigma Workbook Setup
-
-### Required Hidden Controls
-Create these controls in your Sigma workbook:
-
-1. **Context Control**
-   - Control ID: `vizUrlControl`
-   - Label: "URL Control" 
-   - Type: Text
-   - Default: Empty
-
-2. **Area 1 Controls**
-   - Control ID: `viz1_url` | Label: "Area 1 URL" | Type: Text
-   - Control ID: `viz1_nodeid` | Label: "Area 1 Node ID" | Type: Text
-
-3. **Area 2 Controls**
-   - Control ID: `viz2_url` | Label: "Area 2 URL" | Type: Text  
-   - Control ID: `viz2_nodeid` | Label: "Area 2 Node ID" | Type: Text
-
-4. **Area 3 Controls**
-   - Control ID: `viz3_url` | Label: "Area 3 URL" | Type: Text
-   - Control ID: `viz3_nodeid` | Label: "Area 3 Node ID" | Type: Text
-
-5. **Bookmark Control**
-   - Control ID: `explorekey` | Label: "Explore Key" | Type: Text
-
-### Edit Button Configuration
-For each dashboard area's Edit button:
-
-1. **Add Action**: Update Control Value
-   - Control: `vizUrlControl`
-   - Value: `viz1_url` (or appropriate area identifier)
-
-2. **Add Action**: Open Library Modal
-   - Enable KPI selection interface
-
-### KPI Action Configuration
-For each KPI in the Library modal:
-
-1. **Add Action**: Generate Iframe Event
-   - Event Name: `vizComponentSelected` 
-   - Data: `{"vizEmbedUrlControl": "[vizUrlControl]", "nodeId": "ELEMENT_NODE_ID"}`
-
-## Host Implementation
-
-### Core Functions
-
-#### handleVizComponentSelected(values)
-```javascript
-/**
- * Handles KPI selection from Sigma modal
- * @param {Object} values - Contains vizEmbedUrlControl and nodeId
- */
-async function handleVizComponentSelected(values) {
-    const targetControl = values.vizEmbedUrlControl;
-    const selectedKpiNodeId = values.nodeId;
-    
-    // Generate authenticated embed URL for selected KPI
-    const embedUrl = await generateKpiEmbedUrl(selectedKpiNodeId);
-    
-    // Update Sigma control using inbound event API
-    const iframe = document.getElementById("sigma-embed");
-    if (iframe && iframe.contentWindow) {
-        const variablesUpdate = {};
-        variablesUpdate[targetControl] = embedUrl;
-        
-        iframe.contentWindow.postMessage({
-            type: "workbook:variables:update",
-            variables: variablesUpdate
-        }, "*");
-    }
-}
-```
-
-#### generateKpiEmbedUrl(nodeId)
-```javascript
-/**
- * Generates authenticated embed URL for KPI element
- * @param {string} nodeId - Sigma element node ID
- * @returns {Promise<string>} - Complete embed URL with JWT
- */
-async function generateKpiEmbedUrl(nodeId) {
-    const response = await fetch(`/api/jwt/view?embedType=element&nodeId=${nodeId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sub: 'view' })
-    });
-    
-    const { embedUrl } = await response.json();
-    return embedUrl;
-}
-```
-
-### Message Handling
-```javascript
-// Listen for outbound events from Sigma workbook
-window.addEventListener("message", (event) => {
-    if (event.data.type === "vizComponentSelected") {
-        handleVizComponentSelected(event.data.values);
-    }
-});
-```
-
-## Technical Implementation
-
-### JWT Generation
-The host application generates JWTs for element embedding:
-
-```javascript
-// Element-specific embed URL generation
-if (embedType === "element" && nodeId) {
-    const baseUrl = process.env.EMBED_URL_BASE;
-    embedUrl = `${baseUrl}/${process.env.ORG_SLUG}/workbook/${workbook.name}-${workbook.urlId}/element/${nodeId}?:embed=true`;
-}
-
-// Add JWT authentication
-const finalEmbedUrl = `${embedUrl}?:jwt=${jwt}`;
-```
-
-### Control Updates
-Uses Sigma's official inbound event API:
-
-```javascript
-iframe.contentWindow.postMessage({
-    type: "workbook:variables:update", 
-    variables: {
-        "viz1_url": "https://app.sigmacomputing.com/org/workbook/element/abc123?:jwt=..."
-    }
-}, "*");
-```
-
-### Plugin Integration
-The Dashboard Builder plugin automatically:
-- Monitors control changes via `variableService.getVariable()`
-- Re-renders when `vizUrlControlValue` changes
-- Extracts node IDs from URLs for internal tracking
-- Registers iframe message listeners for explore key updates
-
-## Bookmark Persistence
-
-### How Bookmarks Work
-The dashboard builder supports saving and restoring custom dashboard configurations using Sigma's bookmark system:
-
-1. **KPI Placement**: Place KPIs in any of the 3 dashboard areas
-2. **Bookmark Save**: Use Sigma's bookmark feature to save the current state
-3. **Bookmark Load**: Restore saved configurations with proper area cycling
-
-### Technical Implementation
-
-#### Area Cycling for Multi-Area Restoration
-```javascript
-/**
- * Handles bookmark loading with multi-area support
- * Cycles through areas to ensure all KPIs render properly
- */
-async function triggerPluginRefresh() {
-    const iframe = document.getElementById("sigma-embed");
-    if (iframe && iframe.contentWindow) {
-        // Reconstruct URLs for all areas
-        await reconstructAreaUrl("viz1_url");
-        await reconstructAreaUrl("viz2_url"); 
-        await reconstructAreaUrl("viz3_url");
-        
-        // Cycle through areas with delays to force re-subscription
-        const areasWithContent = getAreasWithContent();
-        let delay = 0;
-        
-        areasWithContent.forEach((area, index) => {
-            setTimeout(() => {
-                iframe.contentWindow.postMessage({
-                    type: "workbook:variables:update",
-                    variables: { "vizUrlControl": area }
-                }, "*");
-            }, delay);
-            delay += 300; // 300ms between each area
-        });
-    }
-}
-```
-
-#### Node ID Mapping
-```javascript
-/**
- * Stores and retrieves node IDs for proper area tracking
- * Prevents KPIs from loading in wrong areas after bookmark restoration
- */
-function storeNodeId(nodeIdControl, nodeId) {
-    areaNodeIdMap[nodeIdControl] = nodeId;
-    if (DEBUG) console.log(`Stored node ID: ${nodeIdControl} → ${nodeId}`);
-}
-
-function getStoredNodeId(nodeIdControl) {
-    return areaNodeIdMap[nodeIdControl] || null;
-}
-```
-
-### Bookmark Workflow
-1. **Configure KPIs**: Place KPIs in dashboard areas using the edit buttons
-2. **Save Bookmark**: Use Sigma's bookmark icon to save current configuration  
-3. **Load Bookmark**: Select saved bookmark from Sigma's bookmark dropdown
-4. **Area Cycling**: Host automatically cycles through areas to restore all KPIs
-
-## Multi-Area Configuration
-
-### All Three Areas Pre-Configured
-The host application supports all 3 dashboard areas out of the box:
-
-1. **Area 1**: Uses `viz1_url` and `viz1_nodeid` controls
-2. **Area 2**: Uses `viz2_url` and `viz2_nodeid` controls  
-3. **Area 3**: Uses `viz3_url` and `viz3_nodeid` controls
-
-### Edit Button Configuration
-For each dashboard area's Edit button:
-
-- **Area 1 Edit**: Set `vizUrlControl = "viz1_url"`
-- **Area 2 Edit**: Set `vizUrlControl = "viz2_url"`
-- **Area 3 Edit**: Set `vizUrlControl = "viz3_url"`
-
-### Dynamic Workflow
-The same `vizComponentSelected` event works for all areas automatically based on the current `vizUrlControl` context.
-
-## Troubleshooting
-
-### Plugin Won't Load
-- Verify workbook name matches `WORKBOOK_NAME` in `.env`
-- Check that user has access to the workbook  
-- Ensure plugin is registered with the workbook
-- Review JWT configuration in browser developer tools
-
-### KPI Selection Not Working
-- Check browser console for `vizComponentSelected` events
-- Verify KPI actions are configured with correct event name
-- Ensure `vizUrlControl` is set before KPI selection
-- Test with `DEBUG=true` for verbose logging
-
-### Bookmark Loading Issues
-- Verify `explorekey` control exists in workbook
-- Check that node ID mapping is preserved during bookmark save
-- Ensure area cycling completes before testing KPI rendering
-- Look for "Plugin context set to" messages in console during area cycling
-
-### Authentication Issues
-- Validate Sigma API credentials in `.env`
-- Check user email exists in Sigma organization
-- Verify organization slug is correct
-- Review JWT payload includes team information
-
-### Control Update Failures
-- Confirm control IDs match exactly (case-sensitive)
-- Check iframe is loaded before sending postMessage
-- Verify `workbook:variables:update` message format
-- Test control updates manually in browser console
-
-### Multi-Area Loading Problems
-- Check that all area controls (`viz1_url`, `viz2_url`, `viz3_url`) exist
-- Verify node ID controls (`viz1_nodeid`, `viz2_nodeid`, `viz3_nodeid`) are created
-- Ensure area cycling delays (300ms) are sufficient for your workbook
-- Test with single area first, then add additional areas
-
-## Advanced Customization
-
-### Custom KPI Sources
-Extend the workflow to support KPIs from external sources:
-
-```javascript
-async function generateCustomKpiUrl(kpiConfig) {
-    // Generate URL for custom KPI source
-    return `https://your-kpi-service.com/embed/${kpiConfig.id}`;
-}
-```
-
-### Enhanced Error Handling
-Add robust error handling for production use:
-
-```javascript
-async function handleVizComponentSelected(values) {
-    try {
-        if (!values.vizEmbedUrlControl || !values.nodeId) {
-            throw new Error("Missing required parameters");
-        }
-        
-        const embedUrl = await generateKpiEmbedUrl(values.nodeId);
-        // ... rest of implementation
-        
-    } catch (error) {
-        console.error("KPI selection failed:", error);
-        // Show user-friendly error message
-    }
-}
-```
-
-### Integration with Backend Systems
-Save and restore dashboard configurations:
-
-```javascript
-async function saveDashboardState() {
-    const currentState = {
-        viz1_url: getCurrentControlValue('viz1_url'),
-        viz2_url: getCurrentControlValue('viz2_url'),
-        viz3_url: getCurrentControlValue('viz3_url')
-    };
-    
-    await fetch('/api/dashboards', {
-        method: 'POST',
-        body: JSON.stringify(currentState)
-    });
-}
-```
-
-This host application provides a complete foundation for implementing dynamic dashboard builders with Sigma plugins while leveraging official APIs and maintaining compatibility with the original plugin code.
+# Sigma Dashboard Builder - Multi-Area KPI Placement System
+A sample host application for Sigma's Dashboard Builder plugin that enables users to place different KPIs across three independent dashboard areas with persistent bookmark management.
+
+Please refer to the QuickStart: Use Case: Dashboard Builder Plugin for instructions. Sigma QuickStarts can be found at:
+https://quickstarts.sigmacomputing.com/
+
+## Key Features
+- Multi-Area KPI Placement: Place different KPIs in 3 independent dashboard areas
+- Persistent Bookmarks: Save and restore complete multi-area configurations  
+- Incremental Building: Add KPIs to existing bookmarks without losing current state
+- Cross-Contamination Prevention: Each area operates independently
+- Real-time Synchronization: ExploreKey sync across all areas
+- Secure Authentication: JWT-based authentication with automatic token refresh
+
+### Dual Storage System
+- Sigma Bookmarks: Store exploreKey and workbook state (single-state, cloud)
+- LowDB Database: Store multi-area configurations (multi-state, local)  
+- Combined: Complete bookmark restoration across all dashboard areas
+
+## Dashboard Builder Plugin Host
+The Dashboard Builder host application demonstrates:
+
+- Plugin Integration: Embedding a Sigma plugin in a host application
+- Bidirectional Communication: Messages between host and plugin
+- Element Selection: UI for selecting dashboard elements
+- JWT Authentication: Secure embedding with proper tokens
+
+### Plugin Communication
+The host application communicates with the plugin via `postMessage`:
+
+Messages sent to plugin:
+- `CONFIGURE`: Initial plugin configuration
+- `ADD_ELEMENTS`: Selected elements to add to dashboard
+
+Messages received from plugin:
+- `PLUGIN_READY`: Plugin has loaded and is ready
+- `ELEMENT_SELECTED`: User selected an element in the plugin
+- `DASHBOARD_UPDATED`: Dashboard configuration changed
+
+
+## ARCHITECTURE COMPONENTS
+1: Core Files & Responsibilities
+
+  | File                                 | Lines  | Purpose                                                         |
+  |--------------------------------------|--------|-----------------------------------------------------------------|
+  | /public/dashboard-builder/index.html | 1,500+ | Main orchestrator with plugin hosting, state management, and UI |
+  | /helpers/multi-area-bookmarks.js     | 181    | LowDB database operations and CRUD functions                    |
+  | /routes/api/multi-area-bookmarks.js  | 230    | RESTful API endpoints for bookmark management                   |
+  | /server/server.js                    | 79     | Express server with API routing and static serving              |
+  | /data/multi-area-bookmarks.json      | Auto   | Persistent LowDB database file                                  |
+
+ 2: API Endpoints
+
+  Multi-Area Bookmark Management:
+  • POST   /api/multi-area-bookmarks/save           - Create new bookmark
+  • GET    /api/multi-area-bookmarks/list           - List workbook bookmarks
+  • GET    /api/multi-area-bookmarks/get/:id        - Get specific bookmark
+  • DELETE /api/multi-area-bookmarks/delete/:id     - Delete bookmark
+  • GET    /api/multi-area-bookmarks/stats          - Database statistics
+
+  JWT & Legacy:
+  • POST   /api/jwt/view?bookmarkId                 - Generate embed URLs
+  • POST   /api/bookmarks/create-bookmark           - Create Sigma bookmarks
+
+  
+## OPERATIONAL WORKFLOWS
+  1: Save Bookmark Process
+
+  1. Capture State: Host reads all area node IDs (viz1_nodeid, viz2_nodeid, viz3_nodeid)
+  2. Create Sigma Bookmark: Store exploreKey and workbook state in Sigma Cloud
+  3. Store Local Config: Save multi-area configuration in LowDB with Sigma bookmark link
+  4. Update UI: Refresh bookmark dropdown and set selection to new bookmark
+
+  2: Load Bookmark Process
+
+  1. Fetch Configuration: Load multi-area config from LowDB by local bookmark ID
+  2. Load Workbook: Reload iframe with linked Sigma bookmark (gets exploreKey)
+  3. Restore Areas: Generate URLs for all configured areas and update controls atomically
+  4. Sync State: Update local tracking variables and prevent contamination
+
+  3: Delete Bookmark Process
+
+  1. Remove Local: Delete multi-area configuration from LowDB
+  2. Preserve History: Keep Sigma bookmark for exploreKey history
+  3. Reset UI: Update dropdown and reload if current bookmark was deleted
+
+  ## SYSTEM FLOW DIAGRAMS
+
+  ┌─────────────────────────────────────────────────────────────────────────────────┐
+  │                           DASHBOARD BUILDER SYSTEM                              │
+  │                          Multi-Area KPI Placement                               │
+  └─────────────────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────────────┐
+  │                              COMPONENT OVERVIEW                                 │
+  └─────────────────────────────────────────────────────────────────────────────────┘
+
+      ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+      │   AREA 1        │    │   AREA 2        │    │   AREA 3        │
+      │                 │    │                 │    │                 │
+      │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
+      │ │ Sigma Plugin│ │    │ │ Sigma Plugin│ │    │ │ Sigma Plugin│ │
+      │ │  (iframe)   │ │    │ │  (iframe)   │ │    │ │  (iframe)   │ │
+      │ └─────────────┘ │    │ └─────────────┘ │    │ └─────────────┘ │
+      │                 │    │                 │    │                 │
+      │ Controls:       │    │ Controls:       │    │ Controls:       │
+      │ • viz1_url      │    │ • viz2_url      │    │ • viz3_url      │
+      │ • viz1_nodeid   │    │ • viz2_nodeid   │    │ • viz3_nodeid   │
+      └─────────────────┘    └─────────────────┘    └─────────────────┘
+               │                        │                        │
+               └────────────────────────┼────────────────────────┘
+                                        │
+               ┌────────────────────────▼────────────────────────┐
+               │             HOST APPLICATION                    │
+               │            (index.html)                        │
+               │                                                │
+               │  ┌─────────────────────────────────────────┐   │
+               │  │        MESSAGE ROUTING SYSTEM           │   │
+               │  │                                         │   │
+               │  │ • exploreKey synchronization            │   │
+               │  │ • Node selection handling               │   │
+               │  │ • Variable update distribution          │   │
+               │  │ • Cross-contamination prevention        │   │
+               │  └─────────────────────────────────────────┘   │
+               │                                                │
+               │  ┌─────────────────────────────────────────┐   │
+               │  │       BOOKMARK ORCHESTRATION            │   │
+               │  │                                         │   │
+               │  │ • Multi-area state capture              │   │
+               │  │ • Dual storage coordination             │   │
+               │  │ • Atomic restoration management         │   │
+               │  └─────────────────────────────────────────┘   │
+               └────────────────────────┬───────────────────────┘
+                                        │
+               ┌────────────────────────▼────────────────────────┐
+               │              API LAYER                          │
+               │         (Express.js Routes)                     │
+               │                                                 │
+               │  /api/multi-area-bookmarks/*                    │
+               │  /api/jwt/view                                  │
+               │  /api/bookmarks/* (legacy)                      │
+               └────────────────────────┬────────────────────────┘
+                                        │
+               ┌────────────────────────▼────────────────────────┐
+               │             DUAL STORAGE SYSTEM                 │
+               └─────────────────────────────────────────────────┘
+                        │                        │
+               ┌────────▼──────────┐    ┌────────▼──────────┐
+               │   SIGMA CLOUD     │    │   LOCAL LOWDB     │
+               │   (Remote API)    │    │   (JSON File)     │
+               │                   │    │                   │
+               │ • exploreKey      │    │ • viz1_nodeid     │
+               │ • bookmark name   │    │ • viz2_nodeid     │
+               │ • workbook state  │    │ • viz3_nodeid     │
+               │ • creation date   │    │ • local metadata  │
+               │                   │    │                   │
+               │ ✓ Cloud storage   │    │ ✓ Multi-area      │
+               │ ✓ API integrated  │    │ ✓ Independent     │
+               │ ✗ Single-state    │    │ ✓ Fast access     │
+               └───────────────────┘    └───────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────────────┐
+  │                                SAVE WORKFLOW                                    │
+  └─────────────────────────────────────────────────────────────────────────────────┘
+
+  USER ACTION: Save Bookmark
+        │
+        ▼
+  [1] CAPTURE CURRENT STATE
+        │
+        ├─► Read viz1_nodeid control
+        ├─► Read viz2_nodeid control
+        ├─► Read viz3_nodeid control
+        └─► Get current exploreKey
+        │
+        ▼
+  [2] CREATE SIGMA BOOKMARK
+        │
+        ├─► POST /api/bookmarks/create-bookmark
+        ├─► Payload: { exploreKey, name, workbookUrlId }
+        └─► Returns: sigmaBookmarkId
+        │
+        ▼
+  [3] STORE MULTI-AREA CONFIG
+        │
+        ├─► POST /api/multi-area-bookmarks/save
+        ├─► Payload: {
+        │     name, sigmaBookmarkId, workbookUrlId,
+        │     areas: { viz1_nodeid, viz2_nodeid, viz3_nodeid }
+        │   }
+        └─► Returns: localBookmarkId
+        │
+        ▼
+  [4] UPDATE UI
+        │
+        ├─► Reload bookmark dropdown
+        ├─► Set dropdown to new bookmark
+        └─► Show success message
+
+  ┌─────────────────────────────────────────────────────────────────────────────────┐
+  │                                LOAD WORKFLOW                                    │
+  └─────────────────────────────────────────────────────────────────────────────────┘
+
+  USER ACTION: Select Bookmark
+        │
+        ▼
+  [1] FETCH BOOKMARK DATA
+        │
+        ├─► GET /api/multi-area-bookmarks/get/:localBookmarkId
+        └─► Returns: { sigmaBookmarkId, areas: {...} }
+        │
+        ▼
+  [2] RELOAD WORKBOOK
+        │
+        ├─► Generate JWT with sigmaBookmarkId
+        ├─► Reload iframe with bookmark URL
+        └─► Wait for workbook load
+        │
+        ▼
+  [3] RESTORE ALL AREAS (Atomic)
+        │
+        ├─► For each area with nodeId:
+        │   ├─► Generate embed URL with current exploreKey
+        │   ├─► Prepare variable update
+        │   └─► Add to batch update
+        │
+        ├─► Send single message with all updates:
+        │   └─► { viz1_url, viz1_nodeid, viz2_url, viz2_nodeid, ... }
+        │
+        └─► Update local tracking variables
+
+  ┌─────────────────────────────────────────────────────────────────────────────────┐
+  │                              MESSAGE FLOW                                       │
+  └─────────────────────────────────────────────────────────────────────────────────┘
+
+  PLUGIN TO HOST:
+  ┌─────────────────┐         ┌─────────────────────────────────┐
+  │ Sigma Plugin    │────────▶│ Host Application                │
+  │ (iframe)        │         │                                 │
+  └─────────────────┘         │ Message Types:                  │
+                              │ • workbook:exploreKey:onchange  │
+                              │ • workbook:variables:onchange   │
+                              │ • workbook:id:onchange          │
+                              │ • workbook:bookmark:onchange    │
+                              └─────────────────────────────────┘
+
+  HOST TO PLUGIN:
+  ┌─────────────────────────────────┐         ┌─────────────────┐
+  │ Host Application                │────────▶│ Sigma Plugin    │
+  │                                 │         │ (iframe)        │
+  │ Message Types:                  │         └─────────────────┘
+  │ • workbook:variables:update     │
+  │ • workbook:variables:get        │
+  └─────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────────────┐
+  │                            ERROR HANDLING FLOW                                  │
+  └─────────────────────────────────────────────────────────────────────────────────┘
+
+  ERROR SOURCES:
+  ├─► API Failures (Network, Server Errors)
+  ├─► Database Issues (LowDB Access, Corruption)
+  ├─► JWT Expiration/Generation Failures
+  ├─► Plugin Communication Failures
+  └─► Invalid User Input/Missing Data
+
+  ERROR HANDLING:
+  ├─► Try-Catch Blocks with Detailed Logging
+  ├─► User-Friendly Error Messages
+  ├─► Graceful Degradation (Continue with Available Features)
+  ├─► Automatic Retry for Transient Failures
+  └─► Fallback to Original Workbook on Critical Failures
+
+  ┌─────────────────────────────────────────────────────────────────────────────────┐
+  │                           SECURITY & PERFORMANCE                                │
+  └─────────────────────────────────────────────────────────────────────────────────┘
+
+  SECURITY:
+  ├─► JWT Token Expiration (5 minutes)
+  ├─► Input Validation on All API Endpoints
+  ├─► No Sensitive Data in Client Logs
+  └─► Secure HTTP Headers and CORS
+
+  PERFORMANCE:
+  ├─► Lazy Database Initialization
+  ├─► JWT Caching for Same ExploreKey
+  ├─► Atomic Variable Updates (Single Message)
+  ├─► Efficient Message Filtering
+  └─► Background Database Operations
+
+  ┌─────────────────────────────────────────────────────────────────────────────────┐
+  │                              DATA STRUCTURES                                    │
+  └─────────────────────────────────────────────────────────────────────────────────┘
+
+  LOWDB BOOKMARK STRUCTURE:
+  {
+    "id": "uuid-local-bookmark-id",
+    "name": "User-Friendly Name",
+    "sigmaBookmarkId": "sigma-cloud-bookmark-id",
+    "workbookUrlId": "workbook-identifier",
+    "areas": {
+      "viz1_nodeid": "NDqnIvkXP2" | null,
+      "viz2_nodeid": "4Mv2YcqPSJ" | null,
+      "viz3_nodeid": "-j-GzZaxjj" | null
+    },
+    "created": "2025-10-15T14:31:52.604Z",
+    "updated": "2025-10-15T14:31:52.604Z"
+  }
+
+  RUNTIME STATE TRACKING:
+  - currentExploreKey: Active exploreKey for JWT generation
+  - areaNodeIdMap: { "viz1_nodeid": "nodeId", ... }
+  - availableBookmarks: Array of bookmark objects for dropdown
+  - currentBookmarkId: Currently loaded bookmark ID
