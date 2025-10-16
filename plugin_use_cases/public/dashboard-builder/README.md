@@ -296,66 +296,27 @@ Message Types:
 - Efficient Message Filtering
 - Background Database Operations
 
-## DATA STRUCTURES
+  ┌─────────────────────────────────────────────────────────────────────────────────┐
+  │                              DATA STRUCTURES                                    │
+  └─────────────────────────────────────────────────────────────────────────────────┘
 
-### LowDB Bookmark Structure:
-```json
-{
-  "id": "uuid-local-bookmark-id",
-  "name": "User-Friendly Name", 
-  "sigmaBookmarkId": "sigma-cloud-bookmark-id",
-  "workbookUrlId": "workbook-identifier",
-  "areas": {
-    "viz1_nodeid": "NDqnIvkXP2" | null,
-    "viz2_nodeid": "4Mv2YcqPSJ" | null, 
-    "viz3_nodeid": "-j-GzZaxjj" | null
-  },
-  "created": "2025-10-15T14:31:52.604Z",
-  "updated": "2025-10-15T14:31:52.604Z"
-}
-```
+  LOWDB BOOKMARK STRUCTURE:
+  {
+    "id": "uuid-local-bookmark-id",
+    "name": "User-Friendly Name",
+    "sigmaBookmarkId": "sigma-cloud-bookmark-id",
+    "workbookUrlId": "workbook-identifier",
+    "areas": {
+      "viz1_nodeid": "NDqnIvkXP2" | null,
+      "viz2_nodeid": "4Mv2YcqPSJ" | null,
+      "viz3_nodeid": "-j-GzZaxjj" | null
+    },
+    "created": "2025-10-15T14:31:52.604Z",
+    "updated": "2025-10-15T14:31:52.604Z"
+  }
 
-### Runtime State Tracking:
-- `currentExploreKey` - Active exploreKey for JWT generation
-- `areaNodeIdMap` - Object mapping area controls to node IDs: `{ "viz1_nodeid": "nodeId", ... }`  
-- `availableBookmarks` - Array of bookmark objects for dropdown population
-- `currentBookmarkId` - Currently loaded local bookmark ID
-- `lastSavedBookmark` - Tracking object for recent save operations
-- `currentAreaContext` - Currently active area for plugin context
-
-## KEY FUNCTIONS
-
-### `restoreMultiAreaState(localBookmarkId)`
-**Purpose:** Primary function for restoring multi-area dashboard configurations from LowDB bookmarks.
-
-**Process:**
-1. Fetches bookmark configuration via `GET /api/multi-area-bookmarks/get/:localBookmarkId`
-2. Clears current `areaNodeIdMap` to prevent contamination
-3. Iterates through saved areas configuration
-4. Generates embed URLs for each configured area using `generateKpiEmbedUrl(nodeId)`
-5. Prepares atomic variable update with all area URLs and node IDs
-6. Sends single `workbook:variables:update` message to plugin
-7. Updates local state tracking and area context
-8. Falls back to `rebuildFromBookmarkControls()` on error
-
-**Key Features:**
-- Atomic restoration (all areas updated in single message)
-- Cross-contamination prevention via map clearing
-- Automatic fallback on failure
-- Comprehensive error logging
-
-### `saveBookmark()`
-**Purpose:** Creates new multi-area bookmarks with dual storage system.
-
-**Process:**
-1. Validates bookmark name and current state
-2. Captures current `areaNodeIdMap` and `exploreKey`
-3. Makes atomic API call to `/api/multi-area-bookmarks/save`
-4. Updates UI state and dropdown selection
-5. Tracks saved bookmark for potential updates
-
-**Key Features:**
-- Single API call handles both Sigma and LowDB storage
-- Preserves all area configurations during save
-- Button feedback and error handling
-- Dropdown synchronization
+  RUNTIME STATE TRACKING:
+  - currentExploreKey: Active exploreKey for JWT generation
+  - areaNodeIdMap: { "viz1_nodeid": "nodeId", ... }
+  - availableBookmarks: Array of bookmark objects for dropdown
+  - currentBookmarkId: Currently loaded bookmark ID
