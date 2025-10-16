@@ -53,13 +53,19 @@ Messages received from plugin:
 
   Multi-Area Bookmark Management:
   • POST   /api/multi-area-bookmarks/save           - Create new bookmark
+  
   • GET    /api/multi-area-bookmarks/list           - List workbook bookmarks
+  
   • GET    /api/multi-area-bookmarks/get/:id        - Get specific bookmark
+  
   • DELETE /api/multi-area-bookmarks/delete/:id     - Delete bookmark
+  
   • GET    /api/multi-area-bookmarks/stats          - Database statistics
 
   JWT & Legacy:
+  
   • POST   /api/jwt/view?bookmarkId                 - Generate embed URLs
+  
   • POST   /api/bookmarks/create-bookmark           - Create Sigma bookmarks
 
   
@@ -84,17 +90,9 @@ Messages received from plugin:
   2. Preserve History: Keep Sigma bookmark for exploreKey history
   3. Reset UI: Update dropdown and reload if current bookmark was deleted
 
-  ## SYSTEM FLOW DIAGRAMS
+## SYSTEM FLOW DIAGRAMS
 
-  ┌─────────────────────────────────────────────────────────────────────────────────┐
-  │                           DASHBOARD BUILDER SYSTEM                              │
-  │                          Multi-Area KPI Placement                               │
-  └─────────────────────────────────────────────────────────────────────────────────┘
-
-  ┌─────────────────────────────────────────────────────────────────────────────────┐
-  │                              COMPONENT OVERVIEW                                 │
-  └─────────────────────────────────────────────────────────────────────────────────┘
-
+### COMPONENT OVERVIEW 
       ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
       │   AREA 1        │    │   AREA 2        │    │   AREA 3        │
       │                 │    │                 │    │                 │
@@ -296,11 +294,10 @@ Message Types:
 - Efficient Message Filtering
 - Background Database Operations
 
-  ┌─────────────────────────────────────────────────────────────────────────────────┐
-  │                              DATA STRUCTURES                                    │
-  └─────────────────────────────────────────────────────────────────────────────────┘
+## DATA STRUCTURES
 
-  LOWDB BOOKMARK STRUCTURE:
+### LOWDB BOOKMARK STRUCTURE:
+```
   {
     "id": "uuid-local-bookmark-id",
     "name": "User-Friendly Name",
@@ -314,8 +311,9 @@ Message Types:
     "created": "2025-10-15T14:31:52.604Z",
     "updated": "2025-10-15T14:31:52.604Z"
   }
+```
 
-  RUNTIME STATE TRACKING:
+## RUNTIME STATE TRACKING:
   - currentExploreKey: Active exploreKey for JWT generation
   - areaNodeIdMap: { "viz1_nodeid": "nodeId", ... }
   - availableBookmarks: Array of bookmark objects for dropdown
