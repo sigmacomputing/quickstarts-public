@@ -155,21 +155,43 @@ export async function POST(request: Request) {
     const currentTokenInfo = getCurrentTokenInfo();
     console.log('Current token info:', currentTokenInfo);
     
-    // Auto-populate authentication variables from current token if not explicitly provided or empty
-    if (currentTokenInfo && (!envVariables || !envVariables.CLIENT_ID || envVariables.CLIENT_ID.trim() === '')) {
-      // Replace empty CLIENT_ID with the populated one
-      envContent = envContent.replace(/^CLIENT_ID=\s*$/m, `CLIENT_ID=${currentTokenInfo.clientId}`);
-      console.log('Auto-populated CLIENT_ID from token:', currentTokenInfo.clientId?.substring(0,8) + '...');
-    }
-    if (currentTokenInfo && (!envVariables || !envVariables.baseURL || envVariables.baseURL.trim() === '')) {
-      // Replace empty baseURL with the populated one  
-      envContent = envContent.replace(/^baseURL=\s*$/m, `baseURL=${currentTokenInfo.baseURL}`);
-      console.log('Auto-populated baseURL from token:', currentTokenInfo.baseURL);
-    }
-    if (currentTokenInfo && (!envVariables || !envVariables.authURL || envVariables.authURL.trim() === '')) {
-      // Replace empty authURL with the populated one
-      envContent = envContent.replace(/^authURL=\s*$/m, `authURL=${currentTokenInfo.authURL}`);
-      console.log('Auto-populated authURL from token:', currentTokenInfo.authURL);
+         // --- Auto-populate authentication variables from current token ---
+    if (currentTokenInfo) {
+      const BASE_URL_DEFAULT = 'https://aws-api.sigmacomputing.com/v2';
+      const AUTH_URL_DEFAULT = 'https://aws-api.sigmacomputing.com/v2/auth/token';
+      
+      // 1. CLIENT_ID: Check for missing or empty value
+      const isClientIdMissingOrEmpty = !envVariables || !envVariables.CLIENT_ID || (typeof envVariables.CLIENT_ID === 'string' && envVariables.CLIENT_ID.trim() === '');
+      
+      if (isClientIdMissingOrEmpty && currentTokenInfo.clientId) {
+        // FIX: Use appending (last value wins) instead of fragile replace.
+        envContent += `CLIENT_ID=${currentTokenInfo.clientId}\n`;
+        console.log('Auto-populated CLIENT_ID from token:', currentTokenInfo.clientId?.substring(0,8) + '...');
+      }
+
+      // 2. baseURL: Check for missing/empty OR if the generic default was provided but the token has a specific URL.
+      const isBaseUrlMissingOrDefault = !envVariables || // envVariables is null/undefined
+                                      envVariables.baseURL === undefined || // baseURL key is missing
+                                      (typeof envVariables.baseURL === 'string' && envVariables.baseURL.trim() === '') || // baseURL is empty string
+                                      (envVariables.baseURL === BASE_URL_DEFAULT && currentTokenInfo.baseURL !== BASE_URL_DEFAULT); // Default but token has regional
+      
+      if (isBaseUrlMissingOrDefault && currentTokenInfo.baseURL) {
+        // FIX: Use appending (last value wins) to ensure the token's regional URL is used.
+        envContent += `baseURL=${currentTokenInfo.baseURL}\n`;
+        console.log('Auto-populated baseURL from token:', currentTokenInfo.baseURL);
+      }
+      
+      // 3. authURL: Check for missing/empty OR if the generic default was provided but the token has a specific URL.
+      const isAuthUrlMissingOrDefault = !envVariables || // envVariables is null/undefined
+                                       envVariables.authURL === undefined ||
+                                       (typeof envVariables.authURL === 'string' && envVariables.authURL.trim() === '') || // authURL is empty string
+                                       (envVariables.authURL === AUTH_URL_DEFAULT && currentTokenInfo.authURL !== AUTH_URL_DEFAULT); // Default but token has regional
+
+      if (isAuthUrlMissingOrDefault && currentTokenInfo.authURL) {
+        // FIX: Use appending (last value wins) to ensure the token's regional URL is used.
+        envContent += `authURL=${currentTokenInfo.authURL}\n`;
+        console.log('Auto-populated authURL from token:', currentTokenInfo.authURL);
+      }
     }
 
     fs.writeFileSync(tempEnvPath, envContent);

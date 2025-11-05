@@ -1175,31 +1175,32 @@ export function CodeViewer({ isOpen, onClose, filePath, fileName, envVariables =
                       Server Endpoint <span className="text-red-600">*</span>
                     </label>
                     <select
-                      value={envValues['baseURL'] || 'https://aws-api.sigmacomputing.com/v2'}
+                      id="server-endpoint-select" // Added id for A11y
+                      value={envValues['baseURL'] || 'https://aws-api.sigmacomputing.com'}
                       onChange={(e) => {
                         const baseURL = e.target.value;
-                        let authURL;
-                        if (baseURL === 'https://api.sigmacomputing.com') {
-                          authURL = baseURL + '/v2/auth/token';
-                        } else {
-                          authURL = baseURL + '/auth/token';
-                        }
+                        
+                        // ✅ SIMPLIFIED LOGIC: All endpoints now use /v2/auth/token
+                        const AUTH_TOKEN_PATH = '/auth/token';
+                        const authURL = baseURL + AUTH_TOKEN_PATH;
+
                         handleEnvChange('baseURL', baseURL);
                         handleEnvChange('authURL', authURL);
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="https://api.sigmacomputing.com">GCP hosted organizations</option>
+
+                      <option value="https://api.sigmacomputing.com/v2">GCP hosted organizations</option>
                       <option value="https://aws-api.sigmacomputing.com/v2">AWS US (West) hosted organizations</option>
-                      <option value="https://api.us-a.aws.sigmacomputing.com">AWS US (East) hosted organizations</option>
-                      <option value="https://api.ca.aws.sigmacomputing.com">AWS Canada hosted organizations</option>
-                      <option value="https://api.eu.aws.sigmacomputing.com">AWS Europe hosted organizations</option>
-                      <option value="https://api.au.aws.sigmacomputing.com">AWS Australia hosted organizations</option>
-                      <option value="https://api.uk.aws.sigmacomputing.com">AWS UK hosted organizations</option>
-                      <option value="https://api.us.azure.sigmacomputing.com">Azure US hosted organizations</option>
-                      <option value="https://api.eu.azure.sigmacomputing.com">Azure Europe hosted organizations</option>
-                      <option value="https://api.ca.azure.sigmacomputing.com">Azure Canada hosted organizations</option>
-                      <option value="https://api.uk.azure.sigmacomputing.com">Azure UK hosted organizations</option>
+                      <option value="https://api.us-a.aws.sigmacomputing.com/v2">AWS US (East) hosted organizations</option>
+                      <option value="https://api.ca.aws.sigmacomputing.com/v2">AWS Canada hosted organizations</option>
+                      <option value="https://api.eu.aws.sigmacomputing.com/v2">AWS Europe hosted organizations</option>
+                      <option value="https://api.au.aws.sigmacomputing.com/v2">AWS Australia hosted organizations</option>
+                      <option value="https://api.uk.aws.sigmacomputing.com/v2">AWS UK hosted organizations</option>
+                      <option value="https://api.us.azure.sigmacomputing.com/v2">Azure US hosted organizations</option>
+                      <option value="https://api.eu.azure.sigmacomputing.com/v2">Azure Europe hosted organizations</option>
+                      <option value="https://api.ca.azure.sigmacomputing.com/v2">Azure Canada hosted organizations</option>
+                      <option value="https://api.uk.azure.sigmacomputing.com/v2">Azure UK hosted organizations</option>
                     </select>
                   </div>
 
