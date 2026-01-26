@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sigma with Databricks OAuth</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      }
+
+      .layout-topbar {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        height: 4rem;
+        display: flex;
+        align-items: center;
+        padding: 0 1.5rem;
+        font-weight: bold;
+        font-size: 1.2rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        justify-content: space-between;
+      }
+
+      .left-controls {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .menu-button, .logout-button {
+        background-color: white;
+        color: #667eea;
+        border: 2px solid white;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.95rem;
+        transition: all 0.2s;
+      }
+
+      .menu-button:hover, .logout-button:hover {
+        background-color: rgba(255, 255, 255, 0.9);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .header-title {
+        flex: 1;
+        text-align: right;
+        font-size: 1rem;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+      }
+
+      .user-info {
+        font-size: 0.85rem;
+        opacity: 0.9;
+        margin-top: 2px;
+      }
+
+      .main {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        width: 320px;
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-right: 1px solid #dee2e6;
+        overflow-y: auto;
+        transition: width 0.3s ease, padding 0.3s ease;
+      }
+
+      .sidebar.collapsed {
+        width: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .sidebar h2 {
+        color: #495057;
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid #667eea;
+        padding-bottom: 0.5rem;
+      }
+
+      .sidebar h3 {
+        color: #667eea;
+        font-size: 0.95rem;
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .sidebar p {
+        color: #6c757d;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin-bottom: 1rem;
+      }
+
+      .info-box {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .info-box .label {
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.85rem;
+        margin-bottom: 0.25rem;
+      }
+
+      .info-box .value {
+        color: #6c757d;
+        font-size: 0.85rem;
+        word-break: break-all;
+      }
+
+      .content {
+        flex: 1;
+        padding: 1.5rem;
+        background: #ffffff;
+      }
+
+      .main.expanded .content {
+        flex: 1 1 100%;
+      }
+
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .layout-footer {
+        height: 2.5rem;
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+        text-align: center;
+        line-height: 2.5rem;
+        font-size: 0.85rem;
+        color: #6c757d;
+      }
+
+      .token-display {
+        background: #f1f3f5;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 0.75rem;
+        font-family: 'Monaco', 'Courier New', monospace;
+        font-size: 0.75rem;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 200px;
+        overflow-y: auto;
+        color: #495057;
+      }
+
+      .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #6c757d;
+        font-size: 1.1rem;
+      }
+
+      .error {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #dc3545;
+        font-size: 1rem;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .status-badge {
+        display: inline-block;
+        background: #28a745;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 8px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="layout-topbar">
+      <div class="left-controls">
+        <button id="toggle-sidebar" class="menu-button">☰ Toggle Info</button>
+        <button class="logout-button" onclick="location.href='/logout'">
+          🚪 Logout
+        </button>
+      </div>
+      <div class="header-title">
+        <div>Sigma with Databricks OAuth <span class="status-badge">CONNECTED</span></div>
+        <div class="user-info" id="user-display">Loading user...</div>
+      </div>
+    </header>
+
+    <div class="main">
+      <aside class="sidebar">
+        <h2>📊 Embedding Information</h2>
+
+        <p>
+          This dashboard is embedded using Sigma's connection-level OAuth with Databricks.
+          Your Databricks credentials are used to query data with your own permissions.
+        </p>
+
+        <div id="user-details" class="info-box">
+          <div class="label">Authenticated User:</div>
+          <div class="value" id="user-email">Loading...</div>
+        </div>
+
+        <div id="oauth-info" class="info-box">
+          <div class="label">OAuth Flow:</div>
+          <div class="value">Databricks OAuth 2.0 with PKCE</div>
+        </div>
+
+        <h3>🔐 Security Details</h3>
+        <p style="font-size: 0.85rem;">
+          • Databricks access token encrypted with AES-256<br>
+          • Token embedded in Sigma JWT<br>
+          • Automatic refresh before expiration<br>
+          • Queries run with your Databricks permissions
+        </p>
+
+        <h3>🎫 Decoded JWT Payload</h3>
+        <div id="jwt-decoded">
+          <pre class="token-display">Loading...</pre>
+        </div>
+
+        <h3>📝 Signed JWT Token</h3>
+        <div id="jwt-raw">
+          <pre class="token-display">Loading...</pre>
+        </div>
+      </aside>
+
+      <main class="content">
+        <div class="loading" id="loading">
+          ⏳ Loading Sigma dashboard...
+        </div>
+        <iframe
+          id="sigma-embed"
+          src=""
+          allow="clipboard-read; clipboard-write"
+          style="display: none;"
+        ></iframe>
+      </main>
+    </div>
+
+    <footer class="layout-footer">
+      Sigma Computing with Databricks OAuth &copy; 2025
+    </footer>
+
+    <script>
+      // Toggle sidebar
+      const toggleBtn = document.getElementById('toggle-sidebar');
+      const sidebar = document.querySelector('.sidebar');
+      const mainLayout = document.querySelector('.main');
+
+      toggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+        mainLayout.classList.toggle('expanded');
+      });
+
+      // Decode JWT helper
+      function decodeJwt(token) {
+        try {
+          const [header, payload, signature] = token.split('.');
+          const decode = (str) => JSON.parse(atob(str));
+          return {
+            header: decode(header),
+            payload: decode(payload),
+            signature
+          };
+        } catch (err) {
+          return { error: 'Failed to decode JWT' };
+        }
+      }
+
+      // Load embed URL and JWT
+      fetch('/api/embed-url')
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+          return res.json();
+        })
+        .then((data) => {
+          const iframe = document.getElementById('sigma-embed');
+          const loading = document.getElementById('loading');
+
+          // Set iframe source
+          iframe.src = data.embedUrl;
+          iframe.style.display = 'block';
+          loading.style.display = 'none';
+
+          // Display user info
+          const userDisplay = document.getElementById('user-display');
+          const userEmail = document.getElementById('user-email');
+          userDisplay.textContent = `👤 ${data.user.displayName || data.user.email}`;
+          userEmail.textContent = data.user.email;
+
+          // Display JWT
+          const jwt = data.jwt || 'No JWT generated';
+          document.getElementById('jwt-raw').innerHTML =
+            `<pre class="token-display">${jwt}</pre>`;
+
+          // Decode and display JWT payload
+          const decoded = decodeJwt(jwt);
+          if (decoded.error) {
+            document.getElementById('jwt-decoded').innerHTML =
+              `<pre class="token-display" style="color:#dc3545;">${decoded.error}</pre>`;
+          } else {
+            // Sanitize the payload for display (hide encrypted token)
+            const sanitizedPayload = { ...decoded.payload };
+            if (sanitizedPayload.connection_oauth_tokens) {
+              Object.keys(sanitizedPayload.connection_oauth_tokens).forEach(key => {
+                const encryptedToken = sanitizedPayload.connection_oauth_tokens[key];
+                sanitizedPayload.connection_oauth_tokens[key] =
+                  `[ENCRYPTED: ${encryptedToken.substring(0, 30)}...]`;
+              });
+            }
+
+            document.getElementById('jwt-decoded').innerHTML =
+              `<pre class="token-display">${JSON.stringify(sanitizedPayload, null, 2)}</pre>`;
+          }
+        })
+        .catch((err) => {
+          console.error('Error loading embed:', err);
+          const loading = document.getElementById('loading');
+          loading.className = 'error';
+          loading.innerHTML = `
+            <div>❌ Failed to load Sigma dashboard</div>
+            <div style="font-size: 0.9rem;">${err.message}</div>
+            <button onclick="location.reload()" style="margin-top: 1rem; padding: 10px 20px; cursor: pointer;">
+              🔄 Retry
+            </button>
+          `;
+        });
+    </script>
+  </body>
+</html>
