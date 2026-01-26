@@ -5,102 +5,80 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Login - Sigma with Databricks OAuth</title>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
       body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        font-family: sans-serif;
+        background: #f4f4f4;
         display: flex;
         align-items: center;
         justify-content: center;
         min-height: 100vh;
+        margin: 0;
         padding: 20px;
       }
 
       .login-container {
         background: white;
-        border-radius: 12px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-        max-width: 480px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        max-width: 450px;
         width: 100%;
-        padding: 3rem;
+        padding: 2.5rem;
         text-align: center;
       }
 
-      .logo {
-        font-size: 3rem;
-        margin-bottom: 1rem;
-      }
-
       h1 {
-        color: #2c3e50;
+        color: #333;
         font-size: 1.8rem;
         margin-bottom: 0.5rem;
       }
 
       .subtitle {
-        color: #6c757d;
+        color: #666;
         font-size: 1rem;
         margin-bottom: 2rem;
       }
 
-      .feature-list {
+      .info-box {
         text-align: left;
         margin: 2rem 0;
-        background: #f8f9fa;
-        border-radius: 8px;
+        background: #fef5ed;
+        border-left: 4px solid #f57c00;
+        border-radius: 4px;
         padding: 1.5rem;
       }
 
-      .feature-list h3 {
-        color: #495057;
+      .info-box h3 {
+        color: #f57c00;
         font-size: 0.95rem;
         margin-bottom: 1rem;
-        text-align: center;
       }
 
-      .feature-item {
-        display: flex;
-        align-items: center;
-        margin-bottom: 0.75rem;
-        color: #495057;
+      .info-item {
+        color: #555;
         font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+        line-height: 1.5;
       }
 
-      .feature-item:last-child {
+      .info-item:last-child {
         margin-bottom: 0;
       }
 
-      .feature-icon {
-        font-size: 1.2rem;
-        margin-right: 0.75rem;
-      }
-
       .login-button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: #f57c00;
         color: white;
         border: none;
         padding: 1rem 2rem;
         font-size: 1.1rem;
-        font-weight: 600;
-        border-radius: 8px;
+        font-weight: bold;
+        border-radius: 6px;
         cursor: pointer;
         width: 100%;
-        transition: all 0.3s;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        transition: background 0.2s;
       }
 
       .login-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
-      }
-
-      .login-button:active {
-        transform: translateY(0);
+        background: #c65100;
       }
 
       .alert {
@@ -112,15 +90,15 @@
       }
 
       .alert-error {
-        background: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
+        background: #ffebee;
+        color: #c62828;
+        border: 1px solid #ef9a9a;
       }
 
       .alert-success {
-        background: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
+        background: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #a5d6a7;
       }
 
       .alert-title {
@@ -130,98 +108,33 @@
 
       .footer {
         margin-top: 2rem;
-        color: #6c757d;
+        color: #999;
         font-size: 0.85rem;
-      }
-
-      .footer a {
-        color: #667eea;
-        text-decoration: none;
-      }
-
-      .footer a:hover {
-        text-decoration: underline;
-      }
-
-      .tech-stack {
-        margin-top: 2rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid #dee2e6;
-      }
-
-      .tech-stack h4 {
-        color: #6c757d;
-        font-size: 0.85rem;
-        font-weight: 600;
-        margin-bottom: 0.75rem;
-      }
-
-      .tech-badges {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        justify-content: center;
-      }
-
-      .badge {
-        background: #e9ecef;
-        color: #495057;
-        padding: 4px 12px;
-        border-radius: 12px;
-        font-size: 0.75rem;
-        font-weight: 500;
       }
     </style>
   </head>
 
   <body>
     <div class="login-container">
-      <div class="logo">🔐</div>
-      <h1>Sigma Analytics</h1>
-      <div class="subtitle">with Databricks OAuth</div>
+      <h1>Sigma with Databricks OAuth</h1>
+      <div class="subtitle">Connection-Level OAuth with PKCE</div>
 
       <div id="alert-container"></div>
 
-      <div class="feature-list">
-        <h3>Secure Connection-Level OAuth</h3>
-        <div class="feature-item">
-          <span class="feature-icon">🔒</span>
-          <span>PKCE-protected authentication flow</span>
-        </div>
-        <div class="feature-item">
-          <span class="feature-icon">👤</span>
-          <span>Query with your Databricks permissions</span>
-        </div>
-        <div class="feature-item">
-          <span class="feature-icon">🔄</span>
-          <span>Automatic token refresh</span>
-        </div>
-        <div class="feature-item">
-          <span class="feature-icon">📊</span>
-          <span>Real-time embedded analytics</span>
-        </div>
+      <div class="info-box">
+        <h3>About This Demo:</h3>
+        <div class="info-item">• PKCE-protected OAuth 2.0 authentication</div>
+        <div class="info-item">• Query data with your Databricks permissions</div>
+        <div class="info-item">• Automatic token refresh</div>
+        <div class="info-item">• Real-time embedded analytics</div>
       </div>
 
       <button class="login-button" onclick="login()">
-        🚀 Login with Databricks
+        Login with Databricks
       </button>
 
-      <div class="tech-stack">
-        <h4>POWERED BY</h4>
-        <div class="tech-badges">
-          <span class="badge">Databricks</span>
-          <span class="badge">Sigma Computing</span>
-          <span class="badge">OAuth 2.0</span>
-          <span class="badge">PKCE</span>
-        </div>
-      </div>
-
       <div class="footer">
-        <p>
-          New to Sigma or Databricks?<br>
-          <a href="https://www.sigmacomputing.com/free-trial/" target="_blank">Sigma Free Trial</a> •
-          <a href="https://www.databricks.com/try-databricks" target="_blank">Databricks Free Trial</a>
-        </p>
+        Sigma &copy; 2026
       </div>
     </div>
 
@@ -248,7 +161,7 @@
 
         alertContainer.innerHTML = `
           <div class="alert alert-error">
-            <div class="alert-title">❌ Login Failed</div>
+            <div class="alert-title">Login Failed</div>
             <div>${errorMessage}</div>
           </div>
         `;
@@ -257,7 +170,7 @@
       if (loggedOut === 'true') {
         alertContainer.innerHTML = `
           <div class="alert alert-success">
-            <div class="alert-title">✅ Logged Out</div>
+            <div class="alert-title">Logged Out</div>
             <div>You have been successfully logged out.</div>
           </div>
         `;

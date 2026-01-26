@@ -134,6 +134,11 @@ app.get('/auth/databricks/login', (req, res) => {
  * Handles OAuth callback from Databricks
  */
 app.get('/auth/databricks/callback', async (req, res) => {
+  console.log('[Server] OAuth callback received');
+  console.log('[Server] Query params:', req.query);
+  console.log('[Server] Session state:', req.session.state);
+  console.log('[Server] Session codeVerifier exists:', !!req.session.codeVerifier);
+
   try {
     const { code, state, error } = req.query;
 
@@ -180,8 +185,15 @@ app.get('/auth/databricks/callback', async (req, res) => {
 
     console.log('[Server] OAuth callback successful, user:', userInfo.email);
 
-    // Redirect to dashboard
-    res.redirect('/dashboard');
+    // Save session before redirecting to ensure data persists
+    req.session.save((err) => {
+      if (err) {
+        console.error('[Server] Session save error:', err);
+        return res.redirect('/login.html?error=session_error');
+      }
+      // Redirect to dashboard
+      res.redirect('/dashboard');
+    });
   } catch (error) {
     console.error('[Server] OAuth callback failed:', error.message);
     res.redirect('/login.html?error=authentication_failed');

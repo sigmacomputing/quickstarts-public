@@ -2,39 +2,15 @@
 // Sigma embedding with Databricks OAuth token encryption
 // Generates signed embed URLs with connection-level OAuth tokens
 
+const { encrypt } = require('@sigmacomputing/node-embed-sdk');
 const jwt = require('jsonwebtoken');
 const { v4: uuid } = require('uuid');
-const crypto = require('crypto');
 const dotenv = require('dotenv');
 const path = require('path');
 
 // Load centralized .env file from parent directory
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
-/**
- * Encrypts the Databricks OAuth token for secure embedding
- * Uses AES-256-CBC encryption with PKCS7 padding
- * @param {string} secret - Sigma embed secret
- * @param {string} token - Databricks access token
- * @returns {string} Encrypted token in format: iv:encrypted
- */
-function encryptToken(secret, token) {
-  // Derive a 32-byte key from the secret
-  const key = crypto.createHash('sha256').update(secret).digest();
-
-  // Generate random IV (initialization vector)
-  const iv = crypto.randomBytes(16);
-
-  // Create cipher
-  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-
-  // Encrypt the token
-  let encrypted = cipher.update(token, 'utf8', 'base64');
-  encrypted += cipher.final('base64');
-
-  // Return IV + encrypted data (both base64 encoded)
-  return `${iv.toString('base64')}:${encrypted}`;
-}
 
 /**
  * Generates a signed Sigma embed URL with Databricks OAuth token
@@ -66,18 +42,20 @@ async function generateSignedUrl(databricksAccessToken, userEmail) {
       throw new Error('DATABRICKS_CONNECTION_ID not configured in .env file');
     }
 
-    // Encrypt the Databricks access token
-    const encryptedToken = encryptToken(sigmaSecret, databricksAccessToken);
+    // Encrypt the Databricks access token using Sigma SDK
+    const encryptedToken = encrypt(sigmaSecret, databricksAccessToken);
 
     console.log('[Embed API] Databricks token encrypted for connection:', connectionId);
 
-    // Build JWT payload with encrypted OAuth token
+    // Build JWT payload with encrypted OAuth token (v1.1 format)
     const payload = {
       sub: email,
       iss: sigmaClientId,
+      aud: 'sigmacomputing',
       jti: uuid(),
       iat: now,
       exp: expirationTime,
+      ver: '1.1', // Required for connection_oauth_tokens (string value)
       account_type: accountType,
       teams: teamsArray,
       // Connection-level OAuth token
@@ -92,6 +70,7 @@ async function generateSignedUrl(databricksAccessToken, userEmail) {
       keyid: sigmaClientId
     });
 
+    // Build embed URL (version specified in JWT payload)
     const embedParams = [
       ':embed=true',
       `:jwt=${encodeURIComponent(token)}`
@@ -99,10 +78,15 @@ async function generateSignedUrl(databricksAccessToken, userEmail) {
 
     const signedEmbedUrl = `${baseUrl}?${embedParams.join('&')}`;
 
-    console.log('[Embed API] Signed embed URL generated');
+    console.log('[Embed API] Signed embed URL generated (v1.1)');
     console.log('[Embed API] User:', email);
     console.log('[Embed API] Account Type:', accountType);
     console.log('[Embed API] Teams:', teamsArray);
+    console.log('[Embed API] JWT Payload (before signing):');
+    console.log(JSON.stringify(payload, null, 2));
+    console.log('[Embed API] Decoded JWT (after signing):');
+    console.log(JSON.stringify(decodeJWT(token), null, 2));
+    console.log('[Embed API] Encrypted token length:', encryptedToken.length);
 
     return {
       signedUrl: signedEmbedUrl,
@@ -139,6 +123,5 @@ function decodeJWT(token) {
 
 module.exports = {
   generateSignedUrl,
-  encryptToken,
   decodeJWT
 };
