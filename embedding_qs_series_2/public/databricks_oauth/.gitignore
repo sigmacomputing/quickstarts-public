@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Token files (sensitive)
+databricks_token.json
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

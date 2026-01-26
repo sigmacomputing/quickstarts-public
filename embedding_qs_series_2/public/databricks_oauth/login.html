@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - Sigma with Databricks OAuth</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        background: #f4f4f4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+      }
+
+      .login-container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        max-width: 450px;
+        width: 100%;
+        padding: 2.5rem;
+        text-align: center;
+      }
+
+      h1 {
+        color: #333;
+        font-size: 1.8rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .subtitle {
+        color: #666;
+        font-size: 1rem;
+        margin-bottom: 2rem;
+      }
+
+      .info-box {
+        text-align: left;
+        margin: 2rem 0;
+        background: #fef5ed;
+        border-left: 4px solid #f57c00;
+        border-radius: 4px;
+        padding: 1.5rem;
+      }
+
+      .info-box h3 {
+        color: #f57c00;
+        font-size: 0.95rem;
+        margin-bottom: 1rem;
+      }
+
+      .info-item {
+        color: #555;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+        line-height: 1.5;
+      }
+
+      .info-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .login-button {
+        background: #f57c00;
+        color: white;
+        border: none;
+        padding: 1rem 2rem;
+        font-size: 1.1rem;
+        font-weight: bold;
+        border-radius: 6px;
+        cursor: pointer;
+        width: 100%;
+        transition: background 0.2s;
+      }
+
+      .login-button:hover {
+        background: #c65100;
+      }
+
+      .alert {
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1.5rem;
+        font-size: 0.9rem;
+        text-align: left;
+      }
+
+      .alert-error {
+        background: #ffebee;
+        color: #c62828;
+        border: 1px solid #ef9a9a;
+      }
+
+      .alert-success {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #a5d6a7;
+      }
+
+      .alert-title {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+      }
+
+      .footer {
+        margin-top: 2rem;
+        color: #999;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="login-container">
+      <h1>Sigma with Databricks OAuth</h1>
+      <div class="subtitle">Connection-Level OAuth with PKCE</div>
+
+      <div id="alert-container"></div>
+
+      <div class="info-box">
+        <h3>About This Demo:</h3>
+        <div class="info-item">• PKCE-protected OAuth 2.0 authentication</div>
+        <div class="info-item">• Query data with your Databricks permissions</div>
+        <div class="info-item">• Automatic token refresh</div>
+        <div class="info-item">• Real-time embedded analytics</div>
+      </div>
+
+      <button class="login-button" onclick="login()">
+        Login with Databricks
+      </button>
+
+      <div class="footer">
+        Sigma &copy; 2026
+      </div>
+    </div>
+
+    <script>
+      // Check for URL parameters (error or success messages)
+      const urlParams = new URLSearchParams(window.location.search);
+      const error = urlParams.get('error');
+      const loggedOut = urlParams.get('logged_out');
+
+      const alertContainer = document.getElementById('alert-container');
+
+      if (error) {
+        let errorMessage = 'Authentication failed. Please try again.';
+
+        if (error === 'authentication_failed') {
+          errorMessage = 'Authentication failed. Please check your credentials and try again.';
+        } else if (error === 'token_refresh_failed') {
+          errorMessage = 'Your session expired. Please log in again.';
+        } else if (error === 'access_denied') {
+          errorMessage = 'Access denied. You declined the authorization request.';
+        } else {
+          errorMessage = `Error: ${error}`;
+        }
+
+        alertContainer.innerHTML = `
+          <div class="alert alert-error">
+            <div class="alert-title">Login Failed</div>
+            <div>${errorMessage}</div>
+          </div>
+        `;
+      }
+
+      if (loggedOut === 'true') {
+        alertContainer.innerHTML = `
+          <div class="alert alert-success">
+            <div class="alert-title">Logged Out</div>
+            <div>You have been successfully logged out.</div>
+          </div>
+        `;
+      }
+
+      function login() {
+        // Redirect to OAuth login route
+        window.location.href = '/auth/databricks/login';
+      }
+
+      // Allow Enter key to trigger login
+      document.addEventListener('keypress', function(event) {
+        if (event.key === 'Enter') {
+          login();
+        }
+      });
+    </script>
+  </body>
+</html>
