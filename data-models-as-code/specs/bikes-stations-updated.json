@@ -8,34 +8,15 @@
       "name": "Page 1",
       "elements": [
         {
-          "id": "stations_with_trips",
+          "id": "stations_table",
           "kind": "table",
           "source": {
-            "kind": "join",
-            "left": {
-              "connectionId": "YOUR_CONNECTION_ID_HERE",
-              "kind": "warehouse-table",
-              "path": [
-                "FUN",
-                "BIKES",
-                "STATIONS"
-              ]
-            },
-            "right": {
-              "connectionId": "YOUR_CONNECTION_ID_HERE",
-              "kind": "warehouse-table",
-              "path": [
-                "FUN",
-                "BIKES",
-                "TRIPS"
-              ]
-            },
-            "joinType": "left",
-            "joinConditions": [
-              {
-                "leftColumn": "[STATIONS/Id]",
-                "rightColumn": "[TRIPS/Start_Station_Id]"
-              }
+            "connectionId": "YOUR_CONNECTION_ID_HERE",
+            "kind": "warehouse-table",
+            "path": [
+              "FUN",
+              "BIKES",
+              "STATIONS"
             ]
           },
           "columns": [
@@ -54,14 +35,6 @@
             {
               "id": "station_long",
               "formula": "[STATIONS/Long]"
-            },
-            {
-              "id": "trip_id",
-              "formula": "[TRIPS/Id]"
-            },
-            {
-              "id": "trip_duration",
-              "formula": "[TRIPS/Duration]"
             }
           ]
         }

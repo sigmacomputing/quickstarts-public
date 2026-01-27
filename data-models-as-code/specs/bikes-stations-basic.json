@@ -27,14 +27,6 @@
             {
               "id": "station_name",
               "formula": "[STATIONS/Name]"
-            },
-            {
-              "id": "station_lat",
-              "formula": "[STATIONS/Lat]"
-            },
-            {
-              "id": "station_long",
-              "formula": "[STATIONS/Long]"
             }
           ]
         }
