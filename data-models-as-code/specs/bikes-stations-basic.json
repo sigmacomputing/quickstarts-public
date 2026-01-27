@@ -1,0 +1,36 @@
+{
+  "name": "Bike Stations Data Model",
+  "schemaVersion": 1,
+  "folderId": "YOUR_FOLDER_ID_HERE",
+  "pages": [
+    {
+      "id": "page1",
+      "name": "Page 1",
+      "elements": [
+        {
+          "id": "stations_table",
+          "kind": "table",
+          "source": {
+            "connectionId": "YOUR_CONNECTION_ID_HERE",
+            "kind": "warehouse-table",
+            "path": [
+              "FUN",
+              "BIKES",
+              "STATIONS"
+            ]
+          },
+          "columns": [
+            {
+              "id": "station_id",
+              "formula": "[STATIONS/Id]"
+            },
+            {
+              "id": "station_name",
+              "formula": "[STATIONS/Name]"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
