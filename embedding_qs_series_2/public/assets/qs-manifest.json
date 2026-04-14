@@ -1,6 +1,6 @@
 [
   { "slug": "getting_started", "label": "Getting Started" },
-  { "slug": "ask_sigma", "label": "Ask Sigma for Embedding" },
+  { "slug": "assistant", "label": "Sigma Assistant for Embedding" },
   { "slug": "connection_swapping", "label": "Connection Swapping" },
   { "slug": "dynamic_role_switching", "label": "Dynamic Role Switching with Snowflake" },
   { "slug": "events", "label": "Events" },

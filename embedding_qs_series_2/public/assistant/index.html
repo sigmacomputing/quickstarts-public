@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Embedding 08: Ask Sigma for Embedding</title>
+    <title>Embedding 08: Sigma Assistant for Embedding</title>
     <link rel="stylesheet" href="/styles/layout.css" />
     <style>
       body {
@@ -113,14 +113,14 @@
           ← Back to Landing Page
         </button>
       </div>
-      <span class="header-title">Embedding 08: Ask Sigma for Embedding</span>
+      <span class="header-title">Embedding 08: Sigma Assistant for Embedding</span>
     </header>
 
     <div class="main">
       <aside class="sidebar">
         <h2>Information:</h2>
         <p>
-          Ask Sigma should render in the iframe on the right, based
+          Sigma Assistant should render in the iframe on the right, based
           on your .env file configuration.
         </p>
 
@@ -167,7 +167,7 @@
         }
       }
 
-      fetch("/generate-jwt/ask_sigma")
+      fetch("/generate-jwt/assistant")
         .then((res) => res.json())
         .then((data) => {
           const iframe = document.getElementById("sigma-embed");
