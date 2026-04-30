@@ -42,7 +42,7 @@
         background-color: #ffe1c4;
         color: #c65100;
       }
-      ß .header-title {
+      .header-title {
         flex: 1;
         text-align: right;
         color: white;
@@ -304,12 +304,12 @@
             '<p style="color:red;">Failed to load Sigma embed. Check console for details.</p>';
         });
 
-      // Unified handler for all messages received *inbound* to the iframe from Sigma
+      // Unified handler for all messages received from Sigma (outbound from Sigma)
       window.addEventListener("message", (event) => {
         if (event.origin !== "https://app.sigmacomputing.com") return;
 
         const { type, ...rest } = event.data || {};
-        console.log("Host Application to iframe (Inbound)", event.data);
+        console.log("iframe to Host Application (Outbound)", event.data);
 
         if (type?.startsWith("workbook:")) {
           console.log("⚙️ Workbook event:", type);
@@ -322,10 +322,10 @@
         const logContainer = document.getElementById("event-output");
         const logItem = document.createElement("li");
         logItem.style.marginBottom = "8px";
-        logItem.style.color = "blue"; // Inbound = blue
+        logItem.style.color = "blue"; // Outbound from Sigma = blue
 
         logItem.innerHTML = `
- <strong style="text-decoration: underline;">Host Application to iframe (Inbound)</strong><br/>
+ <strong style="text-decoration: underline;">iframe to Host Application (Outbound)</strong><br/>
     <strong>Timestamp:</strong> ${new Date().toLocaleTimeString()}<br/>
     <strong>Event Type:</strong> ${type || "unknown"}<br/>
     <strong>Payload:</strong> <code>${JSON.stringify(
@@ -350,15 +350,15 @@
             message,
             "https://app.sigmacomputing.com"
           );
-          console.log("iframe to Host Application (Outbound)", message);
+          console.log("Host Application to iframe (Inbound)", message);
 
           const logContainer = document.getElementById("event-output");
           const logItem = document.createElement("li");
           logItem.style.marginBottom = "8px";
-          logItem.style.color = "green"; // Outbound = green
+          logItem.style.color = "green"; // Inbound to Sigma = green
 
           logItem.innerHTML = `
-<strong style="text-decoration: underline;">iframe to Host Application (Outbound)</strong>
+<strong style="text-decoration: underline;">Host Application to iframe (Inbound)</strong>
       <strong>Timestamp:</strong> ${new Date().toLocaleTimeString()}<br/>
       <strong>Event Type:</strong> ${message.type}<br/>
       <strong>Payload:</strong> <code>${JSON.stringify(message, null, 2)}</code>
