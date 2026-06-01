@@ -39,6 +39,14 @@ settings["env"]["TABLEAU_PAT_NAME"]          = pat_name
 settings["env"]["TABLEAU_PAT_SECRET"]        = pat_secret
 
 File.write(SETTINGS_PATH, JSON.pretty_generate(settings))
-puts "Wrote Tableau credentials to #{SETTINGS_PATH}."
+
+redacted_secret = pat_secret.length > 8 ? "#{pat_secret[0..3]}…#{pat_secret[-4..]} (#{pat_secret.length} chars)" : "(#{pat_secret.length} chars)"
+
+puts
+puts "Saved to #{SETTINGS_PATH}:"
+puts "  TABLEAU_SERVER_URL:       #{server}"
+puts "  TABLEAU_SITE_CONTENT_URL: #{content_url}"
+puts "  TABLEAU_PAT_NAME:         #{pat_name}"
+puts "  TABLEAU_PAT_SECRET:       #{redacted_secret}"
 puts
 puts "Open a new Claude Code session (or `! source ~/.claude/settings.json`) so the env vars are live."
