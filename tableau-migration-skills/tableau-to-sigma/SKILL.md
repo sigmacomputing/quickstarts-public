@@ -229,6 +229,24 @@ For page-per-worksheet mode, pass `--page-per-worksheet`.
 
 ---
 
+### Phase 0c — Confirm Sigma warehouse location (MANDATORY, ask the customer)
+
+Before any discovery work, ask the customer where the source data lives in Sigma. Without this, downstream phases brute-force probe every Sigma connection × every plausible warehouse path looking for the source tables — which becomes O(connections × paths) on orgs with many connections, triggers a wall of bash-approval prompts, and usually misses anyway.
+
+```bash
+ruby scripts/prompt-data-location.rb --workdir /tmp/<name>
+```
+
+The script prompts for `connection_name` (as shown in Sigma's `Administration` > `Connections`), `database`, and `schema`, and writes `/tmp/<name>/data-location.json`. The customer can skip by hitting Enter on the first prompt — discovery falls back to probing (slow path).
+
+**Downstream phases (1.5 and 2) MUST check for `data-location.json` first.** When present:
+- Phase 1.5 (find-or-pick-dm) scopes the DM search to candidates that source from this connection + schema.
+- Phase 2 (warehouse columns) resolves `connection_name` → connection ID via a single `GET /v2/connections` call, then uses `database.schema.<table>` directly for each Tableau-referenced table. **Do not iterate connections or guess paths.**
+
+Only fall back to broad connection probing when `data-location.json` is absent — and when probing, log a WARN telling the customer to re-run `prompt-data-location.rb` on the next try.
+
+---
+
 ## Phase 0 — Estimate cost up front
 
 Before committing to the conversion, predict the agent token cost. Useful for
@@ -654,6 +672,7 @@ Measured 2026-05-22 against the same Tableau workbook in two consecutive convers
 
 > **This step is mandatory. Do not skip it or infer column names from Tableau.**
 > **Skip Phase 2 entirely if Phase 1.5 recommended a DM you reused.**
+> **If `/tmp/<name>/data-location.json` exists (from Phase 0c), use it.** Resolve `connection_name` → connection ID via a single `GET /v2/connections` call, then jump straight to step 2 below with the known connectionId and use `database.schema.<table>` as each table's FQN. Do NOT iterate connections or guess warehouse paths.
 
 Tableau display names ("Sub-Category", "Country/Region") are NOT the same as
 warehouse column names ("SUB_CATEGORY", "COUNTRY_REGION" in Snowflake;
