@@ -1,0 +1,30 @@
+# Customer-local artifacts: NEVER commit. The gap-scout subagent + learned-
+# rules system writes here, and these MUST stay out of the skill repo so
+# `git pull` doesn't clobber customer-discovered rules.
+#
+# Canonical location is ~/.tableau-to-sigma/ (user home dir), but if someone
+# accidentally sets TABLEAU_TO_SIGMA_HOME to a path inside this repo or runs
+# the scripts from here, the artifacts would land here. This .gitignore
+# catches that.
+.tableau-to-sigma/
+learned-rules.yaml
+escalations/
+
+# Test artifacts from validate-sigma-formula.rb / scout-validate-and-persist.rb
+scout-test-home/
+scout-tests/
+*-scout-test.json
+*-scout-spec.json
+
+# Local conversion artifacts (intermediate state from a real customer run)
+# typically lives in /tmp/<workbook>/ but if someone runs from inside this
+# directory:
+*-gaps-report.md
+*-gaps.json
+*-actions.md
+specs-*.json
+wb-spec.json
+wb-spec-*.json
+chart-specs-*.json
+dashboard-layout-*.json
+dashboard-layout-*-meta.json

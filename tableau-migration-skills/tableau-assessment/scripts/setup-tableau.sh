@@ -1,0 +1,1 @@
+/Users/tjwells/sigma-skills-staging/tableau-to-sigma/scripts/setup-tableau.rb

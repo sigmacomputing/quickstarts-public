@@ -1,0 +1,1 @@
+/Users/tjwells/sigma-skills-staging/tableau-to-sigma/scripts/get-tableau-token.sh
