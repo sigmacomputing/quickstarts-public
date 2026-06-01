@@ -42,4 +42,3 @@ File.write(SETTINGS_PATH, JSON.pretty_generate(settings))
 puts "Wrote Tableau credentials to #{SETTINGS_PATH}."
 puts
 puts "Open a new Claude Code session (or `! source ~/.claude/settings.json`) so the env vars are live."
-puts "Then run `eval \"$(scripts/get-tableau-token.sh)\"` to sign in."
