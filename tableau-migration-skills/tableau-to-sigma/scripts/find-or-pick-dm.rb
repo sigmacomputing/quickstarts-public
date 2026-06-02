@@ -122,6 +122,15 @@ loop do
   break if page.nil? || page.empty?
 end
 
+# Drop archived (trashed) DMs. Sigma keeps trashed items in the database
+# indefinitely with isArchived=true, so the list endpoint returns them.
+# Reusing a trashed DM is a surprising outcome — the user thought it was
+# deleted, so scoring it as a reuse candidate produces a workbook bound to
+# an apparently-gone DM. Filter them out up front.
+before = all_dms.size
+all_dms = all_dms.reject { |dm| dm['isArchived'] == true }
+warn "dropped #{before - all_dms.size} archived DMs from the candidate list" if before != all_dms.size
+
 # Deterministic ranking: updatedAt desc, then name asc.
 all_dms = all_dms.sort_by do |dm|
   [-(Time.parse(dm['updatedAt'].to_s).to_i rescue 0), dm['name'].to_s]
