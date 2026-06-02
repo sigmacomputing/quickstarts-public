@@ -304,7 +304,7 @@ Write the spec to `/tmp/<name>/dm-spec.json`. Full schema is in
 3. **Column name special characters** — read `refs/column-gotchas.md`. Rename any column whose `name` contains `/` ("Country/Region" → `"Country"`, "State/Province" → `"State"`).
 4. **Element name = formula prefix**. The `name` field on a DM element (e.g. `"Orders"`) becomes the prefix in all workbook formulas that reference it: `[Orders/Sales]`. Choose clean, stable names.
 5. **Relationships go on the source element**, not the target. See `refs/data-model-spec.md`.
-6. **Column formulas use the warehouse table name as prefix**: path `["CSA", "Tableau Test", "ORDERS"]` → formula `"[ORDERS/Column Name]"`.
+6. **Column formulas use the warehouse table name as prefix**: path `["MY_CONNECTION", "MYDB", "ORDERS"]` → formula `"[ORDERS/Column Name]"`.
 
 ### Translate Tableau calc fields here
 

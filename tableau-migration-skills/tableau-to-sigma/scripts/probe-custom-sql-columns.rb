@@ -17,7 +17,7 @@
 #     permutations (CUSTOMER_ID vs CUST_ID vs ID vs RECORD_ID...)
 #
 # Saves ~120s on every Custom SQL fallback. Validated against
-# TJ.PUBLIC.SUPERSTORE_ORDERS on connection bc0319f8-9fe0-4315-aea3-6a2d1eef0623
+# MYDB.MYSCHEMA.ORDERS on connection <connection-id>
 # during Superstore's standalone conversion (2026-05-24).
 #
 # Usage:

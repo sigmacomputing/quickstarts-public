@@ -656,7 +656,7 @@ Sigma supports two map kinds via spec: **`region-map`** (choropleth — fills na
 | `region` | yes | `{id, regionType}` | `id` is the column ID holding the region key |
 | `label` | optional | array `[{id}, ...]` | Values rendered on each region; usually the measure |
 | `tooltip` | optional | array `[{id}, ...]` | Extra columns shown on hover (e.g., active count, avg salary) |
-| `color` | optional | `{by: "category", column: <colId>}` | Categorical fill (one color per category, NOT a gradient) — column must be a **different** column from `region.id` (the API rejects reuse with "Column X is referenced from both 'region' and 'color'"). `by: "value"` is **rejected** with HTTP 400. With `color` omitted the map renders a uniform fill (NOT auto value-based heat). To get a Tableau-style red→blue divergent gradient heat scale, the customer must configure it in the Sigma editor after publish — it is UI-only today. Verified 2026-05-24 against `tj-wells-1989`. |
+| `color` | optional | `{by: "category", column: <colId>}` | Categorical fill (one color per category, NOT a gradient) — column must be a **different** column from `region.id` (the API rejects reuse with "Column X is referenced from both 'region' and 'color'"). `by: "value"` is **rejected** with HTTP 400. With `color` omitted the map renders a uniform fill (NOT auto value-based heat). To get a Tableau-style red→blue divergent gradient heat scale, the user must configure it in the Sigma editor after publish — it is UI-only today. |
 | `size` | — | silently dropped | Choropleths don't size; the API accepts and drops it |
 
 **Valid `regionType` values (verified May 2026 — POST round-trips them):**
@@ -861,7 +861,7 @@ Use `rowsBy`, `columnsBy`, and `values`. **Do NOT use `rows` or `columnGroups`**
 
 **`conditionalFormats`** — Conditional formatting on pivot-table / table columns. Two supported types.
 
-> **Verified 2026-05-24 against `tj-wells-1989` org during audit-run-2.** The
+> The
 > field that holds the column IDs is **`columnIds`**, NOT `columns`. The first
 > POST in audit-run-1 (NASA agent) failed with HTTP 400 `Invalid request` when
 > using `columns`; the second succeeded with `columnIds` and round-trips

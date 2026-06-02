@@ -224,7 +224,7 @@ as compiling to a valid `number` type during PUT readback. Only Phase 6f's
 `POST /v2/workbooks/{wb}/export` + PNG inspection catches the render-time
 failure (the chart exports as an empty plot area). Always run Phase 6f when an
 `If()` predicate is an integer column. Verified 2026-05-24 against OCT's
-`Is Returned` column on `TJ.PUBLIC.SUPERSTORE_ORDERS`.
+`Is Returned` column on `MYDB.MYSCHEMA.ORDERS`.
 
 ## YAML response from spec endpoints
 

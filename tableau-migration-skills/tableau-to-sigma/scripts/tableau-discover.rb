@@ -14,7 +14,7 @@
 #   eval "$(scripts/get-tableau-token.sh)"
 #   ruby scripts/tableau-discover.rb \
 #     --workbook-name "Orders Conversion Test" \
-#     --datasource-name "ORDER_FACT (CSA.ORDER_FACT)+ (New Virtual Connection)" \
+#     --datasource-name "ORDER_FACT (MY_CONNECTION.ORDER_FACT)+ (New Virtual Connection)" \
 #     --out /tmp/orders
 #
 # At least one of --workbook-id / --workbook-name is required.

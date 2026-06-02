@@ -1,8 +1,8 @@
 {
   "cluster-05-global-temperature-anomalies-csv": {
-    "warehouse_tables": ["TJ.PUBLIC.NASA_GISS_LOTI"],
+    "warehouse_tables": ["MYDB.MYSCHEMA.MY_TABLE"],
     "table_columns": {
-      "TJ.PUBLIC.NASA_GISS_LOTI": ["YEAR", "MONTH_NUM", "MONTH", "HEMISPHERE", "DEVIATION"]
+      "MYDB.MYSCHEMA.MY_TABLE": ["YEAR", "MONTH_NUM", "MONTH", "HEMISPHERE", "DEVIATION"]
     },
     "build_4_panel_dashboard": true,
     "note": "Original Tableau source was an embedded CSV with monthly x hemispheric grain. Land via NASA GISS LOTI table. Target dashboard: annual line + Year x Month heatmap (use pivot-table with rowsBy: [{id: month-num}] + columnsBy: [{id: year}] + values: [dev-col] + divergent backgroundScale) + Northern/Southern hemisphere scatter with trendlines."

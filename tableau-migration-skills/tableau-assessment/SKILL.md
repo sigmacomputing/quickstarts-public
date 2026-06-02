@@ -643,7 +643,7 @@ unchanged.
 
 ### Snowflake-flavored examples
 
-Every worked example in this SKILL.md (the `TJ.PUBLIC.*` fixture tables,
+Every worked example in this SKILL.md (the `MYDB.MYSCHEMA.*` fixture tables,
 the `snow sql` reconciliation, the `--snowflake-conn` flag, the
 `tableau-vds-to-snowflake` sibling skill) uses Snowflake because that's
 where the development corpus and audit-run fixtures live. The Sigma-side

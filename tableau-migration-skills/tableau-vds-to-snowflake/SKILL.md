@@ -69,7 +69,7 @@ No data touches Claude or the local machine — Snowflake fetches directly from 
 - The site's `contentUrl` (e.g. `"dataflow"`)
 
 ### Snowflake
-- A database and schema to write to (e.g. `TJ.PUBLIC`)
+- A database and schema to write to (e.g. `MYDB.MYSCHEMA`)
 - A role with `CREATE NETWORK RULE`, `CREATE SECRET`, `CREATE INTEGRATION`, `CREATE PROCEDURE`, `CREATE TABLE` privileges
   - In the TSE sandbox: `SNOWFLAKE_SANDBOX_TSE_PUSH_GROUP`
 - A running warehouse (e.g. `SIGMA_WH`)
@@ -151,7 +151,7 @@ snow sql --connection <conn> --format json -q \
 
 If all four exist (and you trust the PAT secret is current), jump to Phase 3.
 
-The rest of this phase covers first-time setup. Replace `TJ.PUBLIC` throughout.
+The rest of this phase covers first-time setup. Replace `MYDB.MYSCHEMA` throughout.
 
 ### 2a. Network rule + secret + EAI
 
@@ -363,7 +363,7 @@ column formulas should use `Date([SOURCE/Col Name])` directly:
 
 ```json
 { "id": "so-order-date", "name": "Order Date",
-  "formula": "Date([SUPERSTORE_ORDERS/Order Date])" }
+  "formula": "Date([ORDERS/Order Date])" }
 ```
 
 > **Do NOT use the `Date(Left(Text([col]), 10))` pattern here.** That works
@@ -427,7 +427,7 @@ curl -s -X POST "https://<server>/api/v1/vizql-data-service/read-metadata" \
 
 ---
 
-## Worked example: Superstore Datasource → TJ.PUBLIC.SUPERSTORE_ORDERS
+## Worked example: Superstore Datasource → MYDB.MYSCHEMA.ORDERS
 
 A concrete end-to-end run from a measured conversion (May 2026):
 
@@ -442,7 +442,7 @@ CALL QUERY_TABLEAU_VDS(
   'https://10ay.online.tableau.com',
   'dataflow',
   '1bef4413-4d4b-452a-9082-2cae8e94f28d',
-  'TJ.PUBLIC.SUPERSTORE_ORDERS',
+  'MYDB.MYSCHEMA.ORDERS',
   '[
     {\"fieldCaption\": \"Order ID\"},
     {\"fieldCaption\": \"Order Date\"},
@@ -460,7 +460,7 @@ CALL QUERY_TABLEAU_VDS(
   ]'
 );
 "
-# → Loaded 10192 rows into TJ.PUBLIC.SUPERSTORE_ORDERS
+# → Loaded 10192 rows into MYDB.MYSCHEMA.ORDERS
 ```
 
 Result: 19 columns landed (note `Country/Region` → `COUNTRY_REGION` from the

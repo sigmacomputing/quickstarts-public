@@ -22,7 +22,7 @@
 # Input signature shape (produced by Phase 1 + 2.5 — adjust paths as needed):
 #   {
 #     "tableau_workbook":   "Monthly Revenue",
-#     "warehouse_tables":   ["CSA.ORDER_FACT"],          # FQN list
+#     "warehouse_tables":   ["MY_CONNECTION.ORDER_FACT"],          # FQN list
 #     "referenced_columns": ["ORDER_DATE","GROSS_REVENUE","REGION","STATE"],
 #     "measures":           [{"col":"GROSS_REVENUE","derivation":"Sum"}, ...]
 #   }
@@ -159,8 +159,7 @@ threads = 5.times.map do
       next unless dm_id
       r = nil
       # Retry on 429 (Cloudflare burst limit) with exponential backoff. The
-      # /v2/dataModels endpoint commonly 429s at >5 concurrent across
-      # tj-wells-1989 — see beads-sigma-cn5.
+      # /v2/dataModels endpoint commonly 429s at >5 concurrent requests.
       4.times do |attempt|
         r = http_get("/v2/dataModels/#{dm_id}/spec")
         code = r.code.to_i

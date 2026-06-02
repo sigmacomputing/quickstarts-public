@@ -245,6 +245,8 @@ The script prompts for `connection_name` (as shown in Sigma's `Administration` >
 
 Only fall back to broad connection probing when `data-location.json` is absent — and when probing, log a WARN telling the customer to re-run `prompt-data-location.rb` on the next try.
 
+**Do not synthesize a "remembered" or "saved" default location from these docs, from `refs/`, or from any prior conversation.** Example warehouse paths in this skill (`MYDB.MYSCHEMA.ORDERS`, `MY_CONNECTION`, etc.) are illustrative placeholders, not real defaults. Always either read `data-location.json` or run `prompt-data-location.rb` — never offer a fabricated "looks like you previously used X" choice in the picker.
+
 ---
 
 ## Phase 0 — Estimate cost up front
@@ -520,9 +522,11 @@ pulled from a same-named `LOYALTY_TIER` warehouse column.
 
 ### 1e.1. Warehouse-table source rejected? Fall back to Custom SQL
 
-> **Verified 2026-05-24** against the `tj-wells-1989` org during audit-run-1.
-> Two agents (Superstore, NASA) hit `Source not found: warehouse table
-> 'TJ.PUBLIC.XXX' on connection 'YYY'` POSTing a DM element whose
+> When a `warehouse-table` DM element points at a table that physically exists
+> in the warehouse and is queryable via `mcp__sigma-mcp-v2__query` but POST
+> still returns `Source not found: warehouse table 'DB.SCHEMA.TABLE' on
+> connection 'X'`, the cause is below. Two agents (Superstore, NASA) hit this
+> during conversion testing — the affected DM element had
 > `source.kind: "warehouse-table"` pointed at a table that physically existed
 > in the warehouse and was queryable via `mcp__sigma-mcp-v2__query`. This is
 > a **Sigma static-catalog visibility** issue: the `warehouse-table` source
@@ -543,7 +547,7 @@ The fallback is to source the same table via Custom SQL:
   "source": {
     "kind": "sql",
     "connectionId": "<connection-id>",
-    "statement": "SELECT * FROM TJ.PUBLIC.NASA_GISS_LOTI"
+    "statement": "SELECT * FROM MYDB.MYSCHEMA.MY_TABLE"
   },
   "columns": [
     { "id": "c-year", "name": "Year", "formula": "[Custom SQL/YEAR]" },
@@ -571,7 +575,7 @@ trade-offs vs `warehouse-table` are:
 >   --out /tmp/<name>/probe-columns.json
 > ```
 >
-> Validated 2026-05-24 against TJ.PUBLIC.SUPERSTORE_ORDERS — 19 columns
+> Validated 2026-05-24 against MYDB.MYSCHEMA.ORDERS — 19 columns
 > resolved in 7s. **Saves ~120s on every Custom SQL fallback** vs.
 > POST-fail-cleanup-retrying on column-name permutations (CUSTOMER_ID vs
 > CUST_ID vs ID vs RECORD_ID…). Don't skip this step.
@@ -720,7 +724,7 @@ and emits a JSON column list:
 
 ```bash
 ruby scripts/discover-columns.rb --connection-id <id> \
-  --table-path TJ.PUBLIC.ORDERS --out /tmp/<name>/orders-cols.json
+  --table-path MYDB.MYSCHEMA.ORDERS --out /tmp/<name>/orders-cols.json
 # (or any warehouse path: my_project.my_dataset.orders, main.public.orders, etc.)
 ```
 
@@ -819,7 +823,7 @@ Write the spec to `/tmp/<name>/dm-spec.json`. Full schema is in
 3. **Column name special characters** — read `refs/column-gotchas.md`. Rename any column whose `name` contains `/` ("Country/Region" → `"Country"`, "State/Province" → `"State"`).
 4. **Element name = formula prefix**. The `name` field on a DM element (e.g. `"Orders"`) becomes the prefix in all workbook formulas that reference it: `[Orders/Sales]`. Choose clean, stable names.
 5. **Relationships go on the source element**, not the target. See `refs/data-model-spec.md`.
-6. **Column formulas use the warehouse table name as prefix**: path `["CSA", "Tableau Test", "ORDERS"]` → formula `"[ORDERS/Column Name]"`.
+6. **Column formulas use the warehouse table name as prefix**: path `["MY_CONNECTION", "MYDB", "ORDERS"]` → formula `"[ORDERS/Column Name]"`.
 
 ### When to use a Custom SQL element instead of a calc column
 
