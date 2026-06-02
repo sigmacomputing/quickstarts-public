@@ -229,23 +229,34 @@ For page-per-worksheet mode, pass `--page-per-worksheet`.
 
 ---
 
-### Phase 0c — Confirm Sigma warehouse location (MANDATORY, ask the customer)
+### Phase 0c — Ask user how to identify warehouse tables (MANDATORY, runs right after URL resolution)
 
-Before any discovery work, ask the customer where the source data lives in Sigma. Without this, downstream phases brute-force probe every Sigma connection × every plausible warehouse path looking for the source tables — which becomes O(connections × paths) on orgs with many connections, triggers a wall of bash-approval prompts, and usually misses anyway.
+After resolving the URL to a workbook (Phase 1a) and **before any Sigma catalog search, DM picker, or warehouse column discovery**, run `prompt-data-location.rb` to ask the user how they want Claude to identify the warehouse tables for this conversion.
 
 ```bash
 ruby scripts/prompt-data-location.rb --workdir /tmp/<name>
 ```
 
-The script prompts for `connection_name` (as shown in Sigma's `Administration` > `Connections`), `database`, and `schema`, and writes `/tmp/<name>/data-location.json`. The customer can skip by hitting Enter on the first prompt — discovery falls back to probing (slow path).
+The script offers three modes and writes `/tmp/<name>/data-location.json` with a `mode` field:
 
-**Downstream phases (1.5 and 2) MUST check for `data-location.json` first.** When present:
+- `"mode": "user-provided"` — user supplied `connection_name`, `database`, `schema`. Use these values directly. No catalog search needed.
+- `"mode": "auto-search"` — user authorized Claude to search Sigma's catalog. You may now call `mcp__sigma-mcp-v2__search`, `discover-columns.rb`, `find-or-pick-dm.rb`, etc. to find matching tables.
+- `"mode": "probe-fallback"` — user opted into brute-force probing across all connections. Slow path; many bash-approval prompts.
+
+**HARD RULE — do not call `mcp__sigma-mcp-v2__search`, `discover-columns.rb`, `find-or-pick-dm.rb`, or any other Sigma-side catalog-lookup tool until `data-location.json` exists AND its `mode` field has been read.** Doing so silently bypasses the user's authorization choice and produces invisible behavior — the failure mode that motivated Phase 0c in the first place. If the user picked `user-provided`, catalog search is forbidden regardless of how convenient it would be.
+
+**When `mode == "user-provided"`:**
 - Phase 1.5 (find-or-pick-dm) scopes the DM search to candidates that source from this connection + schema.
-- Phase 2 (warehouse columns) resolves `connection_name` → connection ID via a single `GET /v2/connections` call, then uses `database.schema.<table>` directly for each Tableau-referenced table. **Do not iterate connections or guess paths.**
+- Phase 2 (warehouse columns) resolves `connection_name` → connection ID via a single `GET /v2/connections` call, then uses `database.schema.<table>` directly for each Tableau-referenced table. Do NOT iterate connections or guess paths.
 
-Only fall back to broad connection probing when `data-location.json` is absent — and when probing, log a WARN telling the customer to re-run `prompt-data-location.rb` on the next try.
+**When `mode == "auto-search"`:**
+- Run `find-or-pick-dm.rb` and `discover-columns.rb` as normal.
+- If those find nothing, fall through to probing with a WARN telling the user they can re-run `prompt-data-location.rb --force` to switch to `user-provided` mode.
 
-**Do not synthesize a "remembered" or "saved" default location from these docs, from `refs/`, or from any prior conversation.** Example warehouse paths in this skill (`MYDB.MYSCHEMA.ORDERS`, `MY_CONNECTION`, etc.) are illustrative placeholders, not real defaults. Always either read `data-location.json` or run `prompt-data-location.rb` — never offer a fabricated "looks like you previously used X" choice in the picker.
+**When `mode == "probe-fallback"`:**
+- Brute-force probe with WARN.
+
+**Never synthesize a "remembered" or "saved" location** from these docs, from `refs/`, or from prior conversation. Example warehouse paths in this skill (`MYDB.MYSCHEMA.ORDERS`, `MY_CONNECTION`, etc.) are illustrative placeholders, not real defaults.
 
 ---
 
