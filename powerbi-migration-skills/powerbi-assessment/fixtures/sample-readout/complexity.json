@@ -1,0 +1,129 @@
+{
+  "3cb80b45-a326-42b3-b356-450448f8a8e8": {
+    "name": "EMPLOYEE DASHBOARD",
+    "workspace": "My workspace",
+    "model_name": null,
+    "pages": 1,
+    "visuals": 5,
+    "visual_kinds": {
+      "barChart": 1,
+      "azureMap": 1,
+      "textbox": 1,
+      "lineChart": 1,
+      "pieChart": 1
+    },
+    "measure_count": 0,
+    "calc_column_count": 0,
+    "calc_table_count": 0,
+    "rls_role_count": 0,
+    "directquery_tables": 0,
+    "warehouse_sources": [
+
+    ],
+    "dax_buckets": {
+      "a": 0,
+      "b": 0,
+      "c": 0
+    },
+    "twb_size_kb": 0,
+    "n_features": 0,
+    "n_auto": 0,
+    "n_hint": 0,
+    "n_manual": 0,
+    "n_unhandled": 0,
+    "features": [
+
+    ]
+  },
+  "24a32bb9-c448-423e-992f-259c7124a4fd": {
+    "name": "Employee Dashboard",
+    "workspace": "Test",
+    "model_name": "Report",
+    "pages": 1,
+    "visuals": 5,
+    "visual_kinds": {
+      "barChart": 1,
+      "azureMap": 1,
+      "textbox": 1,
+      "lineChart": 1,
+      "pieChart": 1
+    },
+    "measure_count": 3,
+    "calc_column_count": 30,
+    "calc_table_count": 5,
+    "rls_role_count": 0,
+    "directquery_tables": 0,
+    "warehouse_sources": [
+      "Snowflake:ymb68310.snowflakecomputing.com"
+    ],
+    "dax_buckets": {
+      "a": 33,
+      "b": 0,
+      "c": 0
+    },
+    "twb_size_kb": 0,
+    "n_features": 38,
+    "n_auto": 33,
+    "n_hint": 0,
+    "n_manual": 5,
+    "n_unhandled": 0,
+    "features": [
+      {
+        "name": "dax_mechanical",
+        "status": "auto",
+        "count": 33
+      },
+      {
+        "name": "calc_tables",
+        "status": "manual",
+        "count": 5
+      }
+    ]
+  },
+  "0bebf272-45db-466e-ae93-522c6c9c9999": {
+    "name": "Workforce KitchenSink Report",
+    "workspace": "Test",
+    "model_name": "Workforce KitchenSink (complex DAX test)",
+    "pages": 1,
+    "visuals": 1,
+    "visual_kinds": {
+      "card": 1
+    },
+    "measure_count": 20,
+    "calc_column_count": 4,
+    "calc_table_count": 1,
+    "rls_role_count": 0,
+    "directquery_tables": 0,
+    "warehouse_sources": [
+      "Snowflake:ymb68310.snowflakecomputing.com"
+    ],
+    "dax_buckets": {
+      "a": 17,
+      "b": 7,
+      "c": 0
+    },
+    "twb_size_kb": 0,
+    "n_features": 25,
+    "n_auto": 17,
+    "n_hint": 0,
+    "n_manual": 8,
+    "n_unhandled": 0,
+    "features": [
+      {
+        "name": "dax_mechanical",
+        "status": "auto",
+        "count": 17
+      },
+      {
+        "name": "dax_restructure",
+        "status": "manual",
+        "count": 7
+      },
+      {
+        "name": "calc_tables",
+        "status": "manual",
+        "count": 1
+      }
+    ]
+  }
+}

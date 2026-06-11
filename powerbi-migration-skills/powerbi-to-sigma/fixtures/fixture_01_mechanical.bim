@@ -1,0 +1,120 @@
+{
+  "compatibilityLevel": 1600,
+  "model": {
+    "annotations": [
+      {"name": "PBI_QueryOrder", "value": "[\"EMPLOYEES\",\"ABSENCE_RECORDS\",\"SAFETY_INCIDENTS\"]"}
+    ],
+    "culture": "en-US",
+    "dataAccessOptions": {"legacyRedirects": true, "returnErrorValuesAsNull": true},
+    "defaultPowerBIDataSourceVersion": "powerBI_V3",
+    "relationships": [
+      {"name": "rel_absence_emp", "fromColumn": "EMPLOYEE_ID", "fromTable": "ABSENCE_RECORDS", "toColumn": "EMPLOYEE_ID", "toTable": "EMPLOYEES"},
+      {"name": "rel_incident_emp", "fromColumn": "EMPLOYEE_ID", "fromTable": "SAFETY_INCIDENTS", "toColumn": "EMPLOYEE_ID", "toTable": "EMPLOYEES"}
+    ],
+    "sourceQueryCulture": "en-US",
+    "tables": [
+      {
+        "name": "EMPLOYEES",
+        "columns": [
+          {"name": "EMPLOYEE_ID", "dataType": "string", "lineageTag": "f01-emp-id", "sourceColumn": "EMPLOYEE_ID", "summarizeBy": "none"},
+          {"name": "FIRST_NAME", "dataType": "string", "lineageTag": "f01-emp-fn", "sourceColumn": "FIRST_NAME", "summarizeBy": "none"},
+          {"name": "LAST_NAME", "dataType": "string", "lineageTag": "f01-emp-ln", "sourceColumn": "LAST_NAME", "summarizeBy": "none"},
+          {"name": "DEPARTMENT", "dataType": "string", "lineageTag": "f01-emp-dept", "sourceColumn": "DEPARTMENT", "summarizeBy": "none"},
+          {"name": "ROLE", "dataType": "string", "lineageTag": "f01-emp-role", "sourceColumn": "ROLE", "summarizeBy": "none"},
+          {"name": "LOCATION", "dataType": "string", "lineageTag": "f01-emp-loc", "sourceColumn": "LOCATION", "summarizeBy": "none"},
+          {"name": "HIRE_DATE", "dataType": "dateTime", "formatString": "Long Date", "lineageTag": "f01-emp-hd", "sourceColumn": "HIRE_DATE", "summarizeBy": "none"},
+          {"name": "STATUS", "dataType": "string", "lineageTag": "f01-emp-status", "sourceColumn": "STATUS", "summarizeBy": "none"},
+          {"name": "ANNUAL_SALARY", "dataType": "double", "lineageTag": "f01-emp-sal", "sourceColumn": "ANNUAL_SALARY", "summarizeBy": "sum"},
+          {"name": "EMPLOYMENT_TYPE", "dataType": "string", "lineageTag": "f01-emp-et", "sourceColumn": "EMPLOYMENT_TYPE", "summarizeBy": "none"},
+          {
+            "name": "Full Name",
+            "type": "calculated",
+            "expression": "EMPLOYEES[FIRST_NAME] & \" \" & EMPLOYEES[LAST_NAME]",
+            "dataType": "string",
+            "lineageTag": "f01-cc-fullname",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Salary Band",
+            "type": "calculated",
+            "expression": "IF(EMPLOYEES[ANNUAL_SALARY] >= 120000, \"Senior\", IF(EMPLOYEES[ANNUAL_SALARY] >= 70000, \"Mid\", \"Junior\"))",
+            "dataType": "string",
+            "lineageTag": "f01-cc-band",
+            "summarizeBy": "none"
+          }
+        ],
+        "lineageTag": "f01-tbl-emp",
+        "measures": [
+          {"name": "Total Salary", "expression": "SUM(EMPLOYEES[ANNUAL_SALARY])", "formatString": "\\$#,0", "lineageTag": "f01-m-totsal"},
+          {"name": "Avg Salary", "expression": "AVERAGE(EMPLOYEES[ANNUAL_SALARY])", "formatString": "\\$#,0", "lineageTag": "f01-m-avgsal"},
+          {"name": "Headcount", "expression": "COUNTROWS(EMPLOYEES)", "formatString": "0", "lineageTag": "f01-m-hc"},
+          {"name": "Distinct Departments", "expression": "DISTINCTCOUNT(EMPLOYEES[DEPARTMENT])", "formatString": "0", "lineageTag": "f01-m-distdept"},
+          {"name": "Active Headcount", "expression": "CALCULATE(COUNTROWS(EMPLOYEES), EMPLOYEES[STATUS] = \"Active\")", "formatString": "0", "lineageTag": "f01-m-activehc"},
+          {"name": "Total Comp Estimate", "expression": "SUMX(EMPLOYEES, EMPLOYEES[ANNUAL_SALARY] * 1.25)", "formatString": "\\$#,0", "lineageTag": "f01-m-totcomp"},
+          {"name": "Avg Years To Today", "expression": "AVERAGEX(EMPLOYEES, DATEDIFF(EMPLOYEES[HIRE_DATE], TODAY(), YEAR))", "formatString": "0.0", "lineageTag": "f01-m-avgyears"},
+          {"name": "Pct Active", "expression": "DIVIDE([Active Headcount], [Headcount])", "formatString": "0.0%", "lineageTag": "f01-m-pctactive"},
+          {"name": "Status Label", "expression": "SWITCH(TRUE(), [Pct Active] >= 0.9, \"Healthy\", [Pct Active] >= 0.7, \"Watch\", \"At Risk\")", "lineageTag": "f01-m-statuslabel"}
+        ],
+        "partitions": [
+          {"name": "EMPLOYEES", "mode": "import", "source": {"expression": ["let", "  Source = Snowflake.Databases(\"ymb68310.snowflakecomputing.com\", \"SIGMA_WH\", [Role = null, CreateNavigationProperties = null, ConnectionTimeout = null, CommandTimeout = null, Implementation = \"2.0\"]),", "  #\"Navigation 1\" = Source{[Name = \"CSA\", Kind = \"Database\"]}[Data],", "  #\"Navigation 2\" = #\"Navigation 1\"{[Name = \"TJ\", Kind = \"Schema\"]}[Data],", "  #\"Navigation 3\" = #\"Navigation 2\"{[Name = \"EMPLOYEES\", Kind = \"Table\"]}[Data]", "in", "  #\"Navigation 3\""], "type": "m"}}
+        ]
+      },
+      {
+        "name": "ABSENCE_RECORDS",
+        "columns": [
+          {"name": "ABSENCE_ID", "dataType": "string", "lineageTag": "f01-abs-id", "sourceColumn": "ABSENCE_ID", "summarizeBy": "none"},
+          {"name": "EMPLOYEE_ID", "dataType": "string", "lineageTag": "f01-abs-emp", "sourceColumn": "EMPLOYEE_ID", "summarizeBy": "none"},
+          {"name": "DATE", "dataType": "dateTime", "formatString": "Long Date", "lineageTag": "f01-abs-date", "sourceColumn": "DATE", "summarizeBy": "none"},
+          {"name": "ABSENCE_TYPE", "dataType": "string", "lineageTag": "f01-abs-type", "sourceColumn": "ABSENCE_TYPE", "summarizeBy": "none"},
+          {"name": "HOURS", "dataType": "double", "lineageTag": "f01-abs-hours", "sourceColumn": "HOURS", "summarizeBy": "sum"},
+          {"name": "APPROVED", "dataType": "boolean", "formatString": "\"TRUE\";\"TRUE\";\"FALSE\"", "lineageTag": "f01-abs-appr", "sourceColumn": "APPROVED", "summarizeBy": "none"},
+          {"name": "DEPARTMENT", "dataType": "string", "lineageTag": "f01-abs-dept", "sourceColumn": "DEPARTMENT", "summarizeBy": "none"},
+          {
+            "name": "Employee Department",
+            "type": "calculated",
+            "expression": "RELATED(EMPLOYEES[DEPARTMENT])",
+            "dataType": "string",
+            "lineageTag": "f01-cc-empdept",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Manager Lookup",
+            "type": "calculated",
+            "expression": "LOOKUPVALUE(EMPLOYEES[ROLE], EMPLOYEES[EMPLOYEE_ID], ABSENCE_RECORDS[EMPLOYEE_ID])",
+            "dataType": "string",
+            "lineageTag": "f01-cc-mgrlookup",
+            "summarizeBy": "none"
+          }
+        ],
+        "lineageTag": "f01-tbl-abs",
+        "measures": [
+          {"name": "Total Absence Hours", "expression": "SUM(ABSENCE_RECORDS[HOURS])", "formatString": "#,0.0", "lineageTag": "f01-m-abshours"},
+          {"name": "Absence Records", "expression": "COUNTROWS(ABSENCE_RECORDS)", "formatString": "0", "lineageTag": "f01-m-absrec"},
+          {"name": "Approved Absence Hours", "expression": "CALCULATE(SUM(ABSENCE_RECORDS[HOURS]), ABSENCE_RECORDS[APPROVED] = TRUE())", "formatString": "#,0.0", "lineageTag": "f01-m-apprhours"},
+          {"name": "Avg Absence Hours", "expression": "AVERAGE(ABSENCE_RECORDS[HOURS])", "formatString": "0.0", "lineageTag": "f01-m-avgabs"}
+        ],
+        "partitions": [
+          {"name": "ABSENCE_RECORDS", "mode": "import", "source": {"expression": ["let", "  Source = Snowflake.Databases(\"ymb68310.snowflakecomputing.com\", \"SIGMA_WH\", [Role = null, CreateNavigationProperties = null, ConnectionTimeout = null, CommandTimeout = null, Implementation = \"2.0\"]),", "  #\"Navigation 1\" = Source{[Name = \"CSA\", Kind = \"Database\"]}[Data],", "  #\"Navigation 2\" = #\"Navigation 1\"{[Name = \"TJ\", Kind = \"Schema\"]}[Data],", "  #\"Navigation 3\" = #\"Navigation 2\"{[Name = \"ABSENCE_RECORDS\", Kind = \"Table\"]}[Data]", "in", "  #\"Navigation 3\""], "type": "m"}}
+        ]
+      },
+      {
+        "name": "SAFETY_INCIDENTS",
+        "columns": [
+          {"name": "INCIDENT_ID", "dataType": "string", "lineageTag": "f01-inc-id", "sourceColumn": "INCIDENT_ID", "summarizeBy": "none"},
+          {"name": "EMPLOYEE_ID", "dataType": "string", "lineageTag": "f01-inc-emp", "sourceColumn": "EMPLOYEE_ID", "summarizeBy": "none"},
+          {"name": "DATE", "dataType": "dateTime", "formatString": "Long Date", "lineageTag": "f01-inc-date", "sourceColumn": "DATE", "summarizeBy": "none"},
+          {"name": "SEVERITY", "dataType": "string", "lineageTag": "f01-inc-sev", "sourceColumn": "SEVERITY", "summarizeBy": "none"},
+          {"name": "INCIDENT_TYPE", "dataType": "string", "lineageTag": "f01-inc-type", "sourceColumn": "INCIDENT_TYPE", "summarizeBy": "none"}
+        ],
+        "lineageTag": "f01-tbl-inc",
+        "measures": [
+          {"name": "Incident Count", "expression": "DISTINCTCOUNT(SAFETY_INCIDENTS[INCIDENT_ID])", "formatString": "0", "lineageTag": "f01-m-inccount"},
+          {"name": "Max Severity Rows", "expression": "MAXX(SAFETY_INCIDENTS, IF(SAFETY_INCIDENTS[SEVERITY] = \"High\", 1, 0))", "formatString": "0", "lineageTag": "f01-m-maxsev"}
+        ],
+        "partitions": [
+          {"name": "SAFETY_INCIDENTS", "mode": "import", "source": {"expression": ["let", "  Source = Snowflake.Databases(\"ymb68310.snowflakecomputing.com\", \"SIGMA_WH\", [Role = null, CreateNavigationProperties = null, ConnectionTimeout = null, CommandTimeout = null, Implementation = \"2.0\"]),", "  #\"Navigation 1\" = Source{[Name = \"CSA\", Kind = \"Database\"]}[Data],", "  #\"Navigation 2\" = #\"Navigation 1\"{[Name = \"TJ\", Kind = \"Schema\"]}[Data],", "  #\"Navigation 3\" = #\"Navigation 2\"{[Name = \"SAFETY_INCIDENTS\", Kind = \"Table\"]}[Data]", "in", "  #\"Navigation 3\""], "type": "m"}}
+        ]
+      }
+    ]
+  }
+}

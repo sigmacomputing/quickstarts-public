@@ -1,0 +1,3 @@
+msal>=1.28,<1.32
+requests
+truststore>=0.9,<0.11

@@ -1,0 +1,351 @@
+{
+  "tenant": {
+    "generated_at": "2026-05-31",
+    "fabric_aud": "https://api.fabric.microsoft.com",
+    "refresh_history_available": true,
+    "workspace_count": 2
+  },
+  "workspaces": [
+    {
+      "id": "f16f69ff-3763-415e-88aa-f3fefcb11e3d",
+      "name": "My workspace",
+      "on_capacity": true,
+      "capacityId": "fd55b3b0-a19d-48d1-8b10-1fc462c55ce1",
+      "item_type_counts": {
+        "Report": 1,
+        "SemanticModel": 1
+      }
+    },
+    {
+      "id": "269a33d0-98c4-476f-890d-612ea8072f9a",
+      "name": "Test",
+      "on_capacity": true,
+      "capacityId": "85199e0d-aafe-44ff-9d66-26bc4197b353",
+      "item_type_counts": {
+        "Report": 2,
+        "SemanticModel": 1
+      }
+    }
+  ],
+  "semantic_models": [
+    {
+      "id": "81705807-3661-4606-8914-0231575e6ccf",
+      "name": "Report",
+      "workspace": "My workspace",
+      "workspace_id": "f16f69ff-3763-415e-88aa-f3fefcb11e3d",
+      "on_capacity": true,
+      "table_count": 8,
+      "calc_table_count": 5,
+      "measure_count": 3,
+      "calc_column_count": 30,
+      "rls_role_count": 0,
+      "import_tables": 8,
+      "directquery_tables": 0,
+      "warehouse_sources": [
+        "Snowflake:ymb68310.snowflakecomputing.com"
+      ],
+      "dax_buckets": {
+        "a": 33,
+        "b": 0,
+        "c": 0
+      },
+      "measures": [
+        {
+          "name": "Employee Count",
+          "bucket": "a",
+          "chars": 37,
+          "funcs": [
+            "DISTINCTCOUNT"
+          ]
+        },
+        {
+          "name": "Absence Count",
+          "bucket": "a",
+          "chars": 42,
+          "funcs": [
+            "DISTINCTCOUNT"
+          ]
+        },
+        {
+          "name": "Incidents",
+          "bucket": "a",
+          "chars": 44,
+          "funcs": [
+            "DISTINCTCOUNT"
+          ]
+        }
+      ],
+      "measure_total_chars": 123,
+      "max_measure_chars": 44,
+      "refresh_history": null
+    },
+    {
+      "id": "049863fa-5500-4d45-a541-1478799a760c",
+      "name": "Workforce KitchenSink (complex DAX test)",
+      "workspace": "Test",
+      "workspace_id": "269a33d0-98c4-476f-890d-612ea8072f9a",
+      "on_capacity": true,
+      "table_count": 4,
+      "calc_table_count": 1,
+      "measure_count": 20,
+      "calc_column_count": 4,
+      "rls_role_count": 0,
+      "import_tables": 4,
+      "directquery_tables": 0,
+      "warehouse_sources": [
+        "Snowflake:ymb68310.snowflakecomputing.com"
+      ],
+      "dax_buckets": {
+        "a": 17,
+        "b": 7,
+        "c": 0
+      },
+      "measures": [
+        {
+          "name": "Total Salary",
+          "bucket": "a",
+          "chars": 29,
+          "funcs": [
+            "SUM"
+          ]
+        },
+        {
+          "name": "Avg Salary",
+          "bucket": "a",
+          "chars": 33,
+          "funcs": [
+            "AVERAGE"
+          ]
+        },
+        {
+          "name": "Headcount",
+          "bucket": "a",
+          "chars": 20,
+          "funcs": [
+            "COUNTROWS"
+          ]
+        },
+        {
+          "name": "Active Headcount",
+          "bucket": "a",
+          "chars": 61,
+          "funcs": [
+            "CALCULATE",
+            "COUNTROWS"
+          ]
+        },
+        {
+          "name": "Salary Pct of Dept",
+          "bucket": "b",
+          "chars": 94,
+          "funcs": [
+            "ALLEXCEPT",
+            "CALCULATE",
+            "DIVIDE"
+          ]
+        },
+        {
+          "name": "Dept Salary Rank",
+          "bucket": "b",
+          "chars": 64,
+          "funcs": [
+            "ALL",
+            "RANKX"
+          ]
+        },
+        {
+          "name": "Hires In Period",
+          "bucket": "b",
+          "chars": 85,
+          "funcs": [
+            "CALCULATE",
+            "COUNTROWS",
+            "USERELATIONSHIP"
+          ]
+        },
+        {
+          "name": "Retention Rate",
+          "bucket": "a",
+          "chars": 98,
+          "funcs": [
+            "DIVIDE"
+          ]
+        },
+        {
+          "name": "Total Absence Hours",
+          "bucket": "a",
+          "chars": 27,
+          "funcs": [
+            "SUM"
+          ]
+        },
+        {
+          "name": "YTD Absence Hours",
+          "bucket": "b",
+          "chars": 52,
+          "funcs": [
+            "SUM",
+            "TOTALYTD"
+          ]
+        },
+        {
+          "name": "PY Absence Hours",
+          "bucket": "a",
+          "chars": 73,
+          "funcs": [
+            "CALCULATE",
+            "SAMEPERIODLASTYEAR",
+            "SUM"
+          ]
+        },
+        {
+          "name": "Sick Hours",
+          "bucket": "a",
+          "chars": 78,
+          "funcs": [
+            "CALCULATE",
+            "SUM"
+          ]
+        },
+        {
+          "name": "Absence Hours Pct of Total",
+          "bucket": "b",
+          "chars": 97,
+          "funcs": [
+            "ALL",
+            "CALCULATE",
+            "DIVIDE",
+            "SUM"
+          ]
+        },
+        {
+          "name": "Absence Hours Per Head",
+          "bucket": "a",
+          "chars": 42,
+          "funcs": [
+            "DIVIDE"
+          ]
+        },
+        {
+          "name": "Incident Count",
+          "bucket": "a",
+          "chars": 44,
+          "funcs": [
+            "DISTINCTCOUNT"
+          ]
+        },
+        {
+          "name": "PY Incident Count",
+          "bucket": "a",
+          "chars": 90,
+          "funcs": [
+            "CALCULATE",
+            "DISTINCTCOUNT",
+            "SAMEPERIODLASTYEAR"
+          ]
+        },
+        {
+          "name": "Dept Incident Rank",
+          "bucket": "b",
+          "chars": 73,
+          "funcs": [
+            "ALL",
+            "RANKX"
+          ]
+        },
+        {
+          "name": "Overtime-Related Incidents",
+          "bucket": "a",
+          "chars": 99,
+          "funcs": [
+            "CALCULATE",
+            "DISTINCTCOUNT",
+            "TRUE"
+          ]
+        },
+        {
+          "name": "Avg Hours Before Incident",
+          "bucket": "a",
+          "chars": 55,
+          "funcs": [
+            "AVERAGE"
+          ]
+        },
+        {
+          "name": "Incident Risk Index",
+          "bucket": "a",
+          "chars": 159,
+          "funcs": [
+            "DISTINCTCOUNT",
+            "DIVIDE",
+            "SUMX"
+          ]
+        }
+      ],
+      "measure_total_chars": 1373,
+      "max_measure_chars": 159,
+      "refresh_history": []
+    }
+  ],
+  "reports": [
+    {
+      "id": "3cb80b45-a326-42b3-b356-450448f8a8e8",
+      "name": "EMPLOYEE DASHBOARD",
+      "workspace": "My workspace",
+      "workspace_id": "f16f69ff-3763-415e-88aa-f3fefcb11e3d",
+      "dataset_id": null,
+      "page_count": 1,
+      "visual_count": 5,
+      "visual_kinds": {
+        "barChart": 1,
+        "azureMap": 1,
+        "textbox": 1,
+        "lineChart": 1,
+        "pieChart": 1
+      },
+      "custom_visuals": []
+    },
+    {
+      "id": "24a32bb9-c448-423e-992f-259c7124a4fd",
+      "name": "Employee Dashboard",
+      "workspace": "Test",
+      "workspace_id": "269a33d0-98c4-476f-890d-612ea8072f9a",
+      "dataset_id": "81705807-3661-4606-8914-0231575e6ccf",
+      "page_count": 1,
+      "visual_count": 5,
+      "visual_kinds": {
+        "barChart": 1,
+        "azureMap": 1,
+        "textbox": 1,
+        "lineChart": 1,
+        "pieChart": 1
+      },
+      "custom_visuals": []
+    },
+    {
+      "id": "0bebf272-45db-466e-ae93-522c6c9c9999",
+      "name": "Workforce KitchenSink Report",
+      "workspace": "Test",
+      "workspace_id": "269a33d0-98c4-476f-890d-612ea8072f9a",
+      "dataset_id": "049863fa-5500-4d45-a541-1478799a760c",
+      "page_count": 1,
+      "visual_count": 1,
+      "visual_kinds": {
+        "card": 1
+      },
+      "custom_visuals": []
+    }
+  ],
+  "environment_overview": {
+    "workspaces": 2,
+    "on_capacity_workspaces": 2,
+    "semantic_models": 2,
+    "reports": 3,
+    "dashboards": 0,
+    "dataflows": 0,
+    "lakehouses": 0,
+    "warehouses": 0,
+    "notebooks": 0,
+    "other_items": 0
+  }
+}

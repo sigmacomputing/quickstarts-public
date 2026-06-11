@@ -1,0 +1,92 @@
+{
+  "compatibilityLevel": 1600,
+  "model": {
+    "annotations": [
+      {"name": "PBI_QueryOrder", "value": "[\"EMPLOYEES\",\"ABSENCE_RECORDS\",\"SAFETY_INCIDENTS\"]"}
+    ],
+    "culture": "en-US",
+    "dataAccessOptions": {"legacyRedirects": true, "returnErrorValuesAsNull": true},
+    "defaultPowerBIDataSourceVersion": "powerBI_V3",
+    "relationships": [
+      {"name": "rel_absence_emp", "fromColumn": "EMPLOYEE_ID", "fromTable": "ABSENCE_RECORDS", "toColumn": "EMPLOYEE_ID", "toTable": "EMPLOYEES"},
+      {"name": "rel_incident_emp", "fromColumn": "EMPLOYEE_ID", "fromTable": "SAFETY_INCIDENTS", "toColumn": "EMPLOYEE_ID", "toTable": "EMPLOYEES"}
+    ],
+    "sourceQueryCulture": "en-US",
+    "tables": [
+      {
+        "name": "EMPLOYEES",
+        "columns": [
+          {"name": "EMPLOYEE_ID", "dataType": "string", "lineageTag": "f04-emp-id", "sourceColumn": "EMPLOYEE_ID", "summarizeBy": "none"},
+          {"name": "DEPARTMENT", "dataType": "string", "lineageTag": "f04-emp-dept", "sourceColumn": "DEPARTMENT", "summarizeBy": "none"},
+          {"name": "ANNUAL_SALARY", "dataType": "double", "lineageTag": "f04-emp-sal", "sourceColumn": "ANNUAL_SALARY", "summarizeBy": "sum"}
+        ],
+        "lineageTag": "f04-tbl-emp",
+        "measures": [
+          {"name": "Total Salary", "expression": "SUM(EMPLOYEES[ANNUAL_SALARY])", "formatString": "\\$#,0", "lineageTag": "f04-m-totsal"},
+          {"name": "Dept Salary Rank", "expression": "RANKX(ALL(EMPLOYEES[DEPARTMENT]), [Total Salary], , DESC, DENSE)", "formatString": "0", "lineageTag": "f04-m-deptrank"},
+          {
+            "name": "Salary Variance From Mean",
+            "expression": "VAR CompanyMean = CALCULATE(AVERAGE(EMPLOYEES[ANNUAL_SALARY]), ALL(EMPLOYEES))\nVAR DeptMean = AVERAGE(EMPLOYEES[ANNUAL_SALARY])\nRETURN DeptMean - CompanyMean",
+            "formatString": "\\$#,0",
+            "lineageTag": "f04-m-salvar"
+          },
+          {
+            "name": "Weighted Salary Score",
+            "expression": "SUMX(EMPLOYEES, EMPLOYEES[ANNUAL_SALARY] * RANKX(ALL(EMPLOYEES[EMPLOYEE_ID]), EMPLOYEES[ANNUAL_SALARY], , DESC))",
+            "formatString": "#,0",
+            "lineageTag": "f04-m-weighted"
+          }
+        ],
+        "partitions": [
+          {"name": "EMPLOYEES", "mode": "import", "source": {"expression": ["let", "  Source = Snowflake.Databases(\"ymb68310.snowflakecomputing.com\", \"SIGMA_WH\", [Role = null, CreateNavigationProperties = null, ConnectionTimeout = null, CommandTimeout = null, Implementation = \"2.0\"]),", "  #\"Navigation 1\" = Source{[Name = \"CSA\", Kind = \"Database\"]}[Data],", "  #\"Navigation 2\" = #\"Navigation 1\"{[Name = \"TJ\", Kind = \"Schema\"]}[Data],", "  #\"Navigation 3\" = #\"Navigation 2\"{[Name = \"EMPLOYEES\", Kind = \"Table\"]}[Data]", "in", "  #\"Navigation 3\""], "type": "m"}}
+        ]
+      },
+      {
+        "name": "ABSENCE_RECORDS",
+        "columns": [
+          {"name": "ABSENCE_ID", "dataType": "string", "lineageTag": "f04-abs-id", "sourceColumn": "ABSENCE_ID", "summarizeBy": "none"},
+          {"name": "EMPLOYEE_ID", "dataType": "string", "lineageTag": "f04-abs-emp", "sourceColumn": "EMPLOYEE_ID", "summarizeBy": "none"},
+          {"name": "DEPARTMENT", "dataType": "string", "lineageTag": "f04-abs-dept", "sourceColumn": "DEPARTMENT", "summarizeBy": "none"},
+          {"name": "HOURS", "dataType": "double", "lineageTag": "f04-abs-hours", "sourceColumn": "HOURS", "summarizeBy": "sum"}
+        ],
+        "lineageTag": "f04-tbl-abs",
+        "measures": [
+          {"name": "Total Absence Hours", "expression": "SUM(ABSENCE_RECORDS[HOURS])", "formatString": "#,0.0", "lineageTag": "f04-m-abshours"},
+          {"name": "Dept Absence Rank", "expression": "RANKX(ALL(ABSENCE_RECORDS[DEPARTMENT]), [Total Absence Hours], , DESC, DENSE)", "formatString": "0", "lineageTag": "f04-m-absrank"},
+          {
+            "name": "Absence Hours Above Dept Avg",
+            "expression": "VAR DeptAvg = AVERAGEX(VALUES(ABSENCE_RECORDS[EMPLOYEE_ID]), CALCULATE(SUM(ABSENCE_RECORDS[HOURS])))\nVAR ThisTotal = SUM(ABSENCE_RECORDS[HOURS])\nRETURN ThisTotal - DeptAvg",
+            "formatString": "#,0.0",
+            "lineageTag": "f04-m-absabove"
+          }
+        ],
+        "partitions": [
+          {"name": "ABSENCE_RECORDS", "mode": "import", "source": {"expression": ["let", "  Source = Snowflake.Databases(\"ymb68310.snowflakecomputing.com\", \"SIGMA_WH\", [Role = null, CreateNavigationProperties = null, ConnectionTimeout = null, CommandTimeout = null, Implementation = \"2.0\"]),", "  #\"Navigation 1\" = Source{[Name = \"CSA\", Kind = \"Database\"]}[Data],", "  #\"Navigation 2\" = #\"Navigation 1\"{[Name = \"TJ\", Kind = \"Schema\"]}[Data],", "  #\"Navigation 3\" = #\"Navigation 2\"{[Name = \"ABSENCE_RECORDS\", Kind = \"Table\"]}[Data]", "in", "  #\"Navigation 3\""], "type": "m"}}
+        ]
+      },
+      {
+        "name": "SAFETY_INCIDENTS",
+        "columns": [
+          {"name": "INCIDENT_ID", "dataType": "string", "lineageTag": "f04-inc-id", "sourceColumn": "INCIDENT_ID", "summarizeBy": "none"},
+          {"name": "EMPLOYEE_ID", "dataType": "string", "lineageTag": "f04-inc-emp", "sourceColumn": "EMPLOYEE_ID", "summarizeBy": "none"},
+          {"name": "DEPARTMENT", "dataType": "string", "lineageTag": "f04-inc-dept", "sourceColumn": "DEPARTMENT", "summarizeBy": "none"},
+          {"name": "SEVERITY", "dataType": "string", "lineageTag": "f04-inc-sev", "sourceColumn": "SEVERITY", "summarizeBy": "none"}
+        ],
+        "lineageTag": "f04-tbl-inc",
+        "measures": [
+          {"name": "Incident Count", "expression": "DISTINCTCOUNT(SAFETY_INCIDENTS[INCIDENT_ID])", "formatString": "0", "lineageTag": "f04-m-inccount"},
+          {"name": "Dept Incident Rank", "expression": "RANKX(ALL(SAFETY_INCIDENTS[DEPARTMENT]), [Incident Count], , DESC, DENSE)", "formatString": "0", "lineageTag": "f04-m-incrank"},
+          {
+            "name": "Severity Weighted Score",
+            "expression": "SUMX(SAFETY_INCIDENTS, SWITCH(SAFETY_INCIDENTS[SEVERITY], \"High\", 3, \"Medium\", 2, \"Low\", 1, 0))",
+            "formatString": "0",
+            "lineageTag": "f04-m-sevscore"
+          }
+        ],
+        "partitions": [
+          {"name": "SAFETY_INCIDENTS", "mode": "import", "source": {"expression": ["let", "  Source = Snowflake.Databases(\"ymb68310.snowflakecomputing.com\", \"SIGMA_WH\", [Role = null, CreateNavigationProperties = null, ConnectionTimeout = null, CommandTimeout = null, Implementation = \"2.0\"]),", "  #\"Navigation 1\" = Source{[Name = \"CSA\", Kind = \"Database\"]}[Data],", "  #\"Navigation 2\" = #\"Navigation 1\"{[Name = \"TJ\", Kind = \"Schema\"]}[Data],", "  #\"Navigation 3\" = #\"Navigation 2\"{[Name = \"SAFETY_INCIDENTS\", Kind = \"Table\"]}[Data]", "in", "  #\"Navigation 3\""], "type": "m"}}
+        ]
+      }
+    ]
+  }
+}
