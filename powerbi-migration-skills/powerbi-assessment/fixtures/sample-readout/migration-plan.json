@@ -1,0 +1,125 @@
+{
+  "reports": [
+    {
+      "reportId": "3cb80b45-a326-42b3-b356-450448f8a8e8",
+      "name": "EMPLOYEE DASHBOARD",
+      "workspace": "My workspace",
+      "dataset_id": null,
+      "model_name": null,
+      "recommended_path": "powerbi-to-sigma",
+      "priority_tier": "migrate-first",
+      "score": 22.5,
+      "views": null,
+      "warehouse_sources": [
+
+      ],
+      "dax_buckets": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      },
+      "blockers": [
+
+      ],
+      "cluster_id": "cluster-01-misc"
+    },
+    {
+      "reportId": "24a32bb9-c448-423e-992f-259c7124a4fd",
+      "name": "Employee Dashboard",
+      "workspace": "Test",
+      "dataset_id": "81705807-3661-4606-8914-0231575e6ccf",
+      "model_name": "Report",
+      "recommended_path": "powerbi-to-sigma",
+      "priority_tier": "moderate",
+      "score": 1.41,
+      "views": null,
+      "warehouse_sources": [
+        "Snowflake:ymb68310.snowflakecomputing.com"
+      ],
+      "dax_buckets": {
+        "a": 33,
+        "b": 0,
+        "c": 0
+      },
+      "blockers": [
+        "5 restructuring/RLS/calc-table feature(s)"
+      ],
+      "cluster_id": "cluster-02-report"
+    },
+    {
+      "reportId": "0bebf272-45db-466e-ae93-522c6c9c9999",
+      "name": "Workforce KitchenSink Report",
+      "workspace": "Test",
+      "dataset_id": "049863fa-5500-4d45-a541-1478799a760c",
+      "model_name": "Workforce KitchenSink (complex DAX test)",
+      "recommended_path": "blocked",
+      "priority_tier": "moderate",
+      "score": 0.5,
+      "views": null,
+      "warehouse_sources": [
+        "Snowflake:ymb68310.snowflakecomputing.com"
+      ],
+      "dax_buckets": {
+        "a": 17,
+        "b": 7,
+        "c": 0
+      },
+      "blockers": [
+        "8 restructuring/RLS/calc-table feature(s)"
+      ]
+    }
+  ],
+  "dm_clusters": [
+    {
+      "id": "cluster-01-misc",
+      "dataset_id": "no-model-3cb80b45-a326-42b3-b356-450448f8a8e8",
+      "model_name": null,
+      "reportIds": [
+        "3cb80b45-a326-42b3-b356-450448f8a8e8"
+      ],
+      "report_names": [
+        "EMPLOYEE DASHBOARD"
+      ],
+      "shared_warehouse_sources": [
+
+      ],
+      "cluster_size": 1
+    },
+    {
+      "id": "cluster-02-report",
+      "dataset_id": "81705807-3661-4606-8914-0231575e6ccf",
+      "model_name": "Report",
+      "reportIds": [
+        "24a32bb9-c448-423e-992f-259c7124a4fd"
+      ],
+      "report_names": [
+        "Employee Dashboard"
+      ],
+      "shared_warehouse_sources": [
+        "Snowflake:ymb68310.snowflakecomputing.com"
+      ],
+      "cluster_size": 1
+    }
+  ],
+  "summary": {
+    "reports_total": 3,
+    "reports_ready": 2,
+    "reports_need_scout": 0,
+    "reports_blocked": 1,
+    "reports_retire": 0,
+    "cluster_count": 2,
+    "usage_available": false,
+    "suggested_batch": [
+      {
+        "reportId": "3cb80b45-a326-42b3-b356-450448f8a8e8",
+        "name": "EMPLOYEE DASHBOARD",
+        "cluster_id": "cluster-01-misc"
+      },
+      {
+        "reportId": "24a32bb9-c448-423e-992f-259c7124a4fd",
+        "name": "Employee Dashboard",
+        "cluster_id": "cluster-02-report"
+      }
+    ]
+  }
+}

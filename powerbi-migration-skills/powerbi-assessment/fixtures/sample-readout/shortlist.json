@@ -1,0 +1,75 @@
+{
+  "usage_available": false,
+  "value_basis": "complexity-only proxy (pages + visuals/4)",
+  "reports": [
+    {
+      "name": "EMPLOYEE DASHBOARD",
+      "id": "3cb80b45-a326-42b3-b356-450448f8a8e8",
+      "workspace": "My workspace",
+      "model_name": null,
+      "views": null,
+      "users": null,
+      "pages": 1,
+      "visuals": 5,
+      "auto": 0,
+      "hint": 0,
+      "manual": 0,
+      "unhandled": 0,
+      "dax_buckets": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      },
+      "value": 22.5,
+      "cost": 0,
+      "score": 22.5,
+      "tag": "migrate-first"
+    },
+    {
+      "name": "Employee Dashboard",
+      "id": "24a32bb9-c448-423e-992f-259c7124a4fd",
+      "workspace": "Test",
+      "model_name": "Report",
+      "views": null,
+      "users": null,
+      "pages": 1,
+      "visuals": 5,
+      "auto": 33,
+      "hint": 0,
+      "manual": 5,
+      "unhandled": 0,
+      "dax_buckets": {
+        "a": 33,
+        "b": 0,
+        "c": 0
+      },
+      "value": 22.5,
+      "cost": 15,
+      "score": 1.41,
+      "tag": "moderate"
+    },
+    {
+      "name": "Workforce KitchenSink Report",
+      "id": "0bebf272-45db-466e-ae93-522c6c9c9999",
+      "workspace": "Test",
+      "model_name": "Workforce KitchenSink (complex DAX test)",
+      "views": null,
+      "users": null,
+      "pages": 1,
+      "visuals": 1,
+      "auto": 17,
+      "hint": 0,
+      "manual": 8,
+      "unhandled": 0,
+      "dax_buckets": {
+        "a": 17,
+        "b": 7,
+        "c": 0
+      },
+      "value": 12.5,
+      "cost": 24,
+      "score": 0.5,
+      "tag": "moderate"
+    }
+  ]
+}

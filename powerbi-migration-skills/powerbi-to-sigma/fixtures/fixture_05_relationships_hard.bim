@@ -1,0 +1,157 @@
+{
+  "compatibilityLevel": 1600,
+  "model": {
+    "annotations": [
+      {"name": "PBI_QueryOrder", "value": "[\"EMPLOYEES\",\"ABSENCE_RECORDS\",\"SAFETY_INCIDENTS\",\"DimDate\",\"DeptSummary\"]"}
+    ],
+    "culture": "en-US",
+    "dataAccessOptions": {"legacyRedirects": true, "returnErrorValuesAsNull": true},
+    "defaultPowerBIDataSourceVersion": "powerBI_V3",
+    "relationships": [
+      {"name": "rel_absence_emp", "fromColumn": "EMPLOYEE_ID", "fromTable": "ABSENCE_RECORDS", "toColumn": "EMPLOYEE_ID", "toTable": "EMPLOYEES"},
+      {"name": "rel_incident_emp", "fromColumn": "EMPLOYEE_ID", "fromTable": "SAFETY_INCIDENTS", "toColumn": "EMPLOYEE_ID", "toTable": "EMPLOYEES"},
+      {"name": "rel_hire_date", "fromColumn": "HIRE_DATE", "fromTable": "EMPLOYEES", "toColumn": "Date", "toTable": "DimDate"},
+      {"name": "rel_term_date", "fromColumn": "TERMINATION_DATE", "fromTable": "EMPLOYEES", "toColumn": "Date", "toTable": "DimDate", "isActive": false},
+      {"name": "rel_mgr_self", "fromColumn": "MANAGER_ID", "fromTable": "EMPLOYEES", "toColumn": "EMPLOYEE_ID", "toTable": "EMPLOYEES", "isActive": false}
+    ],
+    "sourceQueryCulture": "en-US",
+    "tables": [
+      {
+        "name": "EMPLOYEES",
+        "columns": [
+          {"name": "EMPLOYEE_ID", "dataType": "string", "lineageTag": "f05-emp-id", "sourceColumn": "EMPLOYEE_ID", "summarizeBy": "none"},
+          {"name": "FIRST_NAME", "dataType": "string", "lineageTag": "f05-emp-fn", "sourceColumn": "FIRST_NAME", "summarizeBy": "none"},
+          {"name": "LAST_NAME", "dataType": "string", "lineageTag": "f05-emp-ln", "sourceColumn": "LAST_NAME", "summarizeBy": "none"},
+          {"name": "DEPARTMENT", "dataType": "string", "lineageTag": "f05-emp-dept", "sourceColumn": "DEPARTMENT", "summarizeBy": "none"},
+          {"name": "HIRE_DATE", "dataType": "dateTime", "formatString": "Long Date", "lineageTag": "f05-emp-hd", "sourceColumn": "HIRE_DATE", "summarizeBy": "none"},
+          {"name": "TERMINATION_DATE", "dataType": "dateTime", "formatString": "Long Date", "lineageTag": "f05-emp-td", "sourceColumn": "TERMINATION_DATE", "summarizeBy": "none"},
+          {"name": "MANAGER_ID", "dataType": "string", "lineageTag": "f05-emp-mgr", "sourceColumn": "MANAGER_ID", "summarizeBy": "none"},
+          {"name": "ANNUAL_SALARY", "dataType": "double", "lineageTag": "f05-emp-sal", "sourceColumn": "ANNUAL_SALARY", "summarizeBy": "sum"},
+          {"name": "STATUS", "dataType": "string", "lineageTag": "f05-emp-status", "sourceColumn": "STATUS", "summarizeBy": "none"},
+          {
+            "name": "Tenure Days",
+            "type": "calculated",
+            "expression": "DATEDIFF(EMPLOYEES[HIRE_DATE], IF(ISBLANK(EMPLOYEES[TERMINATION_DATE]), TODAY(), EMPLOYEES[TERMINATION_DATE]), DAY)",
+            "dataType": "int64",
+            "lineageTag": "f05-cc-tenure",
+            "summarizeBy": "sum"
+          },
+          {
+            "name": "Manager Name",
+            "type": "calculated",
+            "expression": "LOOKUPVALUE(EMPLOYEES[FIRST_NAME], EMPLOYEES[EMPLOYEE_ID], EMPLOYEES[MANAGER_ID]) & \" \" & LOOKUPVALUE(EMPLOYEES[LAST_NAME], EMPLOYEES[EMPLOYEE_ID], EMPLOYEES[MANAGER_ID])",
+            "dataType": "string",
+            "lineageTag": "f05-cc-mgrname",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Absence Hours On Record",
+            "type": "calculated",
+            "expression": "SUMX(RELATEDTABLE(ABSENCE_RECORDS), ABSENCE_RECORDS[HOURS])",
+            "dataType": "double",
+            "lineageTag": "f05-cc-absrelated",
+            "summarizeBy": "sum"
+          }
+        ],
+        "lineageTag": "f05-tbl-emp",
+        "measures": [
+          {"name": "Headcount", "expression": "COUNTROWS(EMPLOYEES)", "formatString": "0", "lineageTag": "f05-m-hc"},
+          {"name": "Hires In Period", "expression": "CALCULATE(COUNTROWS(EMPLOYEES), USERELATIONSHIP(EMPLOYEES[HIRE_DATE], DimDate[Date]))", "formatString": "0", "lineageTag": "f05-m-hires"},
+          {"name": "Terminations In Period", "expression": "CALCULATE(COUNTROWS(EMPLOYEES), USERELATIONSHIP(EMPLOYEES[TERMINATION_DATE], DimDate[Date]))", "formatString": "0", "lineageTag": "f05-m-terms"},
+          {"name": "Net Headcount Change", "expression": "[Hires In Period] - [Terminations In Period]", "formatString": "0", "lineageTag": "f05-m-netchange"},
+          {"name": "Avg Tenure Days", "expression": "AVERAGE(EMPLOYEES[Tenure Days])", "formatString": "#,0", "lineageTag": "f05-m-avgtenure"}
+        ],
+        "partitions": [
+          {"name": "EMPLOYEES", "mode": "import", "source": {"expression": ["let", "  Source = Snowflake.Databases(\"ymb68310.snowflakecomputing.com\", \"SIGMA_WH\", [Role = null, CreateNavigationProperties = null, ConnectionTimeout = null, CommandTimeout = null, Implementation = \"2.0\"]),", "  #\"Navigation 1\" = Source{[Name = \"CSA\", Kind = \"Database\"]}[Data],", "  #\"Navigation 2\" = #\"Navigation 1\"{[Name = \"TJ\", Kind = \"Schema\"]}[Data],", "  #\"Navigation 3\" = #\"Navigation 2\"{[Name = \"EMPLOYEES\", Kind = \"Table\"]}[Data]", "in", "  #\"Navigation 3\""], "type": "m"}}
+        ]
+      },
+      {
+        "name": "ABSENCE_RECORDS",
+        "columns": [
+          {"name": "ABSENCE_ID", "dataType": "string", "lineageTag": "f05-abs-id", "sourceColumn": "ABSENCE_ID", "summarizeBy": "none"},
+          {"name": "EMPLOYEE_ID", "dataType": "string", "lineageTag": "f05-abs-emp", "sourceColumn": "EMPLOYEE_ID", "summarizeBy": "none"},
+          {"name": "DATE", "dataType": "dateTime", "formatString": "Long Date", "lineageTag": "f05-abs-date", "sourceColumn": "DATE", "summarizeBy": "none"},
+          {"name": "HOURS", "dataType": "double", "lineageTag": "f05-abs-hours", "sourceColumn": "HOURS", "summarizeBy": "sum"},
+          {
+            "name": "Employee Tenure At Absence",
+            "type": "calculated",
+            "expression": "DATEDIFF(RELATED(EMPLOYEES[HIRE_DATE]), ABSENCE_RECORDS[DATE], DAY)",
+            "dataType": "int64",
+            "lineageTag": "f05-cc-tenureatabs",
+            "summarizeBy": "none"
+          }
+        ],
+        "lineageTag": "f05-tbl-abs",
+        "measures": [
+          {"name": "Total Absence Hours", "expression": "SUM(ABSENCE_RECORDS[HOURS])", "formatString": "#,0.0", "lineageTag": "f05-m-abshours"}
+        ],
+        "partitions": [
+          {"name": "ABSENCE_RECORDS", "mode": "import", "source": {"expression": ["let", "  Source = Snowflake.Databases(\"ymb68310.snowflakecomputing.com\", \"SIGMA_WH\", [Role = null, CreateNavigationProperties = null, ConnectionTimeout = null, CommandTimeout = null, Implementation = \"2.0\"]),", "  #\"Navigation 1\" = Source{[Name = \"CSA\", Kind = \"Database\"]}[Data],", "  #\"Navigation 2\" = #\"Navigation 1\"{[Name = \"TJ\", Kind = \"Schema\"]}[Data],", "  #\"Navigation 3\" = #\"Navigation 2\"{[Name = \"ABSENCE_RECORDS\", Kind = \"Table\"]}[Data]", "in", "  #\"Navigation 3\""], "type": "m"}}
+        ]
+      },
+      {
+        "name": "SAFETY_INCIDENTS",
+        "columns": [
+          {"name": "INCIDENT_ID", "dataType": "string", "lineageTag": "f05-inc-id", "sourceColumn": "INCIDENT_ID", "summarizeBy": "none"},
+          {"name": "EMPLOYEE_ID", "dataType": "string", "lineageTag": "f05-inc-emp", "sourceColumn": "EMPLOYEE_ID", "summarizeBy": "none"},
+          {"name": "DATE", "dataType": "dateTime", "formatString": "Long Date", "lineageTag": "f05-inc-date", "sourceColumn": "DATE", "summarizeBy": "none"},
+          {"name": "OVERTIME_ON_DAY", "dataType": "boolean", "formatString": "\"TRUE\";\"TRUE\";\"FALSE\"", "lineageTag": "f05-inc-ot", "sourceColumn": "OVERTIME_ON_DAY", "summarizeBy": "none"},
+          {
+            "name": "Incident Department",
+            "type": "calculated",
+            "expression": "RELATED(EMPLOYEES[DEPARTMENT])",
+            "dataType": "string",
+            "lineageTag": "f05-cc-incdept",
+            "summarizeBy": "none"
+          }
+        ],
+        "lineageTag": "f05-tbl-inc",
+        "measures": [
+          {"name": "Incident Count", "expression": "DISTINCTCOUNT(SAFETY_INCIDENTS[INCIDENT_ID])", "formatString": "0", "lineageTag": "f05-m-inccount"},
+          {"name": "Overtime-Related Incidents", "expression": "CALCULATE(DISTINCTCOUNT(SAFETY_INCIDENTS[INCIDENT_ID]), SAFETY_INCIDENTS[OVERTIME_ON_DAY] = TRUE())", "formatString": "0", "lineageTag": "f05-m-otinc"}
+        ],
+        "partitions": [
+          {"name": "SAFETY_INCIDENTS", "mode": "import", "source": {"expression": ["let", "  Source = Snowflake.Databases(\"ymb68310.snowflakecomputing.com\", \"SIGMA_WH\", [Role = null, CreateNavigationProperties = null, ConnectionTimeout = null, CommandTimeout = null, Implementation = \"2.0\"]),", "  #\"Navigation 1\" = Source{[Name = \"CSA\", Kind = \"Database\"]}[Data],", "  #\"Navigation 2\" = #\"Navigation 1\"{[Name = \"TJ\", Kind = \"Schema\"]}[Data],", "  #\"Navigation 3\" = #\"Navigation 2\"{[Name = \"SAFETY_INCIDENTS\", Kind = \"Table\"]}[Data]", "in", "  #\"Navigation 3\""], "type": "m"}}
+        ]
+      },
+      {
+        "name": "DimDate",
+        "columns": [
+          {"name": "Date", "dataType": "dateTime", "isKey": true, "formatString": "Long Date", "lineageTag": "f05-dd-date", "sourceColumn": "[Date]", "summarizeBy": "none"},
+          {"name": "Year", "dataType": "int64", "isDataTypeInferred": true, "lineageTag": "f05-dd-year", "sourceColumn": "[Year]", "summarizeBy": "none"},
+          {"name": "Month", "dataType": "string", "isDataTypeInferred": true, "lineageTag": "f05-dd-month", "sourceColumn": "[Month]", "summarizeBy": "none"}
+        ],
+        "lineageTag": "f05-tbl-dimdate",
+        "partitions": [
+          {
+            "name": "DimDate",
+            "mode": "import",
+            "source": {
+              "expression": "ADDCOLUMNS(CALENDAR(DATE(2018,1,1), DATE(2026,12,31)), \"Year\", YEAR([Date]), \"Month\", FORMAT([Date], \"MMM\"))",
+              "type": "calculated"
+            }
+          }
+        ]
+      },
+      {
+        "name": "DeptSummary",
+        "columns": [
+          {"name": "DEPARTMENT", "dataType": "string", "isDataTypeInferred": true, "lineageTag": "f05-ds-dept", "sourceColumn": "[DEPARTMENT]", "summarizeBy": "none"},
+          {"name": "Dept Headcount", "dataType": "int64", "isDataTypeInferred": true, "lineageTag": "f05-ds-hc", "sourceColumn": "[Dept Headcount]", "summarizeBy": "sum"},
+          {"name": "Dept Avg Salary", "dataType": "double", "isDataTypeInferred": true, "lineageTag": "f05-ds-avgsal", "sourceColumn": "[Dept Avg Salary]", "summarizeBy": "sum"}
+        ],
+        "lineageTag": "f05-tbl-deptsummary",
+        "partitions": [
+          {
+            "name": "DeptSummary",
+            "mode": "import",
+            "source": {
+              "expression": "SUMMARIZE(EMPLOYEES, EMPLOYEES[DEPARTMENT], \"Dept Headcount\", COUNTROWS(EMPLOYEES), \"Dept Avg Salary\", AVERAGE(EMPLOYEES[ANNUAL_SALARY]))",
+              "type": "calculated"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
