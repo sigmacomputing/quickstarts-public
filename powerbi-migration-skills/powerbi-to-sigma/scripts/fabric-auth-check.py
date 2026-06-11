@@ -2,6 +2,7 @@ import truststore; truststore.inject_into_ssl()
 import sys, json, base64, os, atexit, requests, msal
 
 CACHE = "/tmp/pbiauth/cache.bin"
+os.makedirs(os.path.dirname(CACHE), exist_ok=True)
 cache = msal.SerializableTokenCache()
 if os.path.exists(CACHE): cache.deserialize(open(CACHE).read())
 atexit.register(lambda: open(CACHE, "w").write(cache.serialize()) if cache.has_state_changed else None)
