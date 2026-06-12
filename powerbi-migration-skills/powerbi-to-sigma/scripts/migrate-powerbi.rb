@@ -557,17 +557,38 @@ inner_path = lambda do |formula|
 end
 
 # Build one master per converter element. master id is "master-<elementId-tail>".
+# The POSTED dm-spec is the column display-name AUTHORITY: convert-model.rb's
+# pre-fixup names bare columns from their formula (e.g. [Custom SQL/ANNUAL_SALARY]
+# -> "Annual Salary"), and workbook refs resolve by that DISPLAY name. Deriving
+# the name from the converter formula leaf alone left raw ALIASES on SQL-element
+# masters ([Dense Rank DEPARTMENT/ANNUAL_SALARY] -> "Dependency not found").
+spec_elements = begin
+  (JSON.parse(File.read(dm_spec))['pages'] || []).flat_map { |p| p['elements'] || [] }
+rescue StandardError
+  []
+end
 masters = {}
 field_map = {}
-conv_elements.each do |cel|
+conv_elements.each_with_index do |cel, cel_idx|
   cname = cel['name']
   # match the posted DM element: by NAME first (PUT keeps names; ids may change),
-  # then by ID. A Custom SQL element is NAMELESS in the spec (rule 3) and Sigma
-  # auto-names it "Custom SQL" on readback — recover that name by id-match so the
-  # master keys + column prefixes resolve (Bug E: nameless SQL element).
+  # then by ID, then POSITIONALLY (POST /spec preserves element order). A Custom
+  # SQL element is NAMELESS in the spec (rule 3) and the readback can ALSO carry
+  # name:null — the old `|| dm_elements.first` fallback then bound it to the
+  # FIRST element (usually the fact table), OVERWRITING that master with the SQL
+  # element's columns (live failure: EMPLOYEES master got SalaryBands' "Band
+  # Floor" -> "Dependency not found: 'employees/band floor'"). Positional match
+  # keeps the nameless element its OWN master (Bug E: nameless SQL element).
   dmel = (cname && dm_elements.find { |e| e['name'] == cname }) ||
-         dm_elements.find { |e| e['id'] == cel['id'] } || dm_elements.first
+         dm_elements.find { |e| e['id'] == cel['id'] } ||
+         dm_elements[cel_idx] || dm_elements.first
   cname ||= (dmel && dmel['name']) || 'Custom SQL'
+  # POSTED-spec column display names for this element (matched the same way the
+  # dm element was), keyed by formula — overrides the formula-leaf derivation.
+  spec_el = (cel['name'] && spec_elements.find { |e| e['name'] == cel['name'] }) ||
+            spec_elements[cel_idx]
+  spec_name_for = (spec_el && spec_el['columns'] || [])
+                  .each_with_object({}) { |c, h| h[c['formula'].to_s] = c['name'] if c['name'] }
   mkey = cname
   mid  = "master-#{Digest::SHA1.hexdigest(cname)[0, 8]}"
   # Bug A: key the master-column id on the FULL cross-element path (not the leaf)
@@ -596,7 +617,10 @@ conv_elements.each do |cel|
     full = c['formula'].to_s.gsub(/^\[|\]$/, '')         # e.g. ORDER_FACT/CUSTOMER_DIM/Customer Key
     next nil if full.empty? || seen_paths[full]
     seen_paths[full] = true
-    dn   = sigma_view_disp.call(c['formula'])            # "Customer Key (CUSTOMER_DIM)"
+    # the POSTED spec's display name wins (it's what workbook refs resolve by);
+    # fall back to Sigma's own derivation from the formula path.
+    dn   = spec_name_for[c['formula'].to_s] ||
+           sigma_view_disp.call(c['formula'])            # "Customer Key (CUSTOMER_DIM)"
     { 'id' => "mc-#{Digest::SHA1.hexdigest("#{cname}/#{full}")[0, 10]}", 'name' => dn,
       'formula' => "[#{cname}/#{dn}]", '_leaf' => disp.call(c['formula']) }
   end.compact
@@ -640,6 +664,11 @@ conv_elements.each do |cel|
   end
   (cel['metrics'] || []).each do |m|
     rewritten = resolve_metric.call(m['formula'].to_s, 0)
+    # Converter gap (live 2026-06-12): DAX SEARCH/FIND translate with their
+    # start argument, but Sigma's Find() takes only (text, search) — a third
+    # arg compiles the column to type "error" (verified: dropping it fixes).
+    # Strip a trailing integer start arg until the converter is fixed.
+    rewritten = rewritten.gsub(/\bFind\((\[[^\]]+\]|"[^"]*")\s*,\s*(\[[^\]]+\]|"[^"]*")\s*,\s*\d+\s*\)/, 'Find(\1, \2)')
     field_map["#{cname}.#{m['name']}"] = { 'master' => mkey, 'ref' => rewritten, 'agg' => nil,
                                            'format' => (m.dig('format', 'formatString')) }
   end
@@ -704,17 +733,32 @@ conv_elements.each do |vcel|
   # masters whose columns the View subsumes: the fact + every dim reachable via
   # a "(DIM)" suffix in the View's columns.
   subsumed = [fact] + vcols.map { |c| c['name'][/\(([^)]*)\)\s*$/, 1] }.compact.uniq
+  # Register the View resolution as an ALT, not the primary (grain fix, found
+  # live during the control-targeting wave): making the View the PRIMARY routed
+  # EVERY field of the subsumed tables onto the join element, so a SINGLE-table
+  # visual (e.g. Median Salary over EMPLOYEES) silently evaluated at the JOIN
+  # grain — one row per fact/absence record, not per employee — and diverged
+  # (live: Sigma median 73,500 vs PBI 73,000). As an alt, visual_master still
+  # majority-picks the View for CROSS-table visuals (the View is the only
+  # master covering all their fields) while same-table visuals tie-break to the
+  # field's own master and keep their source grain.
   field_map.each do |qr, fs|
     next unless subsumed.include?(fs['master'])
+    next if fs['master'] == vname
     old_mid = masters[fs['master']] ? masters[fs['master']]['id'] : nil
     ref_str = fs['ref'].to_s
     is_plain_col = ref_str =~ /\A\[[^\]]+\]\z/ # exactly one bracketed ref, no agg
+    add_alt = lambda do |ref|
+      alts = (fs['alts'] ||= [])
+      alts << { 'master' => vname, 'ref' => ref, 'agg' => fs['agg'] } unless
+        alts.any? { |a| a['master'] == vname }
+    end
     if is_plain_col
       # plain dimension/column ref: match its leaf to a View column.
       leaf = qr.split('.', 2).last.to_s.sub(/\s+\([^)]*\)\s*$/, '')
       vcol = leaf_to_view[leaf] || leaf_to_view[qr.split('.', 2).last.to_s]
       next unless vcol
-      field_map[qr] = fs.merge('master' => vname, 'ref' => "[#{vmid}/#{vcol}]")
+      add_alt.call("[#{vmid}/#{vcol}]")
     elsif old_mid
       # measure/aggregation formula: every referenced fact column must exist on the
       # View (it does — the View carries all fact columns). Swap the old master id
@@ -724,8 +768,8 @@ conv_elements.each do |vcel|
         mapped = leaf_to_view[inner] || leaf_to_view[inner.sub(/\s+\([^)]*\)\s*$/, '')] || inner
         "[#{vmid}/#{mapped}]"
       end
-      # only re-route if we actually rewrote a ref onto the View master.
-      field_map[qr] = fs.merge('master' => vname, 'ref' => remapped) if remapped.include?(vmid)
+      # only register if we actually rewrote a ref onto the View master.
+      add_alt.call(remapped) if remapped.include?(vmid)
     end
   end
 end
@@ -909,6 +953,11 @@ build = ['ruby', File.join(HERE, 'build-workbook-from-pbir.rb'),
          '--signals', signals_path, '--master-map', mmap_path,
          '--data-model', dm_id, '--name', WB_NAME,
          '--source-title', (opts[:source_title] || name_slug.gsub(/[-_]+/, ' ').strip),
+         # control-targeting wave (workstream B): the TMSL relationships drive
+         # slicer-control target scope; control-scope.json (intended-scope
+         # contract for the control lint) lands in WORK.
+         '--model', opts[:tmsl],
+         '--control-scope-out', File.join(WORK, 'control-scope.json'),
          '--out', wb_spec, '--layout-out', layout]
 # The workbook POST requires a folderId. Use --folder if given, else inherit the
 # DM's folderId (harvested from the ref-dm at Phase 3) so both land together.

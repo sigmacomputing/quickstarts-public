@@ -38,7 +38,7 @@
 # Exit codes: 0 = done (clone created; accepted items applied or cleanly
 # reverted; parity-unchanged gate green; layout lint clean); 2 = nothing
 # accepted; 3 = the parity-unchanged gate could not be restored (clone left
-# for inspection, report says so); 4 = layout lint violations on the clone
+# for inspection, report says so); 4 = layout or control lint violations on the clone
 # (fix + re-PUT, then re-lint); other = error.
 
 require 'json'
@@ -390,6 +390,208 @@ def find_element(spec, element_id)
   nil
 end
 
+# ---------------------------------------------------------------------------
+# Control-coverage extension (control-targeting fix, workstream C).
+#
+# add_elements can introduce charts/KPIs whose source chain NEVER reaches the
+# elements the workbook's controls filter — audit-proven: enhancement KPIs
+# added with a DM-direct source were dead to the dashboard's Region/State
+# controls. After adding a viz element, every existing filtering control is
+# EXTENDED to cover it:
+#   - if the element's source chain already reaches one of the control's
+#     targets, Sigma's downstream propagation covers it — nothing to do;
+#   - else target the element's sourcing ROOT (the element itself when it is
+#     its own root, e.g. DM-direct) on the column matching the control's
+#     filter column by name — adding a hidden passthrough column when the
+#     root sources the SAME data-model element as a targeted element (its
+#     column formula is valid verbatim there);
+#   - grain/drill switchers (add_control_and_rewire) are value providers wired
+#     through formulas, not filter targets — deliberately EXEMPT.
+# Every extension/exemption is merged into <workdir>/control-scope.enhanced.json
+# (contract shape — see merged_control_scope!) and linted on the clone.
+# ---------------------------------------------------------------------------
+VIZ_EXTENDABLE = %w[bar-chart line-chart area-chart pie-chart donut-chart combo-chart
+                    scatter-chart kpi-chart table pivot-table box-chart funnel-chart
+                    waterfall-chart region-map point-map].freeze
+$control_scope_notes = []
+
+def spec_elements_by_id(spec)
+  (spec['pages'] || []).flat_map { |p| p['elements'] || [] }.to_h { |e| [e['id'], e] }
+end
+
+# Element ids on `el`'s source chain (excluding el itself); stops at a
+# data-model source or an id not present in the spec.
+def source_chain_ids(spec, el)
+  by_id = spec_elements_by_id(spec)
+  ids = []
+  cur = el
+  loop do
+    src = cur['source'] || {}
+    break if src['kind'] == 'data-model' || src['elementId'].nil?
+    nid = src['elementId']
+    break if ids.include?(nid)
+    ids << nid
+    cur = by_id[nid] or break
+  end
+  ids
+end
+
+def norm_colname(s)
+  s.to_s.strip.downcase.gsub(/[^a-z0-9]+/, '')
+end
+
+# Control filter targets may only point at TABLE elements — a chart/KPI
+# target 400s at PUT with "Dependency not found" (live-verified here AND in
+# the looker builder, which re-sources tiles through hidden scope tables for
+# the same reason). So a DM-direct added viz is covered via the estate
+# repair's hidden SHARED-BASE-TABLE pattern: a hidden table on the Data page
+# sourcing the same DM element, the added viz re-sourced through it (formula
+# prefixes rewritten), and the control targeting the table.
+def ensure_base_table!(spec, el, dm_src, cand_id)
+  base_name = "#{el['name'] || el['id']} Base (#{cand_id})"
+  base = { 'id' => "phasee-base-#{el['id']}".gsub(/[^A-Za-z0-9_-]+/, '-')[0, 60],
+           'kind' => 'table', 'name' => base_name,
+           'source' => JSON.parse(JSON.generate(dm_src)), 'columns' => [] }
+  # Pass through every DM column the viz references, then rewrite the viz's
+  # refs ([<DM element name>/<col>] -> [<base name>/<col>]) and re-source it.
+  refs = (el['columns'] || []).flat_map { |c| c['formula'].to_s.scan(%r{\[([^\]\[/]+)/([^\]]+)\]}) }.uniq
+  seen = {}
+  refs.each do |prefix, colname|
+    next if seen[colname]
+    seen[colname] = true
+    base['columns'] << { 'id' => "#{base['id']}-c#{base['columns'].size}",
+                         'name' => colname, 'formula' => "[#{prefix}/#{colname}]" }
+  end
+  (el['columns'] || []).each do |c|
+    next unless c['formula'].is_a?(String)
+    c['formula'] = c['formula'].gsub(%r{\[[^\]\[/]+/([^\]]+)\]}) { "[#{base_name}/#{Regexp.last_match(1)}]" }
+  end
+  el['source'] = { 'kind' => 'table', 'elementId' => base['id'] }
+  # The base lives on the Data page (same convention as the master and the
+  # looker scope tables); page order puts it before every dashboard page, so
+  # control filter targets resolve in Sigma's array-order dependency walk.
+  data_page = (spec['pages'] || []).find { |p| (p['elements'] || []).any? { |e| e['id'] == 'master' } } ||
+              (spec['pages'] || []).first
+  (data_page['elements'] ||= []) << base
+  base
+end
+
+def extend_controls_for_added!(spec, added_els, cand_id)
+  by_id = spec_elements_by_id(spec)
+  ctrls = by_id.values.select { |e| e['kind'] == 'control' && Array(e['filters']).any? }
+  notes = []
+  added_els.each do |el|
+    next unless VIZ_EXTENDABLE.include?(el['kind'])
+    chain = source_chain_ids(spec, el)
+    root = chain.empty? ? el : (by_id[chain.last] || el)
+    root_src = root['source'] || {}
+    base = nil # lazily-built hidden shared base table (one per added viz)
+    ctrls.each do |ctl|
+      next if Array(ctl['filters']).any? do |f|
+        tid = f.dig('source', 'elementId')
+        tid == el['id'] || chain.include?(tid) # propagation already covers it
+      end
+      # Resolve the control's filter column (name + formula) from its first target.
+      tgt = ctl['filters'].first
+      tgt_el = by_id[tgt.dig('source', 'elementId')]
+      tgt_col = tgt_el && (tgt_el['columns'] || []).find { |c| c['id'] == tgt['columnId'] }
+      unless tgt_col
+        notes << { 'controlId' => ctl['controlId'], 'candidate' => cand_id,
+                   'element' => el['id'], 'status' => 'not-extended',
+                   'reason' => 'control target column not resolvable from the spec' }
+        next
+      end
+      same_dm = root_src['kind'] == 'data-model' &&
+                (tgt_el['source'] || {})['kind'] == 'data-model' &&
+                (tgt_el['source'] || {})['elementId'] == root_src['elementId']
+      col = nil
+      target_id = nil
+      if root['kind'] == 'table' && root['id'] != el['id']
+        # Root is already a table (hidden helper) — target it directly, adding
+        # a passthrough filter column when it shares the control's DM element.
+        col = (root['columns'] || []).find { |c| norm_colname(c['name']) == norm_colname(tgt_col['name']) }
+        if col.nil? && same_dm
+          col = { 'id' => "phasee-ctlext-#{ctl['controlId']}-#{root['id']}".gsub(/[^A-Za-z0-9_-]+/, '-')[0, 60],
+                  'name' => tgt_col['name'], 'formula' => tgt_col['formula'], 'hidden' => true }
+          (root['columns'] ||= []) << col
+        end
+        target_id = root['id']
+      elsif same_dm
+        # DM-direct viz: re-root it through the hidden shared base table and
+        # target that (chart/KPI elements cannot be filter targets).
+        base ||= ensure_base_table!(spec, el, root_src, cand_id)
+        col = base['columns'].find { |c| norm_colname(c['name']) == norm_colname(tgt_col['name']) }
+        unless col
+          col = { 'id' => "#{base['id']}-f#{base['columns'].size}",
+                  'name' => tgt_col['name'], 'formula' => tgt_col['formula'], 'hidden' => true }
+          base['columns'] << col
+        end
+        target_id = base['id']
+      end
+      if col
+        ctl['filters'] << { 'source' => { 'kind' => 'table', 'elementId' => target_id },
+                            'columnId' => col['id'] }
+        notes << { 'controlId' => ctl['controlId'], 'candidate' => cand_id,
+                   'element' => el['id'], 'element_name' => el['name'],
+                   'status' => 'extended', 'target_root' => target_id,
+                   'via_column' => tgt_col['name'] }
+      else
+        notes << { 'controlId' => ctl['controlId'], 'candidate' => cand_id,
+                   'element' => el['id'], 'element_name' => el['name'],
+                   'status' => 'not-extended',
+                   'reason' => "sourcing root '#{root['id']}' has no '#{tgt_col['name']}' column " \
+                               'and is not the same data-model element as the control target — wire manually' }
+      end
+    end
+  end
+  notes
+end
+
+# Merge the enhancement's control-scope notes into the builder's sidecar
+# contract (lib/control_lint.rb CONTRACT shape) and write the result as
+# control-scope.enhanced.json — a SEPARATE file because the workdir's
+# control-scope.json must keep describing the ORIGINAL workbook (its gate-7
+# re-runs would otherwise trip over mustReach entries naming elements that
+# only exist on the clone). Returns the merged contract Hash so the finalize
+# can run the control lint on the live clone spec against it.
+#   extended -> the covering control gains a mustReach hard assertion (and an
+#               allowlist slot when its scope is a narrow array)
+#   exempt   -> grain/drill switchers added by add_control_and_rewire get a
+#               scope:[rewired element] allowlist entry (formula-wired value
+#               providers — deliberately NOT filter-extended)
+#   not-extended -> recorded under enhancement_notes only; a page-scoped
+#               control stays honestly PARTIAL in the lint
+def merged_control_scope!(notes)
+  base = File.join(File.dirname(OUT), 'control-scope.json')
+  scope = File.exist?(base) ? (JSON.parse(File.read(base)) rescue nil) : nil
+  scope = { 'version' => 1, 'source' => 'enhance-apply', 'sourceFilterSignals' => 0 } unless scope.is_a?(Hash)
+  scope['controls'] ||= []
+  notes.each do |n|
+    case n['status']
+    when 'extended'
+      entry = scope['controls'].find { |c| c['controlId'] == n['controlId'] }
+      unless entry
+        entry = { 'controlId' => n['controlId'], 'scope' => 'page',
+                  'sourceName' => 'existing workbook control (extended by phase-e add_elements)' }
+        scope['controls'] << entry
+      end
+      (entry['mustReach'] ||= []) << n['element'] unless Array(entry['mustReach']).include?(n['element'])
+      entry['scope'] << n['element'] if entry['scope'].is_a?(Array) && !entry['scope'].include?(n['element'])
+    when 'exempt'
+      next if scope['controls'].any? { |c| c['controlId'] == n['controlId'] }
+      scope['controls'] << {
+        'controlId' => n['controlId'], 'mechanism' => 'formula',
+        'sourceName' => "phase-e #{n['candidate']} grain/drill switcher (formula-wired value provider)",
+        'scope' => [n['element']].compact
+      }
+    end
+    (scope['enhancement_notes'] ||= []) << n
+  end
+  File.write(File.join(File.dirname(OUT), 'control-scope.enhanced.json'),
+             JSON.pretty_generate(scope))
+  scope
+end
+
 # Apply one candidate's patch to a working spec (in place). Returns a
 # human-readable description, or raises with the reason it cannot apply.
 def apply_patch!(spec, cand)
@@ -409,7 +611,27 @@ def apply_patch!(spec, cand)
       (page['elements'] ||= []) << el
       place_added_element!(spec, page, el, hints[el['id']])
     end
-    "added #{Array(patch['elements']).size} element(s) into page #{page['id']}'s bands"
+    # Extend existing controls to cover the added charts/KPIs (or their
+    # sourcing root) — an enhancement must never ship outside the dashboard's
+    # filter closure (see extend_controls_for_added!).
+    ext_notes = extend_controls_for_added!(spec, Array(patch['elements']), cand['id'])
+    $control_scope_notes.concat(ext_notes)
+    ext = ext_notes.count { |n| n['status'] == 'extended' }
+    missed = ext_notes.count { |n| n['status'] == 'not-extended' }
+    warn "   [#{cand['id']}] control extension: #{missed} added element/control pair(s) NOT coverable — see control-scope.json" if missed.positive?
+    if ext.positive?
+      # Sigma resolves spec dependencies in ARRAY ORDER: a control whose
+      # `filters` target an element appended LATER in the page 400s at PUT with
+      # "Dependency not found" (live-verified; same rule the looker builder
+      # honors by emitting tiles before controls). Stable-move controls to the
+      # end of the page so every extended target precedes its control. Formula
+      # references ([controlId] in a chart calc) do NOT need array order —
+      # the grain-switcher control already PUTs fine after its chart.
+      page['elements'] = page['elements'].reject { |e| e['kind'] == 'control' } +
+                         page['elements'].select { |e| e['kind'] == 'control' }
+    end
+    "added #{Array(patch['elements']).size} element(s) into page #{page['id']}'s bands" \
+      "#{ext.positive? ? " + extended #{ext} control target(s)" : ''}"
   when 'set_column_formula'
     _pg, el = find_element(spec, patch['element_id'])
     raise "element #{patch['element_id']} not found" unless el
@@ -439,6 +661,16 @@ def apply_patch!(spec, cand)
       band = ensure_band!(spec, pg, CTRL_BAND_PREFIX)
       band_add!(spec, pg['id'], band, ctrl['id'], hint['grid_column'] || '17 / 25', hint['height'] || 3)
     end
+    # Grain/drill switchers are value providers wired through the chart's
+    # FORMULA, not filter targets — deliberately exempt from control-coverage
+    # extension; record the exemption so the lint allowlists it.
+    $control_scope_notes << {
+      'controlId' => ctrl['controlId'], 'candidate' => cand['id'],
+      'status' => 'exempt', 'mechanism' => 'formula',
+      'element' => el['id'], 'element_name' => el['name'],
+      'reason' => 'grain/drill switcher — value provider wired through the chart formula, ' \
+                  'not a filter target (deliberately exempt from control extension)'
+    }
     "added control #{ctrl['controlId']} #{placed ? "inside #{el['id']}'s container" : 'to the control band'} + rewired #{el['id']}"
   when 'set_element_prop'
     _pg, el = find_element(spec, patch['element_id'])
@@ -565,11 +797,13 @@ gate_green = true
 accepted.each do |cand|
   print "   [#{cand['id']}] "
   prev = JSON.parse(JSON.generate(current))
+  notes_mark = $control_scope_notes.length # discard this item's scope notes on skip/revert
   begin
     desc = apply_patch!(current, cand)
   rescue StandardError => e
     skipped << { 'id' => cand['id'], 'risk' => cand['risk'], 'reason' => "not applied: #{e.message}" }
     current = prev
+    $control_scope_notes.slice!(notes_mark..)
     puts "SKIP (#{e.message})"
     next
   end
@@ -578,6 +812,7 @@ accepted.each do |cand|
   rescue StandardError => e
     current = prev
     (put_spec(clone_id, current) rescue nil) # restore server state if the PUT half-landed
+    $control_scope_notes.slice!(notes_mark..)
     reverted << { 'id' => cand['id'], 'reason' => "PUT rejected: #{e.message.to_s.gsub(/\s+/, ' ')[0, 200]}" }
     puts 'REVERTED (PUT rejected)'
     next
@@ -587,6 +822,7 @@ accepted.each do |cand|
   diffs = probe_diffs(pair)
   if diffs.any?
     current = prev
+    $control_scope_notes.slice!(notes_mark..)
     begin
       put_spec(clone_id, current)
       recheck = probe_diffs(probe_pair(clone_id, ORIG_WB, probes))
@@ -619,6 +855,18 @@ if lint_violations.any?
   lint_violations.each { |v| warn "  - #{v}" }
 end
 
+# Control-wiring lint on the CLONE (gate-7 grade — the pipeline's gate 7 ran
+# on the ORIGINAL before Phase E; the clone now carries extended/added
+# controls and added elements, so it gets its own lint against the merged
+# contract). Applied items only — reverts were truncated from the notes.
+merged_scope = merged_control_scope!($control_scope_notes)
+require 'control_lint'
+control_violations = ControlLint.lint(live_spec, scope: merged_scope)
+if control_violations.any?
+  warn "enhance-apply FINALIZE FAIL — control lint: #{control_violations.size} violation(s) on the clone:"
+  control_violations.each { |v| warn "  - #{v}" }
+end
+
 final_pair = probe_pair(clone_id, ORIG_WB, probes)
 final_ok = probe_diffs(final_pair).empty?
 gate_green &&= final_ok
@@ -635,6 +883,7 @@ report = {
   'applied' => applied,
   'skipped' => skipped,
   'reverted' => reverted,
+  'control_scope_notes' => $control_scope_notes,
   'descoped_notes' => enh['descoped_notes'] || [],
   'parity_unchanged_gate' => {
     'probe_elements' => probes,
@@ -644,6 +893,11 @@ report = {
   'layout_lint' => {
     'violations' => lint_violations,
     'green' => lint_violations.empty?
+  },
+  'control_lint' => {
+    'violations' => control_violations,
+    'scope_sidecar' => File.join(File.dirname(OUT), 'control-scope.enhanced.json'),
+    'green' => control_violations.empty?
   },
   'original_untouched' => {
     'updatedAt_before' => orig_meta_before['updatedAt'],
@@ -659,6 +913,7 @@ puts "enhance-apply: #{applied.size} applied, #{skipped.size} skipped, #{reverte
 puts "   clone: '#{clone_name}' (#{clone_id})"
 puts "   parity-unchanged gate: #{gate_green ? 'GREEN' : 'NOT GREEN (see report)'}; original untouched: #{orig_untouched}"
 puts "   layout lint: #{lint_violations.empty? ? 'CLEAN' : "#{lint_violations.size} violation(s) — FIX BEFORE DECLARING DONE"}"
+puts "   control lint: #{control_violations.empty? ? 'CLEAN' : "#{control_violations.size} violation(s) — FIX BEFORE DECLARING DONE"}"
 puts "   report -> #{OUT}"
 puts
 puts '──────────────── HARD SCREENSHOT CHECKLIST (Phase E finalize) ────────────────'
@@ -673,4 +928,4 @@ puts '      (grain/drill switchers INSIDE their chart\'s container)'
 puts '  [ ] no orphan elements below the fold (nothing dumped at the page foot)'
 puts '  [ ] no dead zones; row heights look even across each band'
 puts '──────────────────────────────────────────────────────────────────────────────'
-exit(lint_violations.any? ? 4 : (gate_green ? 0 : 3))
+exit((lint_violations.any? || control_violations.any?) ? 4 : (gate_green ? 0 : 3))

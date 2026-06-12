@@ -97,7 +97,7 @@ def main():
               "columns":[{"id":f"mc{i}","name":c,"formula":f"[{elem_name}/{c}]"} for i,c in enumerate(cols)]}
     if a.kind == "kpi-chart":
         test = {"id":"scout","kind":"kpi-chart","name":"scout","source":{"elementId":"m","kind":"table"},
-                "columns":[{"id":"sc","formula":a.formula,"name":"scout_test"}],"value":{"id":"sc"}}
+                "columns":[{"id":"sc","formula":a.formula,"name":"scout_test"}],"value":{"columnId":"sc"}}
     else:
         test = {"id":"scout","kind":"table","name":"scout","source":{"elementId":"m","kind":"table"},
                 "columns":[{"id":"sc","formula":a.formula,"name":"scout_test"}]}

@@ -89,6 +89,8 @@ Map each visual's `x,y,w,h` → 24-col grid (`COL_UNIT = page_w/24`, `ROW_UNIT �
 ## Phase 6 — Verify (mandatory)
 - `sigma-mcp-v2 query` each element → confirm real rows (not blank).
 - True parity: PBI `POST /v1.0/myorg/groups/{ws}/datasets/{id}/executeQueries` (DAX) vs the same Sigma aggregation. DAX-only; breaks under service-principal if RLS.
+- Hard gate: `ruby scripts/assert-phase6-ran.rb --workdir <dir> --workbook-id <wb>` — 7 gates incl. layout lint (6) and **control lint (7**: dead controls / ghost targets / partial same-page reach / `control-scope.json` coverage; `--skip-control-lint` escape; see `refs/control-parity.md`**)**.
+- Optional flip test when the report has slicers→controls: `ruby scripts/probe-controls.rb --workbook-id <wb> --check-out-of-closure` — runtime proof a control actually filters (in-closure export changes under a non-default `parameters` value, out-of-closure doesn't). MCP query can NOT flip controls (defaults only) — export API `parameters` is the only mechanism.
 
 ## Phase 7 — Bookmarks → per-bookmark workbooks (optional)
 PBI bookmarks that **show/hide** or **spotlight** visuals map to Sigma as a

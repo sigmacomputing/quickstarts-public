@@ -269,12 +269,23 @@ def extract(pbir_dir):
                 rec["text"] = _textbox_body(visual)
             visuals.append(rec)
         visuals.sort(key=lambda r: (r["y"], r["x"]))
+        # Visual-interaction overrides (slicer "edit interactions"): page.json
+        # carries them as visualInteractions[{source, target, type}] ONLY when an
+        # author edited them (absent = PBI defaults: slicers filter the page).
+        # Normalized here so the workbook builder can honor a "NoFilter" edit
+        # when wiring control targets (control-targeting wave, workstream B).
+        interactions = []
+        for ia in (page.get("visualInteractions") or []):
+            if isinstance(ia, dict) and ia.get("source") and ia.get("target"):
+                interactions.append({"source": ia["source"], "target": ia["target"],
+                                     "type": str(ia.get("type", "")).lower()})
         out_pages.append({
             "page_id": page.get("name", pname),
             "page_title": page.get("displayName", pname),
             "page_w": page.get("width", 1280),
             "page_h": page.get("height", 720),
             "visuals": visuals,
+            "interactions": interactions,
         })
     return {"source": "pbir", "pbir_dir": pbir_dir, "pages": out_pages}
 

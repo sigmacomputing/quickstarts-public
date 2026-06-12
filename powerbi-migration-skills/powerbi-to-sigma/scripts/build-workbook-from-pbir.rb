@@ -64,6 +64,15 @@ OptionParser.new do |p|
   # its own name is a generic auto-name ("Page 1"). See resolve_header_title.
   p.on('--source-title NAME') { |v| opts[:source_title] = v }
   p.on('--folder-id ID')     { |v| opts[:folder] = v }
+  # Control-targeting wave (workstream B): the TMSL model (model.bim / .tmsl)
+  # supplies the relationships a PBI slicer's filter flows through, so each
+  # control can be wired to EVERY master whose table the slicer reaches —
+  # not just the master the sliced column lives on. Optional: without it,
+  # slicers wire same-table masters only (a WARN says the scope was reduced).
+  p.on('--model PATH')       { |v| opts[:model] = v }
+  # Where the intended-scope contract lands (consumed by workstream A's lint).
+  # Default: control-scope.json next to --out.
+  p.on('--control-scope-out PATH') { |v| opts[:scope_out] = v }
 end.parse!
 %i[sig mmap out].each { |k| abort("missing --#{k.to_s.tr('_','-')}") unless opts[k] }
 
@@ -71,6 +80,98 @@ signals = JSON.parse(File.read(opts[:sig]))
 mmap    = JSON.parse(File.read(opts[:mmap]))
 fields  = mmap['fields'] || {}
 masters = mmap['masters'] || {}
+
+# ---------------------------------------------------------------------------
+# Slicer relationship scope (control-targeting wave, workstream B).
+# A PBI slicer filters its page ACROSS related tables: the filter flows from
+# the sliced table along model relationships (one side -> many side; both ways
+# when crossFilteringBehavior is bothDirections; inactive rels don't flow).
+# ---------------------------------------------------------------------------
+_tmsl = opts[:model] && File.exist?(opts[:model]) ? (JSON.parse(File.read(opts[:model])) rescue nil) : nil
+_tmodel = _tmsl && (_tmsl['model'] || _tmsl)
+MODEL_RELATIONSHIPS = _tmodel ? (_tmodel['relationships'] || []) : []
+MODEL_TABLES_FULL = _tmodel ? (_tmodel['tables'] || []) : []
+MODEL_TABLES = MODEL_TABLES_FULL.map { |t| t['name'].to_s }
+warn '[build-workbook] NOTE: no --model TMSL given — slicer controls wire same-table masters only ' \
+     '(relationship-scoped targets need the model).' if _tmodel.nil?
+
+# Tables reachable by a filter applied on `entity` (always includes entity).
+def reachable_entities(entity)
+  adj = Hash.new { |h, k| h[k] = [] }
+  MODEL_RELATIONSHIPS.each do |r|
+    next if r['isActive'] == false                       # inactive: no filter flow
+    from = r['fromTable'].to_s                           # many side
+    to   = r['toTable'].to_s                             # one side
+    adj[to] << from                                      # one filters many (PBI default)
+    adj[from] << to if r['crossFilteringBehavior'].to_s =~ /both/i
+  end
+  seen = [entity]
+  queue = [entity]
+  until queue.empty?
+    adj[queue.shift].each do |t|
+      next if seen.include?(t)
+      seen << t
+      queue << t
+    end
+  end
+  seen
+end
+
+# entity -> masters that can resolve at least one of its fields (primary + alts).
+# Derived/restructured elements (Dense Rank …, time-intel, Custom SQL calc
+# tables) surface as PSEUDO entities here — names that are not TMSL tables.
+def entity_master_coverage(fields)
+  cov = Hash.new { |h, k| h[k] = [] }
+  fields.each do |k, v|
+    ent = k.to_s.split('.').first
+    ([v['master']] + Array(v['alts']).map { |a| a['master'] }).compact.each do |m|
+      cov[ent] << m unless cov[ent].include?(m)
+    end
+  end
+  cov
+end
+
+# Find the column on a master matching the sliced leaf. Exact (case/​separator-
+# insensitive) name match wins; else a disambiguated "Leaf (ENTITY)" view column
+# — preferring the sliced entity's own. Returns the column hash or nil. NEVER
+# falls back to an arbitrary column (that was the silent wrong-column bug).
+def match_master_column(mrec, leaf, prefer_entity = nil)
+  norm = ->(s) { s.to_s.downcase.gsub(/[^a-z0-9]/, '') }
+  cols = mrec['columns'] || []
+  nl = norm.call(leaf)
+  exact = cols.find { |c| norm.call(c['name']) == nl }
+  return exact if exact
+  cands = cols.select do |c|
+    m = c['name'].to_s.match(/\A(.+?)\s+\(([^)]+)\)\s*\z/)
+    m && norm.call(m[1]) == nl
+  end
+  preferred = prefer_entity && cands.find do |c|
+    c['name'].to_s =~ /\(\s*#{Regexp.escape(prefer_entity)}\s*\)\s*\z/i
+  end
+  preferred || cands.first
+end
+
+# Intended-scope contract accumulators -> control-scope.json (the sidecar
+# workstream A's control lint consumes — schema in lib/control_lint.rb header
+# CONTRACT + refs/control-parity.md). `$control_scope` gets one entry per
+# EMITTED control ({controlId, sourceName, scope:[element ids], excluded:[...]});
+# `$control_unbound` records slicers that produced NO control element (an
+# unresolvable column is dropped LOUDLY, never wired to a wrong column and
+# never shipped dead) so the sidecar carries the full source-signal story.
+$control_scope = []
+$control_unbound = []
+$used_control_ids = Hash.new(0)
+
+# TMSL column type for ENTITY.LEAF — date-typed slicers must become date-range
+# controls: a `list` control bound to a datetime column posts fine but Sigma
+# SILENTLY STRIPS its filter targets (known estate-repair gotcha).
+def tmsl_date_column?(ent, leaf)
+  return false if MODEL_TABLES.empty?
+  tmodel_tables = MODEL_TABLES_FULL
+  t = tmodel_tables.find { |tb| tb['name'].to_s == ent.to_s }
+  c = t && (t['columns'] || []).find { |col| col['name'].to_s.casecmp(leaf.to_s).zero? }
+  !!(c && c['dataType'].to_s =~ /date/i)
+end
 
 SIGMA_KIND = {
   'kpi' => 'kpi-chart', 'bar' => 'bar-chart', 'line' => 'line-chart',
@@ -122,6 +223,11 @@ def qr_leaf(qr, fallback = 'Value')
   s = qr.to_s.strip
   s = Regexp.last_match(1).strip while s =~ /\A[A-Za-z_][A-Za-z0-9_ ]*\(\s*(.*)\s*\)\z/
   leaf = s.split('.').last.to_s
+  # bead c2kf: a '/' (or bracket) inside a generated column NAME breaks the
+  # [Element/Col] cross-element ref path — "Avg $/Unit TY" parses as a
+  # two-segment path and the referencing column compiles to type "error".
+  # Sanitize at this single chokepoint so names and refs stay in sync.
+  leaf = leaf.tr('[]', '').tr('/', '-')
   leaf.empty? ? fallback : leaf
 end
 
@@ -222,6 +328,16 @@ def apply_fmt(col, queryref, fields, vfmts)
   f = sigma_format(hint)
   col.merge!(f) if f
   col
+end
+
+# A field spec is a MEASURE unless it is a bare stored-column reference. The
+# old `agg`/`formula`-emptiness test misclassified auto-derived master-map
+# metrics (always agg:nil with the full expression in `ref`, e.g.
+# "Median([m/Annual Salary])") as dimensions — tables then built UNGROUPED
+# (1 row per source row) and scatters skipped their grouped source (ry0n).
+def measure_ref?(fs)
+  return true unless fs['agg'].to_s.empty? && fs['formula'].to_s.empty?
+  !(fs['ref'].to_s =~ /\A\[[^\]]+\]\z/)
 end
 
 def measure_formula(fs)
@@ -376,28 +492,102 @@ def build_element(rec, fields, masters, extra_data = [])
 
   case kind
   when 'control'
-    # bead 14w(a)/6z5: a PBI slicer -> a Sigma `list` control bound to the sliced
-    # column on its master element. Valid shape (controls.md): controlType:list +
-    # controlId + mode + selectionMode + values[] + source{kind:source,...} +
-    # filters[]. The control defines NO columns of its own — it references the
-    # master's existing column id, so it both populates from and filters that col.
+    # bead 14w(a)/6z5 + control-targeting wave (workstream B): a PBI slicer -> a
+    # Sigma `list` control bound to the sliced column on its master element.
+    # Valid shape (controls.md): controlType:list + controlId + mode +
+    # selectionMode + values[] + source{kind:source,...} + filters[]. The control
+    # defines NO columns of its own — it references master columns by id.
+    #
+    # TARGETING: a PBI slicer filters its whole page ACROSS related tables, so
+    # the control's filters[] gets one entry per master the slicer's filter
+    # reaches: the sliced table's own master(s) always, plus every master
+    # covering a table reachable via model relationships (one->many flow;
+    # bothDirections adds the reverse), plus derived/restructured elements
+    # (pseudo entities) that carry the sliced column. A slicer column that
+    # cannot be resolved to a real master column SKIPS the control with a LOUD
+    # warning — never silently wires the wrong column (the old `|| mcols.first`).
     qr = (b['Values'] || b['Category'] || b['Fields'] || []).first
-    colname = qr_leaf(qr, 'Filter')
-    mcols = (master && masters[master] ? (masters[master]['columns'] || []) : [])
-    mcol = mcols.find { |c| c['name'] == colname } || mcols.first
-    tgt = mcol ? mcol['id'] : nil
-    el['kind'] = 'control'
-    el['controlId'] = colname.gsub(/[^A-Za-z0-9]/, '') + 'Filter'
-    el['name'] = colname
-    el['controlType'] = 'list'
-    el['mode'] = 'include'
-    el['selectionMode'] = 'multiple'
-    el['values'] = []
-    el.delete('source')
-    if master_id && tgt
-      el['source']  = { 'kind' => 'source', 'source' => { 'kind' => 'table', 'elementId' => master_id }, 'columnId' => tgt }
-      el['filters'] = [{ 'source' => { 'kind' => 'table', 'elementId' => master_id }, 'columnId' => tgt }]
+    leaf = qr_leaf(qr, 'Filter')
+    ent  = qr.to_s.split('.').first
+    fs = qr && field_spec(qr, fields)
+    pmaster = fs && fs['master']
+    pm = pmaster && masters[pmaster]
+    pcol = pm && match_master_column(pm, leaf, ent)
+    if pm.nil? || pcol.nil?
+      warn "[build-workbook] ERROR slicer '#{name}' (#{vid}): column '#{qr}' does not resolve to a " \
+           "column on any master (resolved master=#{pmaster.inspect}) — control SKIPPED. " \
+           'Fix the master-map (or add the column to the master) and re-run; a control must ' \
+           'never be silently wired to the wrong column.'
+      $control_unbound << { 'sourceName' => "slicer #{name} (#{vid}) column #{qr}",
+                            'status' => 'unbound',
+                            'reason' => "column '#{qr}' resolves to no master column " \
+                                        "(master=#{pmaster.inspect}); dropped loudly rather than " \
+                                        'wired to a wrong column or shipped dead' }
+      return nil
     end
+    reach = MODEL_RELATIONSHIPS.any? || MODEL_TABLES.any? ? reachable_entities(ent) : [ent]
+    cov = entity_master_coverage(fields)
+    filters, wired, unwired = [], [], []
+    masters.each do |mname, mrec|
+      ents = cov.select { |_e, ms| ms.include?(mname) }.keys
+      real = MODEL_TABLES.any? ? (ents & MODEL_TABLES) : ents
+      pseudo = MODEL_TABLES.any? && real.empty?      # derived/restructured element
+      in_scope = (real & reach).any? || mname == pmaster
+      col = match_master_column(mrec, leaf, ent)
+      # pseudo elements: only when they actually carry the sliced column —
+      # column-name evidence is the best provenance we have for restructured
+      # (Dense Rank / time-intel / calc-table SQL) elements.
+      in_scope ||= pseudo && !col.nil?
+      next unless in_scope
+      if col.nil?
+        unwired << mname
+        next
+      end
+      filters << { 'source' => { 'kind' => 'table', 'elementId' => mrec['id'] }, 'columnId' => col['id'] }
+      wired << mname
+    end
+    unless unwired.empty?
+      warn "[build-workbook] WARN slicer '#{name}': master(s) #{unwired.join(', ')} are in the " \
+           "slicer's relationship scope but carry no column matching '#{leaf}' — NOT wired. " \
+           'Charts on those masters will not respond to this control; add the related column ' \
+           'to the master (cross-element ref) to wire it.'
+    end
+    ctl_id = (title_leaf(qr) || leaf).gsub(/[^A-Za-z0-9]/, '') + 'Filter'
+    n = ($used_control_ids[ctl_id] += 1)
+    ctl_id = "#{ctl_id}#{n}" if n > 1     # two slicers on one column: unique ids
+    el['kind'] = 'control'
+    el['controlId'] = ctl_id
+    el['name'] = name
+    if tmsl_date_column?(ent, leaf)
+      # date-typed slicer -> date-range control. A `list` control bound to a
+      # datetime column gets its filter targets SILENTLY STRIPPED by Sigma
+      # (estate-repair gotcha) — the control posts, then filters nothing.
+      # date-range needs no `source` (columns come from `filters`) but DOES
+      # require a flat `mode` — without it the POST 400s with the misleading
+      # "Invalid kind: control" (live-verified 2026-06-12).
+      el['controlType'] = 'date-range'
+      el['mode'] = 'between'
+      el['includeNulls'] = 'when-no-value-is-selected'
+    else
+      el['controlType'] = 'list'
+      el['mode'] = 'include'
+      el['selectionMode'] = 'multiple'
+      el['values'] = []
+      el['source'] = { 'kind' => 'source', 'source' => { 'kind' => 'table', 'elementId' => pm['id'] }, 'columnId' => pcol['id'] }
+    end
+    el['filters'] = filters
+    $control_scope << { 'controlId' => ctl_id,
+                        'sourceName' => "slicer #{name} (#{vid}) column #{qr}",
+                        'status' => 'wired',
+                        'reachableTables' => reach,
+                        'wiredMasters' => wired,
+                        'unwiredMasters' => unwired,
+                        # internal (stripped before write): resolved to the
+                        # scope allowlist + excluded[] at page assembly.
+                        '_visual_id' => vid,
+                        '_leaf' => leaf,
+                        '_wired_ids' => filters.map { |f| f.dig('source', 'elementId') },
+                        'scope' => [], 'excluded' => [] }
   when 'kpi-chart'
     # A single-value PBI card -> kpi-chart. A multiRowCard (multiple Values) ->
     # ONE kpi-chart tile per measure (bead x81l: a kpi-chart renders only
@@ -528,7 +718,7 @@ def build_element(rec, fields, masters, extra_data = [])
     detail = (b['Category'] || b['Details'] || b['Series'] || b['Legend'] || []).first
     sizeqr = (b['Size'] || []).first
     xfs = field_spec(xqr, fields, master); yfs = field_spec(yqr, fields, master)
-    is_meas = ->(fs) { !(fs['agg'].to_s.empty? && fs['formula'].to_s.empty?) }
+    is_meas = ->(fs) { measure_ref?(fs) }
     if is_meas.call(xfs) && detail && master_id
       # bead ry0n: Sigma's scatter xAxis is a GROUPING axis — binding an AGGREGATE
       # to it makes the aggregate evaluate per-row (Count -> 1) and every point
@@ -630,7 +820,7 @@ def build_element(rec, fields, masters, extra_data = [])
     (b['Values'] || []).each_with_index do |qr, i|
       fs = field_spec(qr, fields, master)
       cid = "#{eid}-c#{i}"
-      is_dim = fs['agg'].to_s.empty? && fs['formula'].to_s.empty?
+      is_dim = !measure_ref?(fs)
       col = { 'id' => cid, 'formula' => is_dim ? fs['ref'] : measure_formula(fs),
               'name' => qr_leaf(qr) }
       apply_fmt(col, qr, fields, vfmts) unless is_dim
@@ -701,14 +891,99 @@ end
 # and are appended to the Data page below.
 extra_data_elements = []
 content_pages = signals['pages'].map do |pg|
-  # build_element may return one element or an array (multiRowCard -> N KPIs).
+  # build_element may return one element or an array (multiRowCard -> N KPIs),
+  # or nil (unresolvable slicer -> control skipped loudly, never wired wrong).
+  vis_elements = {}   # visual_id -> [built element ids] (feeds intended-scope)
   els = pg['visuals'].flat_map do |v|
     r = build_element(v, fields, masters, extra_data_elements)
-    r.is_a?(Array) ? r : [r]   # NB: not Array(r) — that explodes a Hash into pairs
+    list = r.is_a?(Array) ? r : [r] # NB: not Array(r) — that explodes a Hash into pairs
+    list = list.compact
+    vis_elements[v['visual_id']] = list.map { |e| e['id'] }
+    list
+  end
+  # Intended-scope contract (workstream B): for each control on this page,
+  # `scope` (the lint's allowlist — EVERY listed element is hard-asserted to
+  # be in the control's reach) = every chart element built from a same-page
+  # visual whose bound tables the slicer's filter reaches in the SOURCE (PBI:
+  # slicer scope is its page, flowing across relationships) AND whose Sigma
+  # element chains to a master this control actually wired. The remainder —
+  # source-reachable but UN-wireable (cross-grain: the master carries no
+  # column matching the sliced leaf and no relationship-resolvable column
+  # exists) — lands in `excluded` with a reason, NOT in scope, so gate 7
+  # neither asserts the impossible nor lets it pass silently.
+  # Visual-interaction "edit interactions" overrides (page.json
+  # visualInteractions, type none/nofilter) also exclude that target visual —
+  # best-effort: master-level wiring cannot exempt one visual that SHARES a
+  # master with an intended one, so warn when that happens.
+  offs = (pg['interactions'] || []).select { |ia| ia['type'].to_s =~ /no.?filter|none/i }
+  # element id -> the master element id it (transitively) sources, walking
+  # restructured intermediates (e.g. a scatter's grouped source element).
+  src_of = (els + extra_data_elements).each_with_object({}) do |e, h|
+    h[e['id']] = e.dig('source', 'elementId') || e.dig('source', 'source', 'elementId')
+  end
+  eff_master = lambda do |eid|
+    cur = src_of[eid]
+    cur = src_of[cur] while cur && src_of.key?(cur)
+    cur
+  end
+  $control_scope.select { |sc| vis_elements.key?(sc['_visual_id']) }.each do |sc|
+    reach = sc['reachableTables'] || []
+    wired_ids = sc['_wired_ids'] || []
+    pg['visuals'].each do |v|
+      next if v['visual_id'] == sc['_visual_id']
+      next if %w[control text].include?(SIGMA_KIND[v['sigma_kind']] || v['sigma_kind'])
+      ents = (v['bindings'] || {}).values.flatten.compact.map { |q| q.to_s.split('.').first }.uniq
+      next unless ents.any? { |e| reach.include?(e) } || reach.empty?
+      if offs.any? { |ia| ia['source'] == sc['_visual_id'] && ia['target'] == v['visual_id'] }
+        warn "[build-workbook] NOTE control '#{sc['controlId']}': source report turns OFF its " \
+             "interaction with visual '#{v['title'] || v['visual_id']}' — excluded from intended " \
+             'scope. Master-level wiring cannot exempt it if it shares a master with an ' \
+             'intended chart; verify in Sigma.'
+        (vis_elements[v['visual_id']] || []).each do |eid|
+          sc['excluded'] << { 'element' => eid,
+                              'reason' => 'source report visual-interaction set to none for this ' \
+                                          'target — intentionally not filtered in PBI' }
+        end
+        next
+      end
+      (vis_elements[v['visual_id']] || []).each do |eid|
+        if wired_ids.include?(eff_master.call(eid))
+          sc['scope'] << eid
+        else
+          sc['excluded'] << { 'element' => eid,
+                              'reason' => "cross-grain: its master carries no column matching " \
+                                          "'#{sc['_leaf']}' and no relationship path resolves one " \
+                                          '— unreachable without a model change ' \
+                                          "(masters not wired: #{(sc['unwiredMasters'] || []).join(', ')})" }
+        end
+      end
+    end
+    sc['scope'].uniq!
   end
   { 'id' => "page-#{pg['page_id']}", 'name' => pg['page_title'], 'elements' => els }
 end
 data_elements += extra_data_elements
+
+# control-scope.json — the intended-scope contract sidecar (schema: the
+# CONTRACT block in scripts/lib/control_lint.rb + refs/control-parity.md).
+# `sourceFilterSignals` counts the source report's slicer visuals — >0 with
+# zero spec controls FAILS gate 7 (the "interactive source, static migration"
+# class). Each emitted control carries `scope` (allowlist of element ids the
+# lint hard-asserts reachable) + `excluded` (cross-grain / interaction-off,
+# with reasons); slicers that produced no control land in `unbound`.
+scope_path = opts[:scope_out] || File.join(File.dirname(File.expand_path(opts[:out])), 'control-scope.json')
+source_signals = signals['pages'].sum do |pg|
+  (pg['visuals'] || []).count { |v| (SIGMA_KIND[v['sigma_kind']] || v['sigma_kind']) == 'control' }
+end
+scope_controls = $control_scope.map { |sc| sc.reject { |k, _| k.start_with?('_') } }
+File.write(scope_path, JSON.pretty_generate(
+             { 'version' => 1, 'source' => 'powerbi',
+               'sourceFilterSignals' => source_signals,
+               'controls' => scope_controls,
+               'unbound' => $control_unbound }
+           ))
+warn "[build-workbook] wrote control scope -> #{scope_path} (#{scope_controls.size} control(s), " \
+     "#{source_signals} source signal(s), #{$control_unbound.size} unbound)"
 
 # Derived titles can collide (two untitled visuals over the same projections) —
 # suffix duplicates so every element keeps a distinct human-readable name.
@@ -782,8 +1057,14 @@ pages_xml = signals['pages'].map do |pg|
     end
   end
   page_id = "page-#{pg['page_id']}"
-  next nil if items.empty?
   page_spec = content_pages.find { |p| p['id'] == page_id }
+  # A skipped visual (e.g. an unresolvable slicer) has no spec element — a
+  # layout entry for a non-existent element id breaks the layout write.
+  if page_spec
+    built_ids = page_spec['elements'].map { |e| e['id'] }
+    items = items.select { |i| built_ids.include?(i[0]) }
+  end
+  next nil if items.empty?
   # phase-e layout-quality fix: a short title TEXTBOX at the top of the source
   # canvas becomes the header band's text (white-on-dark), MOVED out of band 1
   # (never left behind as a dead zone). The candidate may start up to one grid

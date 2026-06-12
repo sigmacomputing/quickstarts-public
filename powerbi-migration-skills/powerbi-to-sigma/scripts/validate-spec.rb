@@ -138,6 +138,12 @@ spec.fetch('pages', []).each do |page|
     errors << "#{name}: invalid kind \"pie\" — must be \"pie-chart\"" if kind == 'pie'
     errors << "#{name}: invalid kind \"donut\" — must be \"donut-chart\"" if kind == 'donut'
     errors << "#{name}: kpi-chart missing value" if kind == 'kpi-chart' && !el['value']
+    # Breaking-change-2026-06-11: kpi-chart value binding moved id -> columnId
+    # (matching the 2026-05-21 chart axis change).
+    # OLD (now rejected): value: {id: ...}   NEW (required): value: {columnId: ...}
+    if kind == 'kpi-chart' && (v = el['value']).is_a?(Hash) && v['id'] && !v['columnId']
+      errors << "#{name}: kpi-chart value uses old shape {id: ...} — must be {columnId: ...} (breaking change 2026-06-11)"
+    end
 
     if %w[pie-chart donut-chart].include?(kind)
       errors << "#{name}: #{kind} missing color" unless el['color']
@@ -242,7 +248,15 @@ if opts[:type] == 'workbook'
     end
     next if masters.empty?
 
-    others = els.reject { |e| masters.include?(e) }
+    # HIDDEN helper tables that source a master (visibleAsSource:false, e.g.
+    # the scatter grouped-source tables — bead z1d0/ry0n) are data-page
+    # citizens, not content: exempt them from the mixing rule.
+    master_ids = masters.map { |m| m['id'] }
+    helpers = els.select do |e|
+      e['kind'] == 'table' && e['visibleAsSource'] == false &&
+        e.dig('source', 'kind') == 'table' && master_ids.include?(e.dig('source', 'elementId'))
+    end
+    others = els.reject { |e| masters.include?(e) || helpers.include?(e) }
     unless others.empty?
       master_names = masters.map { |m| m['name'] || m['id'] }.join(', ')
       kind_counts = Hash.new(0)

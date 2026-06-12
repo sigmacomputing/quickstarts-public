@@ -20,6 +20,8 @@ OptionParser.new do |p|
   p.on('--out P')                          { |v| opts[:out]  = v }
   p.on('--workdir P', 'Per-conversion working dir (default: dir of --spec). Used to track posted workbook IDs across retries.') { |v| opts[:workdir] = v }
   p.on('--skip-layout-lint') { opts[:skip_lint] = true }
+  p.on('--skip-control-lint') { opts[:skip_control_lint] = true }
+  p.on('--control-scope P', 'control-scope.json sidecar (default: <workdir>/control-scope.json if present)') { |v| opts[:control_scope] = v }
 end.parse!
 %i[type spec out].each { |k| abort("missing --#{k}") unless opts[k] }
 opts[:workdir] ||= File.dirname(File.expand_path(opts[:spec]))
@@ -189,6 +191,42 @@ if opts[:type] == 'workbook' && !opts[:skip_lint]
     exit(3)
   end
   warn 'layout lint: clean (raw-id names / orphan controls / dead zones)'
+end
+
+# Control-wiring lint (shared scripts/lib/control_lint.rb — vendored byte-
+# identical, md5 discipline): fails loudly on dead controls (no resolving
+# filter target AND no [controlId] formula reference — the "Orders Overview
+# (from Looker)" estate escape), ghost filter targets, and controls whose
+# source-closure misses same-page queryable elements (the PHASEE
+# "Action(Region) -> Monthly Revenue Trend" escape). If the builder emitted a
+# control-scope sidecar (<workdir>/control-scope.json — see the lib header
+# CONTRACT), it also fails when the source artifact had filter signals but the
+# spec shipped zero controls (the Qlik class), and honors per-control
+# scope:[...] allowlists for intentional single-chart switchers (grain
+# controls). Escape: --skip-control-lint (name the reason in your report).
+if opts[:type] == 'workbook' && !opts[:skip_control_lint]
+  require_relative 'lib/control_lint'
+  scope_path = opts[:control_scope] || File.join(opts[:workdir], 'control-scope.json')
+  scope = nil
+  if File.exist?(scope_path)
+    scope = JSON.parse(File.read(scope_path)) rescue nil
+    warn "WARN: #{scope_path} is not valid JSON — control lint runs without source scope" if scope.nil?
+  end
+  violations = ControlLint.lint(spec, scope: scope)
+  if violations.any?
+    warn "\n========================================"
+    warn "FAIL — control lint: #{violations.size} violation(s):"
+    violations.each { |v| warn "  - #{v}" }
+    warn 'Fix the control wiring and re-PUT before continuing: dead controls -> add'
+    warn 'filters targets ({source:{elementId}, columnId}) or remove the control;'
+    warn 'partial reach -> wire the uncovered elements or annotate controlScope in'
+    warn 'control-scope.json (see scripts/lib/control_lint.rb CONTRACT). The workbook'
+    warn 'DID post — fix with PUT /v2/workbooks/<id>/spec (re-POSTing creates an orphan).'
+    warn '========================================'
+    exit(4)
+  end
+  n = ControlLint.controls_report(spec).length
+  warn "control lint: clean (#{n} control(s); dead / ghost-target / reach#{scope ? ' / source-scope' : ''})"
 end
 
 # Phase 6 nag — column-type guard catches formula-resolution errors but does

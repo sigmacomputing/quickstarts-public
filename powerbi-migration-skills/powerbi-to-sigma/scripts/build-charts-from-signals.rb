@@ -717,7 +717,7 @@ def build_kpi_element(z, meta, mmap, opts, warnings)
     'name'    => cap,
     'source'  => { 'kind' => 'table', 'elementId' => opts[:master_id] },
     'columns' => [measure_col],
-    'value'   => { 'id' => measure_col_id }
+    'value'   => { 'columnId' => measure_col_id }
   }
 
   # If the Tableau worksheet had Show Mark Labels on (typical for KPIs since
