@@ -1,0 +1,53 @@
+{
+  "_doc": "Per-dashboard token/$ estimator for migration assessments. Estimate = per_dashboard[bucket] * n_dashboards + per_review_item * n_review_items (n_review_items = items the assessment flags with unsupported/needs-review features, n_unhandled > 0). Tokens are the portable unit; rescale $ by your coding agent's model pricing. ALL numbers below are MEASURED from controlled end-to-end conversions (2026-06-07) unless noted.",
+  "calibration": {
+    "date": "2026-06-07",
+    "models": ["opus", "sonnet"],
+    "rates_per_million_usd": {
+      "opus":   { "input": 15.0, "output": 75.0, "cache_write": 18.75, "cache_read": 1.50 },
+      "sonnet": { "input": 3.0,  "output": 15.0, "cache_write": 3.75,  "cache_read": 0.30 }
+    },
+    "real_samples": {
+      "quicksight_D8_orchestrator":  { "opus_usd": 0.69, "sonnet_usd": 0.14 },
+      "qlik_RetailOrders_orchestrator": { "opus_usd": 0.72, "sonnet_usd": 0.08 },
+      "tableau_Superstore_full":     { "opus_usd": 29.35, "sonnet_usd": 6.55 },
+      "per_review_interactive_delta_opus": 0.46
+    },
+    "for_reference_naive_vs_orchestrator": {
+      "quicksight_D8_naive": { "opus_usd": 8.56, "sonnet_usd": 2.79 },
+      "quicksight_D8_optimized_brief": { "opus_usd": 3.48, "sonnet_usd": 1.16 },
+      "quicksight_D8_orchestrator": { "opus_usd": 0.69, "sonnet_usd": 0.14 },
+      "note": "For tools WITH a mechanical converter, the one-shot orchestrator is ~12-20x cheaper than a naive agent-driven migration."
+    }
+  },
+  "per_dashboard": {
+    "mechanical": {
+      "tools": ["quicksight", "powerbi", "qlik", "thoughtspot"],
+      "opus_usd": 0.70,
+      "sonnet_usd": 0.11,
+      "tokens_output_plus_cache_creation": 25000,
+      "basis": "measured — one-shot orchestrator path (mechanical converter → deterministic; cost flat & tool-independent across QuickSight + Qlik)"
+    },
+    "tableau": {
+      "opus_usd": 29.0,
+      "sonnet_usd": 6.5,
+      "tokens_output_plus_cache_creation": 480000,
+      "range_opus_usd": [15.0, 45.0],
+      "basis": "measured — full agent-authored conversion (Superstore Overview: 7 KPIs + map + 2 area charts + controls)",
+      "note": "Tableau has NO mechanical converter, so the agent authors the entire DM+workbook spec from the .twb — ~40x the mechanical tools. The one-shot orchestrator does NOT reduce this (spec-authoring is the irreducible agent work, not the post-spec pipeline). Scales with dashboard richness + calc/LOD/custom-SQL complexity. The real lever to cut Tableau cost is building a mechanical Tableau->Sigma converter."
+    }
+  },
+  "per_review_item": {
+    "opus_usd": 0.46,
+    "sonnet_usd": 0.08,
+    "basis": "measured — interactive decision-checkpoint delta vs the --yes floor (QuickSight D8; one OPEN QUESTIONS round). Negligible at Sonnet pricing.",
+    "note": "Each item the assessment flags with unsupported/needs-review features (n_unhandled > 0) adds ~one human decision round at the orchestrator checkpoint. Does not apply to the mechanical floor when run with auto-accepted defaults."
+  },
+  "caveats": [
+    "Calibrated on Claude Code; rescale $ by your coding agent's per-token pricing — tokens are portable, $ is not.",
+    "Mechanical-converter tools (QuickSight/PowerBI/Qlik/ThoughtSpot) assume the one-shot orchestrator path; a naive agent-driven migration is ~12-20x more expensive.",
+    "Tableau is the outlier (~40x) because its spec is agent-authored; its number is a full-conversion measurement, not an orchestrator floor.",
+    "Warehouse/compute cost (Sigma + Snowflake query) is separate and NOT included — this is LLM cost only.",
+    "Tableau is one measured sample (a rich standard dashboard); expect variance with dashboard complexity (range shown)."
+  ]
+}

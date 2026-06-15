@@ -1,0 +1,22 @@
+{
+  "_resourcetype": "app",
+  "_updates": [],
+  "createdDate": "2026-06-02T18:41:44.379Z",
+  "description": "CSA.TJ star schema \u2014 Qlik\u2192Sigma migration test fixture",
+  "dynamicColor": "",
+  "hasSectionAccess": false,
+  "id": "ec9a73e3-a89b-4b20-a681-5064b86855c7",
+  "isDirectQueryMode": false,
+  "lastReloadTime": "2026-06-03T05:48:56.764Z",
+  "modifiedDate": "2026-06-10T18:33:45.810Z",
+  "name": "Retail Orders (Qlik)",
+  "originAppId": "",
+  "owner": "qlikbot\\019e8995572fe1ea4b0f76d5f914ac5f",
+  "ownerId": "6a1f20814577653b07482b8b",
+  "publishTime": "",
+  "published": false,
+  "resourceType": "app",
+  "spaceId": "6a1f22b9eb09257e6fb4cc60",
+  "thumbnail": "",
+  "usage": "ANALYTICS"
+}

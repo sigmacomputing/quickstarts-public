@@ -1,0 +1,1511 @@
+[
+  {
+    "id": "bar-cat-v2",
+    "vizType": "barchart",
+    "title": "Net Revenue by Category",
+    "sheet": null,
+    "dimensions": [
+      [
+        "CATEGORY"
+      ]
+    ],
+    "dimLabels": [
+      "Category"
+    ],
+    "dimNullSuppression": [
+      false
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      null
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "bar-seg-v2",
+    "vizType": "barchart",
+    "title": "Holiday Revenue by Segment",
+    "sheet": null,
+    "dimensions": [
+      [
+        "CUSTOMER_SEGMENT"
+      ]
+    ],
+    "dimLabels": [
+      "Customer Segment"
+    ],
+    "dimNullSuppression": [
+      false
+    ],
+    "measures": [
+      "Sum({<IS_HOLIDAY={1}>} NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Holiday Revenue"
+    ],
+    "measureFmts": [
+      null
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "c-cat",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Category",
+    "sheet": "yGLwX",
+    "dimensions": [
+      [
+        "CATEGORY"
+      ]
+    ],
+    "dimLabels": [
+      "Category"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "c-mon",
+    "vizType": "auto-chart",
+    "title": "Revenue & Profit by Month",
+    "sheet": "yGLwX",
+    "dimensions": [
+      [
+        "MONTH_NUMBER"
+      ]
+    ],
+    "dimLabels": [
+      "Month"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)",
+      "Sum(NET_PROFIT)"
+    ],
+    "measureLabels": [
+      "Net Revenue",
+      "Net Profit"
+    ],
+    "measureFmts": [
+      "$#,##0",
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        },
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "c-seg",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Customer Segment",
+    "sheet": "yGLwX",
+    "dimensions": [
+      [
+        "CUSTOMER_SEGMENT"
+      ]
+    ],
+    "dimLabels": [
+      "Segment"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "c-tbl",
+    "vizType": "auto-chart",
+    "title": "Store Performance",
+    "sheet": "yGLwX",
+    "dimensions": [
+      [
+        "STORE_NAME"
+      ],
+      [
+        "STORE_REGION"
+      ]
+    ],
+    "dimLabels": [
+      "Store",
+      "Region"
+    ],
+    "dimNullSuppression": [
+      true,
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)",
+      "Count(DISTINCT ORDER_ID)"
+    ],
+    "measureLabels": [
+      "Net Revenue",
+      "Orders"
+    ],
+    "measureFmts": [
+      "$#,##0",
+      "#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        [],
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        },
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "cu-c1",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Segment",
+    "sheet": "sh-customer",
+    "dimensions": [
+      [
+        "CUSTOMER_SEGMENT"
+      ]
+    ],
+    "dimLabels": [
+      "Segment"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "cu-c2",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Region",
+    "sheet": "sh-customer",
+    "dimensions": [
+      [
+        "CUSTOMER_REGION"
+      ]
+    ],
+    "dimLabels": [
+      "Region"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "cu-c3",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Loyalty Tier",
+    "sheet": "sh-customer",
+    "dimensions": [
+      [
+        "LOYALTY_TIER"
+      ]
+    ],
+    "dimLabels": [
+      "Loyalty Tier"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "cu-c4",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Acquisition Channel",
+    "sheet": "sh-customer",
+    "dimensions": [
+      [
+        "ACQUISITION_CHANNEL"
+      ]
+    ],
+    "dimLabels": [
+      "Channel"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "cu-k1",
+    "vizType": "kpi",
+    "title": "Net Revenue",
+    "sheet": "sh-customer",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "cu-k2",
+    "vizType": "kpi",
+    "title": "Orders",
+    "sheet": "sh-customer",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Count(DISTINCT ORDER_ID)"
+    ],
+    "measureLabels": [
+      "Orders"
+    ],
+    "measureFmts": [
+      "#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "cu-k3",
+    "vizType": "kpi",
+    "title": "Avg Order Value",
+    "sheet": "sh-customer",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Sum(NET_REVENUE)/Count(DISTINCT ORDER_ID)"
+    ],
+    "measureLabels": [
+      "Avg Order Value"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "k-mar",
+    "vizType": "kpi",
+    "title": "Net Margin",
+    "sheet": "yGLwX",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Sum(NET_PROFIT)/Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Margin"
+    ],
+    "measureFmts": [
+      "#0.0%"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "k-ord",
+    "vizType": "kpi",
+    "title": "Orders",
+    "sheet": "yGLwX",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Count(DISTINCT ORDER_ID)"
+    ],
+    "measureLabels": [
+      "Orders"
+    ],
+    "measureFmts": [
+      "#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "k-rev",
+    "vizType": "kpi",
+    "title": "Net Revenue",
+    "sheet": "yGLwX",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "kpi-rev-v2",
+    "vizType": "kpi",
+    "title": "Net Revenue",
+    "sheet": null,
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      null
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "line-month-v2",
+    "vizType": "linechart",
+    "title": "Revenue & Profit by Month",
+    "sheet": null,
+    "dimensions": [
+      [
+        "MONTH_NAME"
+      ]
+    ],
+    "dimLabels": [
+      "Month"
+    ],
+    "dimNullSuppression": [
+      false
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)",
+      "Sum(NET_PROFIT)"
+    ],
+    "measureLabels": [
+      "Net Revenue",
+      "Net Profit"
+    ],
+    "measureFmts": [
+      null,
+      null
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        },
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "p-c1",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Category",
+    "sheet": "sh-product",
+    "dimensions": [
+      [
+        "CATEGORY"
+      ]
+    ],
+    "dimLabels": [
+      "Category"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "p-c2",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Subcategory",
+    "sheet": "sh-product",
+    "dimensions": [
+      [
+        "SUBCATEGORY"
+      ]
+    ],
+    "dimLabels": [
+      "Subcategory"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "p-c3",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Brand",
+    "sheet": "sh-product",
+    "dimensions": [
+      [
+        "BRAND"
+      ]
+    ],
+    "dimLabels": [
+      "Brand"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "p-c4",
+    "vizType": "auto-chart",
+    "title": "Units Sold by Category",
+    "sheet": "sh-product",
+    "dimensions": [
+      [
+        "CATEGORY"
+      ]
+    ],
+    "dimLabels": [
+      "Category"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(QUANTITY_ORDERED)"
+    ],
+    "measureLabels": [
+      "Units"
+    ],
+    "measureFmts": [
+      "#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "p-k1",
+    "vizType": "kpi",
+    "title": "Net Revenue",
+    "sheet": "sh-product",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "p-k2",
+    "vizType": "kpi",
+    "title": "Units Sold",
+    "sheet": "sh-product",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Sum(QUANTITY_ORDERED)"
+    ],
+    "measureLabels": [
+      "Units Sold"
+    ],
+    "measureFmts": [
+      "#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "p-k3",
+    "vizType": "kpi",
+    "title": "Return Rate",
+    "sheet": "sh-product",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Sum(QUANTITY_RETURNED)/Sum(QUANTITY_ORDERED)"
+    ],
+    "measureLabels": [
+      "Return Rate"
+    ],
+    "measureFmts": [
+      "#0.0%"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "pr-c1",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Promo Type",
+    "sheet": "sh-promo",
+    "dimensions": [
+      [
+        "PROMO_TYPE"
+      ]
+    ],
+    "dimLabels": [
+      "Promo Type"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "pr-c2",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Order Channel",
+    "sheet": "sh-promo",
+    "dimensions": [
+      [
+        "ORDER_CHANNEL"
+      ]
+    ],
+    "dimLabels": [
+      "Channel"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "pr-c3",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Ship Method",
+    "sheet": "sh-promo",
+    "dimensions": [
+      [
+        "SHIP_METHOD"
+      ]
+    ],
+    "dimLabels": [
+      "Ship Method"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "pr-c4",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Month",
+    "sheet": "sh-promo",
+    "dimensions": [
+      [
+        "MONTH_NUMBER"
+      ]
+    ],
+    "dimLabels": [
+      "Month"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "pr-k1",
+    "vizType": "kpi",
+    "title": "Net Revenue",
+    "sheet": "sh-promo",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "pr-k2",
+    "vizType": "kpi",
+    "title": "Discount Amount",
+    "sheet": "sh-promo",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Sum(DISCOUNT_AMOUNT)"
+    ],
+    "measureLabels": [
+      "Discount Amount"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "pr-k3",
+    "vizType": "kpi",
+    "title": "Holiday Revenue",
+    "sheet": "sh-promo",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Sum({<IS_HOLIDAY={1}>} NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Holiday Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "s-c1",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Store Region",
+    "sheet": "sh-store",
+    "dimensions": [
+      [
+        "STORE_REGION"
+      ]
+    ],
+    "dimLabels": [
+      "Region"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "s-c2",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by Store",
+    "sheet": "sh-store",
+    "dimensions": [
+      [
+        "STORE_NAME"
+      ]
+    ],
+    "dimLabels": [
+      "Store"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "s-c3",
+    "vizType": "auto-chart",
+    "title": "Net Revenue by District",
+    "sheet": "sh-store",
+    "dimensions": [
+      [
+        "DISTRICT"
+      ]
+    ],
+    "dimLabels": [
+      "District"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "s-c4",
+    "vizType": "auto-chart",
+    "title": "Orders by Store Type",
+    "sheet": "sh-store",
+    "dimensions": [
+      [
+        "STORE_TYPE"
+      ]
+    ],
+    "dimLabels": [
+      "Store Type"
+    ],
+    "dimNullSuppression": [
+      true
+    ],
+    "measures": [
+      "Count(DISTINCT ORDER_ID)"
+    ],
+    "measureLabels": [
+      "Orders"
+    ],
+    "measureFmts": [
+      "#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "s-k1",
+    "vizType": "kpi",
+    "title": "Net Revenue",
+    "sheet": "sh-store",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue"
+    ],
+    "measureFmts": [
+      "$#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "s-k2",
+    "vizType": "kpi",
+    "title": "Orders",
+    "sheet": "sh-store",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Count(DISTINCT ORDER_ID)"
+    ],
+    "measureLabels": [
+      "Orders"
+    ],
+    "measureFmts": [
+      "#,##0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "s-k3",
+    "vizType": "kpi",
+    "title": "Avg Days to Ship",
+    "sheet": "sh-store",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [
+      "Avg(DAYS_TO_SHIP)"
+    ],
+    "measureLabels": [
+      "Avg Days to Ship"
+    ],
+    "measureFmts": [
+      "#0.0"
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": [
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "singlepublic-pinnedItems",
+    "vizType": "singlepublic",
+    "title": null,
+    "sheet": null,
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [],
+    "measureLabels": [],
+    "measureFmts": [],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [],
+      "measures": []
+    }
+  },
+  {
+    "id": "tbl-store-v2",
+    "vizType": "table",
+    "title": "Store Performance",
+    "sheet": null,
+    "dimensions": [
+      [
+        "STORE_NAME"
+      ],
+      [
+        "STORE_REGION"
+      ]
+    ],
+    "dimLabels": [
+      "Store",
+      "Region"
+    ],
+    "dimNullSuppression": [
+      false,
+      false
+    ],
+    "measures": [
+      "Sum(NET_REVENUE)",
+      "Count(DISTINCT ORDER_ID)",
+      "Sum(NET_PROFIT)/Sum(NET_REVENUE)"
+    ],
+    "measureLabels": [
+      "Net Revenue",
+      "Order Count",
+      "Net Margin %"
+    ],
+    "measureFmts": [
+      null,
+      null,
+      null
+    ],
+    "sort": {
+      "interColumnSortOrder": [],
+      "dimensions": [
+        [],
+        []
+      ],
+      "measures": [
+        {
+          "qExpression": {}
+        },
+        {
+          "qExpression": {}
+        },
+        {
+          "qExpression": {}
+        }
+      ]
+    }
+  },
+  {
+    "id": "fp-1",
+    "vizType": "filterpane",
+    "title": "Filters",
+    "sheet": "yGLwX",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [],
+    "measureLabels": [],
+    "measureFmts": [],
+    "sort": {},
+    "children": [
+      "lb-1",
+      "lb-2"
+    ]
+  },
+  {
+    "id": "lb-1",
+    "vizType": "listbox",
+    "title": "Region",
+    "sheet": null,
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [],
+    "measureLabels": [],
+    "measureFmts": [],
+    "sort": {},
+    "listbox": {
+      "field": "CUSTOMER_REGION",
+      "label": "Customer Region",
+      "state": null
+    }
+  },
+  {
+    "id": "lb-2",
+    "vizType": "listbox",
+    "title": "AltState",
+    "sheet": null,
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [],
+    "measureLabels": [],
+    "measureFmts": [],
+    "sort": {},
+    "listbox": {
+      "field": "CATEGORY",
+      "label": "Category",
+      "state": "AltA"
+    }
+  },
+  {
+    "id": "lb-3",
+    "vizType": "listbox",
+    "title": "Ship Mode",
+    "sheet": "yGLwX",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [],
+    "measureLabels": [],
+    "measureFmts": [],
+    "sort": {},
+    "listbox": {
+      "field": "NO_SUCH_FIELD",
+      "label": "Bogus",
+      "state": null
+    }
+  },
+  {
+    "id": "lb-4",
+    "vizType": "listbox",
+    "title": "Category",
+    "sheet": "yGLwX",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [],
+    "measureLabels": [],
+    "measureFmts": [],
+    "sort": {},
+    "listbox": {
+      "field": "CATEGORY",
+      "label": "Category",
+      "state": null
+    }
+  },
+  {
+    "id": "lb-5",
+    "vizType": "listbox",
+    "title": "Customer Region (dup)",
+    "sheet": "sh-product",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [],
+    "measureLabels": [],
+    "measureFmts": [],
+    "sort": {},
+    "listbox": {
+      "field": "CUSTOMER_REGION",
+      "label": "Customer Region",
+      "state": null
+    }
+  },
+  {
+    "id": "lb-6",
+    "vizType": "listbox",
+    "title": "Order Date",
+    "sheet": "yGLwX",
+    "dimensions": [],
+    "dimLabels": [],
+    "dimNullSuppression": [],
+    "measures": [],
+    "measureLabels": [],
+    "measureFmts": [],
+    "sort": {},
+    "listbox": {
+      "field": "FULL_DATE",
+      "label": "Order Date",
+      "state": null,
+      "tags": [
+        "$date",
+        "$numeric"
+      ],
+      "numFmt": "YYYY-MM-DD"
+    }
+  }
+]

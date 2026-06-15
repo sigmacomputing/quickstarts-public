@@ -1,0 +1,46 @@
+[
+  {
+    "title": "Brand",
+    "expr": ""
+  },
+  {
+    "title": "Category",
+    "expr": ""
+  },
+  {
+    "title": "Customer Region",
+    "expr": ""
+  },
+  {
+    "title": "Customer Segment",
+    "expr": ""
+  },
+  {
+    "title": "Loyalty Tier",
+    "expr": ""
+  },
+  {
+    "title": "Month",
+    "expr": ""
+  },
+  {
+    "title": "Order Channel",
+    "expr": ""
+  },
+  {
+    "title": "Promo Type",
+    "expr": ""
+  },
+  {
+    "title": "Store Region",
+    "expr": ""
+  },
+  {
+    "title": "Subcategory",
+    "expr": ""
+  },
+  {
+    "title": "Year",
+    "expr": ""
+  }
+]

@@ -1,0 +1,367 @@
+[
+  {
+    "sheetId": "yGLwX",
+    "title": "Retail Orders \u2014 Overview",
+    "rank": -1,
+    "columns": 24,
+    "rows": 21,
+    "cells": [
+      {
+        "objectId": "k-rev",
+        "type": "kpi",
+        "col": 0,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "k-ord",
+        "type": "kpi",
+        "col": 8,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "k-mar",
+        "type": "kpi",
+        "col": 16,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "c-cat",
+        "type": "auto-chart",
+        "col": 0,
+        "row": 3,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "c-mon",
+        "type": "auto-chart",
+        "col": 12,
+        "row": 3,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "c-seg",
+        "type": "auto-chart",
+        "col": 0,
+        "row": 12,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "c-tbl",
+        "type": "auto-chart",
+        "col": 12,
+        "row": 12,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "fp-1",
+        "type": "filterpane",
+        "col": 0,
+        "row": 10,
+        "colspan": 4,
+        "rowspan": 6
+      },
+      {
+        "objectId": "lb-3",
+        "type": "listbox",
+        "col": 4,
+        "row": 10,
+        "colspan": 4,
+        "rowspan": 3
+      },
+      {
+        "objectId": "lb-4",
+        "type": "listbox",
+        "col": 8,
+        "row": 10,
+        "colspan": 4,
+        "rowspan": 3
+      },
+      {
+        "objectId": "lb-6",
+        "type": "listbox",
+        "col": 20,
+        "row": 0,
+        "colspan": 4,
+        "rowspan": 2
+      }
+    ]
+  },
+  {
+    "sheetId": "sh-product",
+    "title": "Product Performance",
+    "rank": 1,
+    "columns": 24,
+    "rows": 30,
+    "cells": [
+      {
+        "objectId": "p-k1",
+        "type": "kpi",
+        "col": 0,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "p-k2",
+        "type": "kpi",
+        "col": 8,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "p-k3",
+        "type": "kpi",
+        "col": 16,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "p-c1",
+        "type": "auto-chart",
+        "col": 0,
+        "row": 3,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "p-c2",
+        "type": "auto-chart",
+        "col": 12,
+        "row": 3,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "p-c3",
+        "type": "auto-chart",
+        "col": 0,
+        "row": 12,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "p-c4",
+        "type": "auto-chart",
+        "col": 12,
+        "row": 12,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "lb-5",
+        "type": "listbox",
+        "col": 0,
+        "row": 0,
+        "colspan": 4,
+        "rowspan": 3
+      }
+    ]
+  },
+  {
+    "sheetId": "sh-customer",
+    "title": "Customer Analytics",
+    "rank": 2,
+    "columns": 24,
+    "rows": 30,
+    "cells": [
+      {
+        "objectId": "cu-k1",
+        "type": "kpi",
+        "col": 0,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "cu-k2",
+        "type": "kpi",
+        "col": 8,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "cu-k3",
+        "type": "kpi",
+        "col": 16,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "cu-c1",
+        "type": "auto-chart",
+        "col": 0,
+        "row": 3,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "cu-c2",
+        "type": "auto-chart",
+        "col": 12,
+        "row": 3,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "cu-c3",
+        "type": "auto-chart",
+        "col": 0,
+        "row": 12,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "cu-c4",
+        "type": "auto-chart",
+        "col": 12,
+        "row": 12,
+        "colspan": 12,
+        "rowspan": 9
+      }
+    ]
+  },
+  {
+    "sheetId": "sh-store",
+    "title": "Store Operations",
+    "rank": 3,
+    "columns": 24,
+    "rows": 30,
+    "cells": [
+      {
+        "objectId": "s-k1",
+        "type": "kpi",
+        "col": 0,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "s-k2",
+        "type": "kpi",
+        "col": 8,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "s-k3",
+        "type": "kpi",
+        "col": 16,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "s-c1",
+        "type": "auto-chart",
+        "col": 0,
+        "row": 3,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "s-c2",
+        "type": "auto-chart",
+        "col": 12,
+        "row": 3,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "s-c3",
+        "type": "auto-chart",
+        "col": 0,
+        "row": 12,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "s-c4",
+        "type": "auto-chart",
+        "col": 12,
+        "row": 12,
+        "colspan": 12,
+        "rowspan": 9
+      }
+    ]
+  },
+  {
+    "sheetId": "sh-promo",
+    "title": "Promotions & Channel",
+    "rank": 4,
+    "columns": 24,
+    "rows": 30,
+    "cells": [
+      {
+        "objectId": "pr-k1",
+        "type": "kpi",
+        "col": 0,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "pr-k2",
+        "type": "kpi",
+        "col": 8,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "pr-k3",
+        "type": "kpi",
+        "col": 16,
+        "row": 0,
+        "colspan": 8,
+        "rowspan": 3
+      },
+      {
+        "objectId": "pr-c1",
+        "type": "auto-chart",
+        "col": 0,
+        "row": 3,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "pr-c2",
+        "type": "auto-chart",
+        "col": 12,
+        "row": 3,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "pr-c3",
+        "type": "auto-chart",
+        "col": 0,
+        "row": 12,
+        "colspan": 12,
+        "rowspan": 9
+      },
+      {
+        "objectId": "pr-c4",
+        "type": "auto-chart",
+        "col": 12,
+        "row": 12,
+        "colspan": 12,
+        "rowspan": 9
+      }
+    ]
+  }
+]

@@ -1,0 +1,300 @@
+{
+  "appName": "Retail Orders (Qlik)",
+  "tables": [
+    {
+      "name": "ORDER_FACT",
+      "noOfRows": 618,
+      "fields": [
+        {
+          "name": "ORDER_ID"
+        },
+        {
+          "name": "ORDER_LINE"
+        },
+        {
+          "name": "CUSTOMER_KEY"
+        },
+        {
+          "name": "PRODUCT_KEY"
+        },
+        {
+          "name": "PROMO_KEY"
+        },
+        {
+          "name": "STORE_KEY"
+        },
+        {
+          "name": "DATE_KEY"
+        },
+        {
+          "name": "ORDER_CHANNEL"
+        },
+        {
+          "name": "SHIP_METHOD"
+        },
+        {
+          "name": "ORDER_STATUS"
+        },
+        {
+          "name": "QUANTITY_ORDERED"
+        },
+        {
+          "name": "QUANTITY_RETURNED"
+        },
+        {
+          "name": "UNIT_PRICE"
+        },
+        {
+          "name": "UNIT_COST"
+        },
+        {
+          "name": "DISCOUNT_AMOUNT"
+        },
+        {
+          "name": "SHIPPING_AMOUNT"
+        },
+        {
+          "name": "TAX_AMOUNT"
+        },
+        {
+          "name": "GROSS_REVENUE"
+        },
+        {
+          "name": "NET_REVENUE"
+        },
+        {
+          "name": "GROSS_PROFIT"
+        },
+        {
+          "name": "NET_PROFIT"
+        },
+        {
+          "name": "IS_FIRST_ORDER"
+        },
+        {
+          "name": "IS_RETURNED"
+        },
+        {
+          "name": "IS_CANCELLED"
+        },
+        {
+          "name": "DAYS_TO_SHIP"
+        }
+      ]
+    },
+    {
+      "name": "CUSTOMER_DIM",
+      "noOfRows": 25,
+      "fields": [
+        {
+          "name": "CUSTOMER_KEY"
+        },
+        {
+          "name": "CUSTOMER_ID"
+        },
+        {
+          "name": "FIRST_NAME"
+        },
+        {
+          "name": "LAST_NAME"
+        },
+        {
+          "name": "CUSTOMER_CITY"
+        },
+        {
+          "name": "CUSTOMER_STATE"
+        },
+        {
+          "name": "CUSTOMER_REGION"
+        },
+        {
+          "name": "CUSTOMER_SEGMENT"
+        },
+        {
+          "name": "LOYALTY_TIER"
+        },
+        {
+          "name": "ACQUISITION_CHANNEL"
+        },
+        {
+          "name": "LIFETIME_REVENUE"
+        }
+      ]
+    },
+    {
+      "name": "PRODUCT_DIM",
+      "noOfRows": 25,
+      "fields": [
+        {
+          "name": "PRODUCT_KEY"
+        },
+        {
+          "name": "PRODUCT_ID"
+        },
+        {
+          "name": "PRODUCT_NAME"
+        },
+        {
+          "name": "CATEGORY"
+        },
+        {
+          "name": "SUBCATEGORY"
+        },
+        {
+          "name": "BRAND"
+        },
+        {
+          "name": "IS_PRIVATE_LABEL"
+        },
+        {
+          "name": "IS_SEASONAL"
+        }
+      ]
+    },
+    {
+      "name": "STORE_DIM",
+      "noOfRows": 15,
+      "fields": [
+        {
+          "name": "STORE_KEY"
+        },
+        {
+          "name": "STORE_ID"
+        },
+        {
+          "name": "STORE_NAME"
+        },
+        {
+          "name": "STORE_TYPE"
+        },
+        {
+          "name": "STORE_CITY"
+        },
+        {
+          "name": "STORE_STATE"
+        },
+        {
+          "name": "STORE_REGION"
+        },
+        {
+          "name": "DISTRICT"
+        },
+        {
+          "name": "MANAGER_NAME"
+        }
+      ]
+    },
+    {
+      "name": "DATE_DIM",
+      "noOfRows": 1096,
+      "fields": [
+        {
+          "name": "DATE_KEY"
+        },
+        {
+          "name": "FULL_DATE"
+        },
+        {
+          "name": "DAY_OF_WEEK"
+        },
+        {
+          "name": "MONTH_NUMBER"
+        },
+        {
+          "name": "MONTH_NAME"
+        },
+        {
+          "name": "QUARTER"
+        },
+        {
+          "name": "YEAR"
+        },
+        {
+          "name": "IS_WEEKEND"
+        },
+        {
+          "name": "IS_HOLIDAY"
+        }
+      ]
+    },
+    {
+      "name": "PROMO_DIM",
+      "noOfRows": 23,
+      "fields": [
+        {
+          "name": "PROMO_KEY"
+        },
+        {
+          "name": "PROMO_NAME"
+        },
+        {
+          "name": "PROMO_TYPE"
+        },
+        {
+          "name": "PROMO_CHANNEL"
+        },
+        {
+          "name": "DISCOUNT_PCT"
+        },
+        {
+          "name": "TARGET_SEGMENT"
+        }
+      ]
+    }
+  ],
+  "masterMeasures": [
+    {
+      "title": "Net Revenue",
+      "qDef": "Sum(NET_REVENUE)"
+    },
+    {
+      "title": "Gross Revenue",
+      "qDef": "Sum(GROSS_REVENUE)"
+    },
+    {
+      "title": "Net Profit",
+      "qDef": "Sum(NET_PROFIT)"
+    },
+    {
+      "title": "Gross Profit",
+      "qDef": "Sum(GROSS_PROFIT)"
+    },
+    {
+      "title": "Units Sold",
+      "qDef": "Sum(QUANTITY_ORDERED)"
+    },
+    {
+      "title": "Units Returned",
+      "qDef": "Sum(QUANTITY_RETURNED)"
+    },
+    {
+      "title": "Order Count",
+      "qDef": "Count(DISTINCT ORDER_ID)"
+    },
+    {
+      "title": "Avg Order Value",
+      "qDef": "Sum(NET_REVENUE)/Count(DISTINCT ORDER_ID)"
+    },
+    {
+      "title": "Net Margin %",
+      "qDef": "Sum(NET_PROFIT)/Sum(NET_REVENUE)"
+    },
+    {
+      "title": "Return Rate %",
+      "qDef": "Sum(QUANTITY_RETURNED)/Sum(QUANTITY_ORDERED)"
+    },
+    {
+      "title": "Holiday Revenue",
+      "qDef": "Sum({<IS_HOLIDAY={1}>} NET_REVENUE)"
+    },
+    {
+      "title": "Avg Days to Ship",
+      "qDef": "Avg(DAYS_TO_SHIP)"
+    },
+    {
+      "title": "Discount Amount",
+      "qDef": "Sum(DISCOUNT_AMOUNT)"
+    }
+  ],
+  "masterDimensions": []
+}
