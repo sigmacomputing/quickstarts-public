@@ -1,0 +1,56 @@
+{
+  "lastReloadTime": "2026-06-03T05:48:56.764Z",
+  "kpis": [
+    {
+      "expr": "Sum(NET_REVENUE)",
+      "title": "Net Revenue",
+      "value": "106723.34"
+    },
+    {
+      "expr": "Count(DISTINCT ORDER_ID)",
+      "title": "Orders",
+      "value": "620"
+    },
+    {
+      "expr": "Sum(NET_REVENUE)/Count(DISTINCT ORDER_ID)",
+      "title": "Avg Order Value",
+      "value": "172.13441935484"
+    },
+    {
+      "expr": "Sum(NET_PROFIT)/Sum(NET_REVENUE)",
+      "title": "Net Margin",
+      "value": "0.62380834407919"
+    },
+    {
+      "expr": "Sum(QUANTITY_ORDERED)",
+      "title": "Units Sold",
+      "value": "1426"
+    },
+    {
+      "expr": "Sum(QUANTITY_RETURNED)/Sum(QUANTITY_ORDERED)",
+      "title": "Return Rate",
+      "value": "0.032258064516129"
+    },
+    {
+      "expr": "Sum(DISCOUNT_AMOUNT)",
+      "title": "Discount Amount",
+      "value": "5249.52"
+    },
+    {
+      "expr": "Sum({<IS_HOLIDAY={1}>} NET_REVENUE)",
+      "title": "Holiday Revenue",
+      "value": "3314.99"
+    },
+    {
+      "expr": "Avg(DAYS_TO_SHIP)",
+      "title": "Avg Days to Ship",
+      "value": "3.724359"
+    }
+  ],
+  "maxDates": [
+    {
+      "field": "DATE_KEY",
+      "value": "20261231"
+    }
+  ]
+}

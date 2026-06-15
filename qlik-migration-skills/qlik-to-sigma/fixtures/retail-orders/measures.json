@@ -1,0 +1,54 @@
+[
+  {
+    "title": "Avg Days to Ship",
+    "expr": "Avg(DAYS_TO_SHIP)"
+  },
+  {
+    "title": "Avg Order Value",
+    "expr": "Sum(NET_REVENUE)/Count(DISTINCT ORDER_ID)"
+  },
+  {
+    "title": "Discount Amount",
+    "expr": "Sum(DISCOUNT_AMOUNT)"
+  },
+  {
+    "title": "Gross Profit",
+    "expr": "Sum(GROSS_PROFIT)"
+  },
+  {
+    "title": "Gross Revenue",
+    "expr": "Sum(GROSS_REVENUE)"
+  },
+  {
+    "title": "Holiday Revenue",
+    "expr": "Sum({<IS_HOLIDAY={1}>} NET_REVENUE)"
+  },
+  {
+    "title": "Net Margin %",
+    "expr": "Sum(NET_PROFIT)/Sum(NET_REVENUE)"
+  },
+  {
+    "title": "Net Profit",
+    "expr": "Sum(NET_PROFIT)"
+  },
+  {
+    "title": "Net Revenue",
+    "expr": "Sum(NET_REVENUE)"
+  },
+  {
+    "title": "Order Count",
+    "expr": "Count(DISTINCT ORDER_ID)"
+  },
+  {
+    "title": "Return Rate %",
+    "expr": "Sum(QUANTITY_RETURNED)/Sum(QUANTITY_ORDERED)"
+  },
+  {
+    "title": "Units Returned",
+    "expr": "Sum(QUANTITY_RETURNED)"
+  },
+  {
+    "title": "Units Sold",
+    "expr": "Sum(QUANTITY_ORDERED)"
+  }
+]
