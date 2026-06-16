@@ -1,0 +1,338 @@
+guid: d09e27fd-414e-4378-a148-c061da79d8e4
+model:
+  name: Retail Analytics
+  model_tables:
+  - name: ORDER_FACT
+    fqn: 7ccc4d3c-eb28-463e-bf74-790c67129a9e
+    joins:
+    - with: CUSTOMER_DIM
+      'on': '[ORDER_FACT::CUSTOMER_KEY] = [CUSTOMER_DIM::CUSTOMER_KEY]'
+      type: LEFT_OUTER
+      cardinality: MANY_TO_ONE
+    - with: DATE_DIM
+      'on': '[ORDER_FACT::ORDER_DATE_KEY] = [DATE_DIM::DATE_KEY]'
+      type: LEFT_OUTER
+      cardinality: MANY_TO_ONE
+    - with: PRODUCT_DIM
+      'on': '[ORDER_FACT::PRODUCT_KEY] = [PRODUCT_DIM::PRODUCT_KEY]'
+      type: LEFT_OUTER
+      cardinality: MANY_TO_ONE
+    - with: PROMO_DIM
+      'on': '[ORDER_FACT::PROMO_KEY] = [PROMO_DIM::PROMO_KEY]'
+      type: LEFT_OUTER
+      cardinality: MANY_TO_ONE
+    - with: STORE_DIM
+      'on': '[ORDER_FACT::ORDER_STORE_KEY] = [STORE_DIM::STORE_KEY]'
+      type: LEFT_OUTER
+      cardinality: MANY_TO_ONE
+  - name: CUSTOMER_DIM
+    fqn: 988bb03f-c374-4216-b77d-69fb188d47ca
+  - name: PRODUCT_DIM
+    fqn: ce0b9665-b271-487e-86e4-74d208178876
+  - name: STORE_DIM
+    fqn: 83b78191-f7d6-41f4-8bf2-5485e3b1ede1
+  - name: DATE_DIM
+    fqn: 774ac78d-f650-4d9b-b0cb-3b874eb8465d
+  - name: PROMO_DIM
+    fqn: bd078b70-2dcf-47fe-aa60-39f693cc5ad4
+  formulas:
+  - id: formula_Avg Order Value
+    name: Avg Order Value
+    expr: safe_divide ( [ORDER_FACT::GROSS_REVENUE] , [ORDER_FACT::QUANTITY_ORDERED] )
+  - id: formula_Channel Group
+    name: Channel Group
+    expr: if ( [ORDER_FACT::ORDER_CHANNEL] in { "EMAIL" , "SMS" } ) then "Digital Direct" else if ( [ORDER_FACT::ORDER_CHANNEL] in { "STORE" } ) then "In-Store" else "Other"
+  - id: formula_Gross Margin Pct
+    name: Gross Margin Pct
+    expr: if ( [ORDER_FACT::GROSS_REVENUE] > 0 ) then [ORDER_FACT::GROSS_PROFIT] / [ORDER_FACT::GROSS_REVENUE] else 0
+  - id: formula_Order Count
+    name: Order Count
+    expr: count ( [ORDER_FACT::ORDER_ID] )
+  columns:
+  - name: Order ID
+    column_id: ORDER_FACT::ORDER_ID
+    properties:
+      column_type: ATTRIBUTE
+  - name: Order Channel
+    column_id: ORDER_FACT::ORDER_CHANNEL
+    properties:
+      column_type: ATTRIBUTE
+  - name: Order Status
+    column_id: ORDER_FACT::ORDER_STATUS
+    properties:
+      column_type: ATTRIBUTE
+  - name: Ship Method
+    column_id: ORDER_FACT::SHIP_METHOD
+    properties:
+      column_type: ATTRIBUTE
+  - name: Is First Order
+    column_id: ORDER_FACT::IS_FIRST_ORDER
+    properties:
+      column_type: ATTRIBUTE
+  - name: Is Returned
+    column_id: ORDER_FACT::IS_RETURNED
+    properties:
+      column_type: ATTRIBUTE
+  - name: Is Cancelled
+    column_id: ORDER_FACT::IS_CANCELLED
+    properties:
+      column_type: ATTRIBUTE
+  - name: Customer Key
+    column_id: ORDER_FACT::CUSTOMER_KEY
+    properties:
+      column_type: ATTRIBUTE
+  - name: Product Key
+    column_id: ORDER_FACT::PRODUCT_KEY
+    properties:
+      column_type: ATTRIBUTE
+  - name: Order Store Key
+    column_id: ORDER_FACT::ORDER_STORE_KEY
+    properties:
+      column_type: ATTRIBUTE
+  - name: Order Date Key
+    column_id: ORDER_FACT::ORDER_DATE_KEY
+    properties:
+      column_type: ATTRIBUTE
+  - name: Promo Key
+    column_id: ORDER_FACT::PROMO_KEY
+    properties:
+      column_type: ATTRIBUTE
+  - name: Gross Revenue
+    column_id: ORDER_FACT::GROSS_REVENUE
+    properties:
+      column_type: MEASURE
+      aggregation: SUM
+  - name: Net Revenue
+    column_id: ORDER_FACT::NET_REVENUE
+    properties:
+      column_type: MEASURE
+      aggregation: SUM
+  - name: Gross Profit
+    column_id: ORDER_FACT::GROSS_PROFIT
+    properties:
+      column_type: MEASURE
+      aggregation: SUM
+  - name: Discount Amount
+    column_id: ORDER_FACT::DISCOUNT_AMOUNT
+    properties:
+      column_type: MEASURE
+      aggregation: SUM
+  - name: Quantity Ordered
+    column_id: ORDER_FACT::QUANTITY_ORDERED
+    properties:
+      column_type: MEASURE
+      aggregation: SUM
+  - name: Quantity Returned
+    column_id: ORDER_FACT::QUANTITY_RETURNED
+    properties:
+      column_type: MEASURE
+      aggregation: SUM
+  - name: Days To Ship
+    column_id: ORDER_FACT::DAYS_TO_SHIP
+    properties:
+      column_type: MEASURE
+      aggregation: AVERAGE
+  - name: Customer Key (Customer)
+    column_id: CUSTOMER_DIM::CUSTOMER_KEY
+    properties:
+      column_type: ATTRIBUTE
+  - name: Customer ID
+    column_id: CUSTOMER_DIM::CUSTOMER_ID
+    properties:
+      column_type: ATTRIBUTE
+  - name: First Name
+    column_id: CUSTOMER_DIM::FIRST_NAME
+    properties:
+      column_type: ATTRIBUTE
+  - name: Last Name
+    column_id: CUSTOMER_DIM::LAST_NAME
+    properties:
+      column_type: ATTRIBUTE
+  - name: Customer Segment
+    column_id: CUSTOMER_DIM::CUSTOMER_SEGMENT
+    properties:
+      column_type: ATTRIBUTE
+  - name: Loyalty Tier
+    column_id: CUSTOMER_DIM::LOYALTY_TIER
+    properties:
+      column_type: ATTRIBUTE
+  - name: Region
+    column_id: CUSTOMER_DIM::REGION
+    properties:
+      column_type: ATTRIBUTE
+  - name: State
+    column_id: CUSTOMER_DIM::STATE
+    properties:
+      column_type: ATTRIBUTE
+  - name: Acquisition Channel
+    column_id: CUSTOMER_DIM::ACQUISITION_CHANNEL
+    properties:
+      column_type: ATTRIBUTE
+  - name: Is Active
+    column_id: CUSTOMER_DIM::IS_ACTIVE
+    properties:
+      column_type: ATTRIBUTE
+  - name: Lifetime Revenue
+    column_id: CUSTOMER_DIM::LIFETIME_REVENUE
+    properties:
+      column_type: MEASURE
+      aggregation: SUM
+  - name: Lifetime Order Count
+    column_id: CUSTOMER_DIM::LIFETIME_ORDER_COUNT
+    properties:
+      column_type: MEASURE
+      aggregation: SUM
+  - name: Product Key (Product)
+    column_id: PRODUCT_DIM::PRODUCT_KEY
+    properties:
+      column_type: ATTRIBUTE
+  - name: Product ID
+    column_id: PRODUCT_DIM::PRODUCT_ID
+    properties:
+      column_type: ATTRIBUTE
+  - name: Product Name
+    column_id: PRODUCT_DIM::PRODUCT_NAME
+    properties:
+      column_type: ATTRIBUTE
+  - name: Category
+    column_id: PRODUCT_DIM::CATEGORY
+    properties:
+      column_type: ATTRIBUTE
+  - name: Subcategory
+    column_id: PRODUCT_DIM::SUBCATEGORY
+    properties:
+      column_type: ATTRIBUTE
+  - name: Brand
+    column_id: PRODUCT_DIM::BRAND
+    properties:
+      column_type: ATTRIBUTE
+  - name: Unit Cost
+    column_id: PRODUCT_DIM::UNIT_COST
+    properties:
+      column_type: MEASURE
+      aggregation: AVERAGE
+  - name: Unit Price
+    column_id: PRODUCT_DIM::UNIT_PRICE
+    properties:
+      column_type: MEASURE
+      aggregation: AVERAGE
+  - name: Store Key
+    column_id: STORE_DIM::STORE_KEY
+    properties:
+      column_type: ATTRIBUTE
+  - name: Store ID
+    column_id: STORE_DIM::STORE_ID
+    properties:
+      column_type: ATTRIBUTE
+  - name: Store Name
+    column_id: STORE_DIM::STORE_NAME
+    properties:
+      column_type: ATTRIBUTE
+  - name: Store Type
+    column_id: STORE_DIM::STORE_TYPE
+    properties:
+      column_type: ATTRIBUTE
+  - name: City
+    column_id: STORE_DIM::CITY
+    properties:
+      column_type: ATTRIBUTE
+  - name: State (Store)
+    column_id: STORE_DIM::STATE
+    properties:
+      column_type: ATTRIBUTE
+  - name: Region (Store)
+    column_id: STORE_DIM::REGION
+    properties:
+      column_type: ATTRIBUTE
+  - name: District
+    column_id: STORE_DIM::DISTRICT
+    properties:
+      column_type: ATTRIBUTE
+  - name: Square Footage
+    column_id: STORE_DIM::SQUARE_FOOTAGE
+    properties:
+      column_type: MEASURE
+      aggregation: AVERAGE
+  - name: Annual Lease Cost
+    column_id: STORE_DIM::ANNUAL_LEASE_COST
+    properties:
+      column_type: MEASURE
+      aggregation: SUM
+  - name: Date Key
+    column_id: DATE_DIM::DATE_KEY
+    properties:
+      column_type: ATTRIBUTE
+  - name: Full Date
+    column_id: DATE_DIM::FULL_DATE
+    properties:
+      column_type: ATTRIBUTE
+  - name: Year
+    column_id: DATE_DIM::YEAR
+    properties:
+      column_type: ATTRIBUTE
+  - name: Quarter
+    column_id: DATE_DIM::QUARTER
+    properties:
+      column_type: ATTRIBUTE
+  - name: Month Number
+    column_id: DATE_DIM::MONTH_NUMBER
+    properties:
+      column_type: ATTRIBUTE
+  - name: Month Name
+    column_id: DATE_DIM::MONTH_NAME
+    properties:
+      column_type: ATTRIBUTE
+  - name: Day Of Week
+    column_id: DATE_DIM::DAY_OF_WEEK
+    properties:
+      column_type: ATTRIBUTE
+  - name: Promo Key (Promo)
+    column_id: PROMO_DIM::PROMO_KEY
+    properties:
+      column_type: ATTRIBUTE
+  - name: Promo ID
+    column_id: PROMO_DIM::PROMO_ID
+    properties:
+      column_type: ATTRIBUTE
+  - name: Promo Name
+    column_id: PROMO_DIM::PROMO_NAME
+    properties:
+      column_type: ATTRIBUTE
+  - name: Promo Type
+    column_id: PROMO_DIM::PROMO_TYPE
+    properties:
+      column_type: ATTRIBUTE
+  - name: Channel
+    column_id: PROMO_DIM::CHANNEL
+    properties:
+      column_type: ATTRIBUTE
+  - name: Target Segment
+    column_id: PROMO_DIM::TARGET_SEGMENT
+    properties:
+      column_type: ATTRIBUTE
+  - name: Discount Pct
+    column_id: PROMO_DIM::DISCOUNT_PCT
+    properties:
+      column_type: MEASURE
+      aggregation: AVERAGE
+  - name: Gross Margin Pct
+    formula_id: formula_Gross Margin Pct
+    properties:
+      column_type: MEASURE
+  - name: Channel Group
+    formula_id: formula_Channel Group
+    properties:
+      column_type: ATTRIBUTE
+  - name: Avg Order Value
+    formula_id: formula_Avg Order Value
+    properties:
+      column_type: MEASURE
+  - name: Order Count
+    formula_id: formula_Order Count
+    properties:
+      column_type: MEASURE
+  properties:
+    is_bypass_rls: false
+    join_progressive: false
+    spotter_config:
+      is_spotter_enabled: true
