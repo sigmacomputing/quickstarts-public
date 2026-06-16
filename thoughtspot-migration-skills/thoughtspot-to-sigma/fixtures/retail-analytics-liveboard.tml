@@ -1,0 +1,226 @@
+guid: a4e9c7c6-c4e4-49ab-bcf6-013b1ebf42a5
+liveboard:
+  name: Retail Analytics (TS Fixture)
+  description: "Migration fixture — KPI, column, line, pie, table over Retail Analytics model"
+  visualizations:
+  - id: Viz_1
+    answer:
+      name: Total Net Revenue
+      tables:
+      - id: Retail Analytics
+        name: Retail Analytics
+        fqn: d09e27fd-414e-4378-a148-c061da79d8e4
+      search_query: "[Net Revenue]"
+      answer_columns:
+      - name: Total Net Revenue
+      table:
+        table_columns:
+        - column_id: Total Net Revenue
+          headline_aggregation: SUM
+        ordered_column_ids:
+        - Total Net Revenue
+        client_state: ""
+        client_state_v2: "{\"tableVizPropVersion\": \"V1\",\"columnProperties\": [{\"columnId\": \"Total Net Revenue\",\"columnProperty\": {}}]}"
+      chart:
+        type: KPI
+        chart_columns:
+        - column_id: Total Net Revenue
+        axis_configs:
+        - x:
+          - Total Net Revenue
+          "y":
+          - Total Net Revenue
+        client_state: ""
+        client_state_v2: "{\"version\": \"V4DOT2\",\"chartProperties\": {\"gridLines\": {},\"responsiveLayoutPreference\": \"USER_PREFERRED_ON\",\"chartSpecific\": {\"dataFieldArea\": \"column\"}},\"columnProperties\": [{\"columnId\": \"Total Net Revenue\",\"columnProperty\": {}}],\"axisProperties\": [{\"id\": \"377d8e1a-7beb-40af-a39d-6394be0375bb\",\"properties\": {\"axisType\": \"Y\",\"linkedColumns\": [\"Total Net Revenue\"],\"isOpposite\": false}},{\"id\": \"6aa9acb9-4e99-427d-bcdd-c04ea6d65997\",\"properties\": {\"axisType\": \"X\",\"linkedColumns\": [\"Total Net Revenue\"]}}]}"
+      display_mode: CHART_MODE
+    viz_guid: 5f56140a-4fb0-4e70-a65e-0c2826b7197e
+  - id: Viz_2
+    answer:
+      name: Net Revenue by Category
+      tables:
+      - id: Retail Analytics
+        name: Retail Analytics
+        fqn: d09e27fd-414e-4378-a148-c061da79d8e4
+      search_query: "[Category] [Net Revenue]"
+      answer_columns:
+      - name: Category
+      - name: Total Net Revenue
+      table:
+        table_columns:
+        - column_id: Category
+          headline_aggregation: COUNT_DISTINCT
+        - column_id: Total Net Revenue
+          headline_aggregation: SUM
+        ordered_column_ids:
+        - Category
+        - Total Net Revenue
+        client_state: ""
+        client_state_v2: "{\"tableVizPropVersion\": \"V1\",\"columnProperties\": [{\"columnId\": \"Category\",\"columnProperty\": {}},{\"columnId\": \"Total Net Revenue\",\"columnProperty\": {}}]}"
+      chart:
+        type: COLUMN
+        chart_columns:
+        - column_id: Category
+        - column_id: Total Net Revenue
+        axis_configs:
+        - x:
+          - Category
+          "y":
+          - Total Net Revenue
+        client_state: ""
+        client_state_v2: "{\"version\": \"V4DOT2\",\"chartProperties\": {\"gridLines\": {},\"responsiveLayoutPreference\": \"USER_PREFERRED_ON\",\"chartSpecific\": {\"dataFieldArea\": \"column\"}},\"columnProperties\": [{\"columnId\": \"Total Net Revenue\",\"columnProperty\": {}},{\"columnId\": \"Category\",\"columnProperty\": {}}],\"axisProperties\": [{\"id\": \"692c3228-b6e1-4bc7-80af-a418c6f4684d\",\"properties\": {\"axisType\": \"Y\",\"linkedColumns\": [\"Total Net Revenue\"],\"isOpposite\": false}},{\"id\": \"4312cff6-d545-4038-84e8-0057b8d01eac\",\"properties\": {\"axisType\": \"X\",\"linkedColumns\": [\"Category\"]}}]}"
+      display_mode: CHART_MODE
+    viz_guid: 2f3a1ee8-be25-450d-902e-de1a75b9e498
+  - id: Viz_3
+    answer:
+      name: Net Revenue by Month
+      tables:
+      - id: Retail Analytics
+        name: Retail Analytics
+        fqn: d09e27fd-414e-4378-a148-c061da79d8e4
+      search_query: "[Month Name] [Net Revenue]"
+      answer_columns:
+      - name: Month Name
+      - name: Total Net Revenue
+      table:
+        table_columns:
+        - column_id: Month Name
+          headline_aggregation: COUNT_DISTINCT
+        - column_id: Total Net Revenue
+          headline_aggregation: SUM
+        ordered_column_ids:
+        - Month Name
+        - Total Net Revenue
+        client_state: ""
+        client_state_v2: "{\"tableVizPropVersion\": \"V1\",\"columnProperties\": [{\"columnId\": \"Month Name\",\"columnProperty\": {}},{\"columnId\": \"Total Net Revenue\",\"columnProperty\": {}}]}"
+      chart:
+        type: LINE
+        chart_columns:
+        - column_id: Month Name
+        - column_id: Total Net Revenue
+        axis_configs:
+        - x:
+          - Month Name
+          "y":
+          - Total Net Revenue
+        client_state: ""
+        client_state_v2: "{\"version\": \"V4DOT2\",\"chartProperties\": {\"gridLines\": {},\"responsiveLayoutPreference\": \"USER_PREFERRED_ON\",\"chartSpecific\": {\"dataFieldArea\": \"column\"}},\"columnProperties\": [{\"columnId\": \"Month Name\",\"columnProperty\": {}},{\"columnId\": \"Total Net Revenue\",\"columnProperty\": {}}],\"axisProperties\": [{\"id\": \"74d0646f-48b8-48f0-a379-b4e042bb4f03\",\"properties\": {\"axisType\": \"Y\",\"linkedColumns\": [\"Total Net Revenue\"],\"isOpposite\": false}},{\"id\": \"aa3f12ec-fabf-4db1-a25e-5e0306d751cf\",\"properties\": {\"axisType\": \"X\",\"linkedColumns\": [\"Month Name\"]}}]}"
+      display_mode: CHART_MODE
+    viz_guid: 222a545b-a5b5-4618-b96d-22f118528aab
+  - id: Viz_4
+    answer:
+      name: Net Revenue by Customer Segment
+      tables:
+      - id: Retail Analytics
+        name: Retail Analytics
+        fqn: d09e27fd-414e-4378-a148-c061da79d8e4
+      search_query: "[Customer Segment] [Net Revenue]"
+      answer_columns:
+      - name: Customer Segment
+      - name: Total Net Revenue
+      table:
+        table_columns:
+        - column_id: Customer Segment
+          headline_aggregation: COUNT_DISTINCT
+        - column_id: Total Net Revenue
+          headline_aggregation: SUM
+        ordered_column_ids:
+        - Customer Segment
+        - Total Net Revenue
+        client_state: ""
+        client_state_v2: "{\"tableVizPropVersion\": \"V1\",\"columnProperties\": [{\"columnId\": \"Customer Segment\",\"columnProperty\": {}},{\"columnId\": \"Total Net Revenue\",\"columnProperty\": {}}]}"
+      chart:
+        type: PIE
+        chart_columns:
+        - column_id: Customer Segment
+        - column_id: Total Net Revenue
+        axis_configs:
+        - x:
+          - Customer Segment
+          "y":
+          - Total Net Revenue
+        client_state: ""
+        client_state_v2: "{\"version\": \"V4DOT2\",\"chartProperties\": {\"gridLines\": {},\"responsiveLayoutPreference\": \"USER_PREFERRED_ON\",\"chartSpecific\": {\"dataFieldArea\": \"column\"}},\"columnProperties\": [{\"columnId\": \"Customer Segment\",\"columnProperty\": {\"dataLabels\": true}},{\"columnId\": \"Total Net Revenue\",\"columnProperty\": {\"dataLabels\": true}}],\"axisProperties\": [{\"id\": \"54f2918a-b558-4345-8a46-2a797ca4b7c3\",\"properties\": {\"axisType\": \"Y\",\"linkedColumns\": [\"Total Net Revenue\"],\"isOpposite\": false}},{\"id\": \"0c8b7814-4c4a-47f0-9aa5-0d5e9dd8d3b5\",\"properties\": {\"axisType\": \"X\",\"linkedColumns\": [\"Customer Segment\"]}}]}"
+      display_mode: CHART_MODE
+    viz_guid: ccf2096b-5321-4f95-adcc-f0a7f78ce116
+  - id: Viz_5
+    answer:
+      name: Region Performance
+      tables:
+      - id: Retail Analytics
+        name: Retail Analytics
+        fqn: d09e27fd-414e-4378-a148-c061da79d8e4
+      search_query: "[Region] [Net Revenue] [Gross Profit]"
+      answer_columns:
+      - name: Region
+      - name: Total Gross Profit
+      - name: Total Net Revenue
+      table:
+        table_columns:
+        - column_id: Region
+          headline_aggregation: COUNT_DISTINCT
+        - column_id: Total Gross Profit
+          headline_aggregation: SUM
+        - column_id: Total Net Revenue
+          headline_aggregation: SUM
+        ordered_column_ids:
+        - Region
+        - Total Net Revenue
+        - Total Gross Profit
+        client_state: ""
+        client_state_v2: "{\"tableVizPropVersion\": \"V1\",\"columnProperties\": [{\"columnId\": \"Region\",\"columnProperty\": {}},{\"columnId\": \"Total Net Revenue\",\"columnProperty\": {}},{\"columnId\": \"Total Gross Profit\",\"columnProperty\": {}}]}"
+      chart:
+        type: ADVANCED_COLUMN
+        chart_columns:
+        - column_id: Region
+        - column_id: Total Gross Profit
+        - column_id: Total Net Revenue
+        client_state: ""
+        client_state_v2: "{\"version\": \"V4DOT2\",\"chartProperties\": {\"gridLines\": {},\"responsiveLayoutPreference\": \"USER_PREFERRED_ON\",\"chartSpecific\": {\"dataFieldArea\": \"column\"}},\"columnProperties\": [{\"columnId\": \"Region\",\"columnProperty\": {}},{\"columnId\": \"Total Net Revenue\",\"columnProperty\": {}},{\"columnId\": \"Total Gross Profit\",\"columnProperty\": {}}],\"axisProperties\": [{\"id\": \"590ebb18-a971-4803-abe7-54a6657d71dd\",\"properties\": {\"axisType\": \"Y\",\"linkedColumns\": [\"Total Net Revenue\"],\"isOpposite\": false}},{\"id\": \"5f1b517a-19b8-4737-a22b-7f64bdaad289\",\"properties\": {\"axisType\": \"Y\",\"linkedColumns\": [\"Total Gross Profit\"],\"isOpposite\": true}},{\"id\": \"a40a91df-ea58-4416-b7f2-791d99744d64\",\"properties\": {\"axisType\": \"X\",\"linkedColumns\": [\"Region\"]}}]}"
+        custom_chart_config:
+        - key: basic
+          dimensions:
+          - key: x-axis
+            axes:
+            - type: FLAT
+              column: Region
+            mode: AXIS_DRIVEN
+          - key: y-axis
+            axes:
+            - type: MERGED
+              columns:
+              - Total Net Revenue
+              - Total Gross Profit
+            mode: AXIS_DRIVEN
+          - key: slice-with-color
+            mode: AXIS_DRIVEN
+          - key: trellis-by
+            mode: AXIS_DRIVEN
+      display_mode: TABLE_MODE
+    viz_guid: b77f0de5-b5fc-4b9a-bef4-d8982f9e6d08
+  layout:
+    tiles:
+    - visualization_id: Viz_1
+      x: 0
+      "y": 0
+      height: 4
+      width: 3
+    - visualization_id: Viz_2
+      x: 3
+      "y": 0
+      height: 8
+      width: 6
+    - visualization_id: Viz_3
+      x: 0
+      "y": 8
+      height: 8
+      width: 6
+    - visualization_id: Viz_4
+      x: 6
+      "y": 8
+      height: 8
+      width: 6
+    - visualization_id: Viz_5
+      x: 0
+      "y": 16
+      height: 8
+      width: 12
