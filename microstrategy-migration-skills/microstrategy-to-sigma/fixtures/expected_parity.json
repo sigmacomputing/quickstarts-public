@@ -1,0 +1,547 @@
+{
+ "Revenue by Region and Category": [
+  {
+   "keys": [
+    "Midwest",
+    "Apparel"
+   ],
+   "values": {
+    "Total Net Revenue": 1338.56,
+    "Total Gross Profit": 904.0,
+    "Profit Margin Pct": 0.67535262
+   }
+  },
+  {
+   "keys": [
+    "Midwest",
+    "Beauty"
+   ],
+   "values": {
+    "Total Net Revenue": 961.05,
+    "Total Gross Profit": 728.0,
+    "Profit Margin Pct": 0.75750481
+   }
+  },
+  {
+   "keys": [
+    "Midwest",
+    "Electronics"
+   ],
+   "values": {
+    "Total Net Revenue": 434.91,
+    "Total Gross Profit": 287.91,
+    "Profit Margin Pct": 0.66199903
+   }
+  },
+  {
+   "keys": [
+    "Midwest",
+    "Home"
+   ],
+   "values": {
+    "Total Net Revenue": 351.8,
+    "Total Gross Profit": 240.95,
+    "Profit Margin Pct": 0.6849062
+   }
+  },
+  {
+   "keys": [
+    "Midwest",
+    "Sports"
+   ],
+   "values": {
+    "Total Net Revenue": 382.41,
+    "Total Gross Profit": 291.41,
+    "Profit Margin Pct": 0.76203551
+   }
+  },
+  {
+   "keys": [
+    "Northeast",
+    "Apparel"
+   ],
+   "values": {
+    "Total Net Revenue": 882.81,
+    "Total Gross Profit": 539.0,
+    "Profit Margin Pct": 0.6105504
+   }
+  },
+  {
+   "keys": [
+    "Northeast",
+    "Beauty"
+   ],
+   "values": {
+    "Total Net Revenue": 216.48,
+    "Total Gross Profit": 168.0,
+    "Profit Margin Pct": 0.77605322
+   }
+  },
+  {
+   "keys": [
+    "Northeast",
+    "Electronics"
+   ],
+   "values": {
+    "Total Net Revenue": 2711.3,
+    "Total Gross Profit": 1737.72,
+    "Profit Margin Pct": 0.64091764
+   }
+  },
+  {
+   "keys": [
+    "Northeast",
+    "Home"
+   ],
+   "values": {
+    "Total Net Revenue": 864.82,
+    "Total Gross Profit": 583.87,
+    "Profit Margin Pct": 0.67513471
+   }
+  },
+  {
+   "keys": [
+    "Northeast",
+    "Sports"
+   ],
+   "values": {
+    "Total Net Revenue": 706.31,
+    "Total Gross Profit": 486.91,
+    "Profit Margin Pct": 0.68937152
+   }
+  },
+  {
+   "keys": [
+    "South",
+    "Apparel"
+   ],
+   "values": {
+    "Total Net Revenue": 3012.85,
+    "Total Gross Profit": 1968.0,
+    "Profit Margin Pct": 0.65320212
+   }
+  },
+  {
+   "keys": [
+    "South",
+    "Beauty"
+   ],
+   "values": {
+    "Total Net Revenue": 928.88,
+    "Total Gross Profit": 728.0,
+    "Profit Margin Pct": 0.78373956
+   }
+  },
+  {
+   "keys": [
+    "South",
+    "Electronics"
+   ],
+   "values": {
+    "Total Net Revenue": 4450.83,
+    "Total Gross Profit": 2753.72,
+    "Profit Margin Pct": 0.61869809
+   }
+  },
+  {
+   "keys": [
+    "South",
+    "Home"
+   ],
+   "values": {
+    "Total Net Revenue": 3045.65,
+    "Total Gross Profit": 2164.96,
+    "Profit Margin Pct": 0.71083677
+   }
+  },
+  {
+   "keys": [
+    "South",
+    "Sports"
+   ],
+   "values": {
+    "Total Net Revenue": 2239.54,
+    "Total Gross Profit": 1614.69,
+    "Profit Margin Pct": 0.72099181
+   }
+  },
+  {
+   "keys": [
+    "West",
+    "Apparel"
+   ],
+   "values": {
+    "Total Net Revenue": 2696.87,
+    "Total Gross Profit": 1711.0,
+    "Profit Margin Pct": 0.63443918
+   }
+  },
+  {
+   "keys": [
+    "West",
+    "Electronics"
+   ],
+   "values": {
+    "Total Net Revenue": 2771.95,
+    "Total Gross Profit": 1739.81,
+    "Profit Margin Pct": 0.62764841
+   }
+  },
+  {
+   "keys": [
+    "West",
+    "Home"
+   ],
+   "values": {
+    "Total Net Revenue": 2799.81,
+    "Total Gross Profit": 1914.74,
+    "Profit Margin Pct": 0.68388212
+   }
+  },
+  {
+   "keys": [
+    "West",
+    "Sports"
+   ],
+   "values": {
+    "Total Net Revenue": 1167.35,
+    "Total Gross Profit": 842.0,
+    "Profit Margin Pct": 0.72129181
+   }
+  }
+ ],
+ "Monthly Revenue Trend": [
+  {
+   "keys": [
+    "2024",
+    "January"
+   ],
+   "values": {
+    "Total Net Revenue": 2947.38,
+    "Order Count": 19
+   }
+  },
+  {
+   "keys": [
+    "2024",
+    "Feb"
+   ],
+   "values": {
+    "Total Net Revenue": 3309.41,
+    "Order Count": 13
+   }
+  },
+  {
+   "keys": [
+    "2024",
+    "March"
+   ],
+   "values": {
+    "Total Net Revenue": 3255.74,
+    "Order Count": 16
+   }
+  },
+  {
+   "keys": [
+    "2024",
+    "Apr"
+   ],
+   "values": {
+    "Total Net Revenue": 3243.79,
+    "Order Count": 16
+   }
+  },
+  {
+   "keys": [
+    "2024",
+    "May"
+   ],
+   "values": {
+    "Total Net Revenue": 16176.6,
+    "Order Count": 133
+   }
+  },
+  {
+   "keys": [
+    "2024",
+    "June"
+   ],
+   "values": {
+    "Total Net Revenue": 3345.98,
+    "Order Count": 22
+   }
+  },
+  {
+   "keys": [
+    "2024",
+    "July"
+   ],
+   "values": {
+    "Total Net Revenue": 3068.53,
+    "Order Count": 17
+   }
+  },
+  {
+   "keys": [
+    "2024",
+    "August"
+   ],
+   "values": {
+    "Total Net Revenue": 3043.97,
+    "Order Count": 15
+   }
+  },
+  {
+   "keys": [
+    "2024",
+    "September"
+   ],
+   "values": {
+    "Total Net Revenue": 2982.02,
+    "Order Count": 16
+   }
+  },
+  {
+   "keys": [
+    "2024",
+    "October"
+   ],
+   "values": {
+    "Total Net Revenue": 2000.41,
+    "Order Count": 14
+   }
+  },
+  {
+   "keys": [
+    "2024",
+    "November"
+   ],
+   "values": {
+    "Total Net Revenue": 5020.6,
+    "Order Count": 22
+   }
+  },
+  {
+   "keys": [
+    "2024",
+    "December"
+   ],
+   "values": {
+    "Total Net Revenue": 2685.91,
+    "Order Count": 20
+   }
+  },
+  {
+   "keys": [
+    "2025",
+    "January"
+   ],
+   "values": {
+    "Total Net Revenue": 2947.38,
+    "Order Count": 19
+   }
+  },
+  {
+   "keys": [
+    "2025",
+    "Feb"
+   ],
+   "values": {
+    "Total Net Revenue": 3309.41,
+    "Order Count": 13
+   }
+  },
+  {
+   "keys": [
+    "2025",
+    "March"
+   ],
+   "values": {
+    "Total Net Revenue": 3255.74,
+    "Order Count": 16
+   }
+  },
+  {
+   "keys": [
+    "2025",
+    "Apr"
+   ],
+   "values": {
+    "Total Net Revenue": 3243.79,
+    "Order Count": 16
+   }
+  },
+  {
+   "keys": [
+    "2025",
+    "May"
+   ],
+   "values": {
+    "Total Net Revenue": 16176.6,
+    "Order Count": 133
+   }
+  },
+  {
+   "keys": [
+    "2025",
+    "June"
+   ],
+   "values": {
+    "Total Net Revenue": 3345.98,
+    "Order Count": 22
+   }
+  },
+  {
+   "keys": [
+    "2025",
+    "July"
+   ],
+   "values": {
+    "Total Net Revenue": 3068.53,
+    "Order Count": 17
+   }
+  },
+  {
+   "keys": [
+    "2025",
+    "August"
+   ],
+   "values": {
+    "Total Net Revenue": 3043.97,
+    "Order Count": 15
+   }
+  },
+  {
+   "keys": [
+    "2025",
+    "September"
+   ],
+   "values": {
+    "Total Net Revenue": 2982.02,
+    "Order Count": 16
+   }
+  },
+  {
+   "keys": [
+    "2025",
+    "October"
+   ],
+   "values": {
+    "Total Net Revenue": 2000.41,
+    "Order Count": 14
+   }
+  },
+  {
+   "keys": [
+    "2025",
+    "November"
+   ],
+   "values": {
+    "Total Net Revenue": 5020.6,
+    "Order Count": 22
+   }
+  },
+  {
+   "keys": [
+    "2025",
+    "December"
+   ],
+   "values": {
+    "Total Net Revenue": 2685.91,
+    "Order Count": 20
+   }
+  },
+  {
+   "keys": [
+    "2026",
+    "January"
+   ],
+   "values": {
+    "Total Net Revenue": 2947.38,
+    "Order Count": 19
+   }
+  },
+  {
+   "keys": [
+    "2026",
+    "Feb"
+   ],
+   "values": {
+    "Total Net Revenue": 3309.41,
+    "Order Count": 13
+   }
+  },
+  {
+   "keys": [
+    "2026",
+    "March"
+   ],
+   "values": {
+    "Total Net Revenue": 3255.74,
+    "Order Count": 16
+   }
+  },
+  {
+   "keys": [
+    "2026",
+    "Apr"
+   ],
+   "values": {
+    "Total Net Revenue": 3243.79,
+    "Order Count": 16
+   }
+  },
+  {
+   "keys": [
+    "2026",
+    "May"
+   ],
+   "values": {
+    "Total Net Revenue": 16176.6,
+    "Order Count": 133
+   }
+  },
+  {
+   "keys": [
+    "2026",
+    "June"
+   ],
+   "values": {
+    "Total Net Revenue": 3345.98,
+    "Order Count": 22
+   }
+  }
+ ],
+ "Channel Performance": [
+  {
+   "keys": [
+    "App"
+   ],
+   "values": {
+    "Total Net Revenue": 16507.39,
+    "Units Sold": 228,
+    "Order Count": 93
+   }
+  },
+  {
+   "keys": [
+    "In-Store"
+   ],
+   "values": {
+    "Total Net Revenue": 31964.18,
+    "Units Sold": 411,
+    "Order Count": 173
+   }
+  },
+  {
+   "keys": [
+    "Online"
+   ],
+   "values": {
+    "Total Net Revenue": 62316.78,
+    "Units Sold": 842,
+    "Order Count": 387
+   }
+  }
+ ]
+}

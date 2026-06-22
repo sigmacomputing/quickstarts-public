@@ -1,0 +1,3349 @@
+{
+ "dataModelId": "45D9150F17634F7AB43B00D5FC381951",
+ "dataModel": {
+  "information": {
+   "dateCreated": "2026-06-11T02:54:52.497Z",
+   "dateModified": "2026-06-11T02:55:03.048Z",
+   "versionId": "717D54A62B49024DA91D46B13AD2159E",
+   "acg": 255,
+   "objectId": "45D9150F17634F7AB43B00D5FC381951",
+   "subType": "report_emma_cube",
+   "name": "Orders Data Model"
+  },
+  "dataServeMode": "connect_live",
+  "schemaFolderId": "80808BA0E03949BD988ABBF0C116BE5E",
+  "enableWrangleRecommendations": true,
+  "enableAutoHierarchyRelationships": true,
+  "sampling": {
+   "type": "first",
+   "rowCount": 1000
+  },
+  "autoJoin": true
+ },
+ "tables": {
+  "offset": 0,
+  "limit": -1,
+  "total": 4,
+  "tables": [
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "5D15CB80A04A4C8D997A9260A6E1A55A",
+     "subType": "logical_table",
+     "name": "ORDER_FACT"
+    }
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "7751DF0514D64104A56548A014AB7253",
+     "subType": "logical_table",
+     "name": "PRODUCT_DIM"
+    }
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+     "subType": "logical_table",
+     "name": "STORE_DIM"
+    }
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+     "subType": "logical_table",
+     "name": "DATE_DIM"
+    }
+   }
+  ]
+ },
+ "attributes": {
+  "offset": 0,
+  "limit": -1,
+  "total": 8,
+  "attributes": [
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "EAD7F93400BF440C83C41419DBF2E17E",
+     "subType": "attribute",
+     "name": "Region",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "forms": [
+     {
+      "id": "45C11FA478E745FEA08D781CEA190FE5",
+      "name": "ID",
+      "category": "ID",
+      "type": "system",
+      "displayFormat": "text",
+      "dataType": {
+       "type": "utf8_char",
+       "precision": 20,
+       "scale": 0
+      },
+      "expressions": [
+       {
+        "expressionId": "5CC8555A72484D539B52E16C481AD204",
+        "expression": {
+         "text": "REGION",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "REGION",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "75E5C96E03B244E8AD595A688E471C8E",
+            "subType": "column",
+            "name": "REGION"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+          "subType": "logical_table",
+          "name": "STORE_DIM"
+         }
+        ]
+       }
+      ],
+      "alias": "REGION",
+      "lookupTable": {
+       "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+       "subType": "logical_table",
+       "name": "STORE_DIM"
+      }
+     }
+    ],
+    "attributeLookupTable": {
+     "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+     "subType": "logical_table",
+     "name": "STORE_DIM"
+    },
+    "keyForm": {
+     "id": "45C11FA478E745FEA08D781CEA190FE5",
+     "name": "ID"
+    },
+    "displays": {
+     "reportDisplays": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID"
+      }
+     ],
+     "browseDisplays": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID"
+      }
+     ]
+    },
+    "sorts": {},
+    "relationships": [
+     {
+      "parent": {
+       "objectId": "EAD7F93400BF440C83C41419DBF2E17E",
+       "subType": "attribute",
+       "name": "Region"
+      },
+      "child": {
+       "objectId": "854CFD98AC1E4CD68FC0FA75B9A17594",
+       "subType": "attribute",
+       "name": "Store"
+      },
+      "relationshipTable": {
+       "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+       "subType": "logical_table",
+       "name": "STORE_DIM"
+      },
+      "relationshipType": "one_to_many"
+     }
+    ],
+    "nonAggregatable": false,
+    "autoDetectLookupTable": true
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "D2A1321AC2AE45CAA719BC68730D8317",
+     "subType": "attribute",
+     "name": "Category",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "forms": [
+     {
+      "id": "45C11FA478E745FEA08D781CEA190FE5",
+      "name": "ID",
+      "category": "ID",
+      "type": "system",
+      "displayFormat": "text",
+      "dataType": {
+       "type": "utf8_char",
+       "precision": 50,
+       "scale": 0
+      },
+      "expressions": [
+       {
+        "expressionId": "5D079ED5FF744B478A940C7C9C5A47B8",
+        "expression": {
+         "text": "CATEGORY",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "CATEGORY",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "25AD0BE937304BDC962A1E2E12415B3D",
+            "subType": "column",
+            "name": "CATEGORY"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "7751DF0514D64104A56548A014AB7253",
+          "subType": "logical_table",
+          "name": "PRODUCT_DIM"
+         }
+        ]
+       }
+      ],
+      "alias": "CATEGORY",
+      "lookupTable": {
+       "objectId": "7751DF0514D64104A56548A014AB7253",
+       "subType": "logical_table",
+       "name": "PRODUCT_DIM"
+      }
+     }
+    ],
+    "attributeLookupTable": {
+     "objectId": "7751DF0514D64104A56548A014AB7253",
+     "subType": "logical_table",
+     "name": "PRODUCT_DIM"
+    },
+    "keyForm": {
+     "id": "45C11FA478E745FEA08D781CEA190FE5",
+     "name": "ID"
+    },
+    "displays": {
+     "reportDisplays": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID"
+      }
+     ],
+     "browseDisplays": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID"
+      }
+     ]
+    },
+    "sorts": {},
+    "relationships": [
+     {
+      "parent": {
+       "objectId": "D2A1321AC2AE45CAA719BC68730D8317",
+       "subType": "attribute",
+       "name": "Category"
+      },
+      "child": {
+       "objectId": "9B0445D348354586AA1EBA2DBC97032B",
+       "subType": "attribute",
+       "name": "Product"
+      },
+      "relationshipTable": {
+       "objectId": "7751DF0514D64104A56548A014AB7253",
+       "subType": "logical_table",
+       "name": "PRODUCT_DIM"
+      },
+      "relationshipType": "one_to_many"
+     }
+    ],
+    "nonAggregatable": false,
+    "autoDetectLookupTable": true
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "8A31FB1D1D454A7D943C5D18DA2F3F1B",
+     "subType": "attribute",
+     "name": "Year",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "forms": [
+     {
+      "id": "45C11FA478E745FEA08D781CEA190FE5",
+      "name": "ID",
+      "category": "ID",
+      "type": "system",
+      "displayFormat": "number",
+      "dataType": {
+       "type": "int64",
+       "precision": 8,
+       "scale": 0
+      },
+      "expressions": [
+       {
+        "expressionId": "A0B18927EB7E4D30AF3AA080026A8F62",
+        "expression": {
+         "text": "YEAR",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "YEAR",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "D838C0CDF1A6417994AAFF651D5BF688",
+            "subType": "column",
+            "name": "YEAR"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+          "subType": "logical_table",
+          "name": "DATE_DIM"
+         }
+        ]
+       }
+      ],
+      "alias": "YEAR",
+      "lookupTable": {
+       "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+       "subType": "logical_table",
+       "name": "DATE_DIM"
+      }
+     }
+    ],
+    "attributeLookupTable": {
+     "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+     "subType": "logical_table",
+     "name": "DATE_DIM"
+    },
+    "keyForm": {
+     "id": "45C11FA478E745FEA08D781CEA190FE5",
+     "name": "ID"
+    },
+    "displays": {
+     "reportDisplays": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID"
+      }
+     ],
+     "browseDisplays": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID"
+      }
+     ]
+    },
+    "sorts": {},
+    "relationships": [
+     {
+      "parent": {
+       "objectId": "8A31FB1D1D454A7D943C5D18DA2F3F1B",
+       "subType": "attribute",
+       "name": "Year"
+      },
+      "child": {
+       "objectId": "FCC42217F759485DB03D155EAA9B727A",
+       "subType": "attribute",
+       "name": "Month"
+      },
+      "relationshipTable": {
+       "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+       "subType": "logical_table",
+       "name": "DATE_DIM"
+      },
+      "relationshipType": "one_to_many"
+     }
+    ],
+    "nonAggregatable": false,
+    "autoDetectLookupTable": true
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "FCC42217F759485DB03D155EAA9B727A",
+     "subType": "attribute",
+     "name": "Month",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "forms": [
+     {
+      "id": "45C11FA478E745FEA08D781CEA190FE5",
+      "name": "ID",
+      "category": "ID",
+      "type": "system",
+      "displayFormat": "number",
+      "dataType": {
+       "type": "int64",
+       "precision": 8,
+       "scale": 0
+      },
+      "expressions": [
+       {
+        "expressionId": "EAE34347A0A24E54A7703DE3E7C06C24",
+        "expression": {
+         "text": "MONTH_NUMBER",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "MONTH_NUMBER",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "DE981C8BAE544FC3AFEA415D5E646A73",
+            "subType": "column",
+            "name": "MONTH_NUMBER"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+          "subType": "logical_table",
+          "name": "DATE_DIM"
+         }
+        ]
+       }
+      ],
+      "alias": "MONTH_NUMBER",
+      "lookupTable": {
+       "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+       "subType": "logical_table",
+       "name": "DATE_DIM"
+      }
+     },
+     {
+      "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+      "name": "DESC",
+      "category": "DESC",
+      "type": "system",
+      "displayFormat": "text",
+      "dataType": {
+       "type": "utf8_char",
+       "precision": 10,
+       "scale": 0
+      },
+      "expressions": [
+       {
+        "expressionId": "37D3B7BAA52A4B7DA22E0883EDBCE87D",
+        "expression": {
+         "text": "MONTH_NAME",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "MONTH_NAME",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "98D8A1F502F642839F380293EA18DD26",
+            "subType": "column",
+            "name": "MONTH_NAME"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+          "subType": "logical_table",
+          "name": "DATE_DIM"
+         }
+        ]
+       }
+      ],
+      "alias": "MONTH_NAME",
+      "lookupTable": {
+       "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+       "subType": "logical_table",
+       "name": "DATE_DIM"
+      }
+     }
+    ],
+    "attributeLookupTable": {
+     "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+     "subType": "logical_table",
+     "name": "DATE_DIM"
+    },
+    "keyForm": {
+     "id": "45C11FA478E745FEA08D781CEA190FE5",
+     "name": "ID"
+    },
+    "displays": {
+     "reportDisplays": [
+      {
+       "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+       "name": "DESC"
+      }
+     ],
+     "browseDisplays": [
+      {
+       "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+       "name": "DESC"
+      }
+     ]
+    },
+    "sorts": {},
+    "relationships": [
+     {
+      "parent": {
+       "objectId": "8A31FB1D1D454A7D943C5D18DA2F3F1B",
+       "subType": "attribute",
+       "name": "Year"
+      },
+      "child": {
+       "objectId": "FCC42217F759485DB03D155EAA9B727A",
+       "subType": "attribute",
+       "name": "Month"
+      },
+      "relationshipTable": {
+       "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+       "subType": "logical_table",
+       "name": "DATE_DIM"
+      },
+      "relationshipType": "one_to_many"
+     },
+     {
+      "parent": {
+       "objectId": "FCC42217F759485DB03D155EAA9B727A",
+       "subType": "attribute",
+       "name": "Month"
+      },
+      "child": {
+       "objectId": "A9DB3C84879F4F57819A7A7BFB518507",
+       "subType": "attribute",
+       "name": "Day"
+      },
+      "relationshipTable": {
+       "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+       "subType": "logical_table",
+       "name": "DATE_DIM"
+      },
+      "relationshipType": "one_to_many"
+     }
+    ],
+    "nonAggregatable": false,
+    "autoDetectLookupTable": true
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "854CFD98AC1E4CD68FC0FA75B9A17594",
+     "subType": "attribute",
+     "name": "Store",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "forms": [
+     {
+      "id": "45C11FA478E745FEA08D781CEA190FE5",
+      "name": "ID",
+      "category": "ID",
+      "type": "system",
+      "displayFormat": "number",
+      "dataType": {
+       "type": "int64",
+       "precision": 8,
+       "scale": 0
+      },
+      "expressions": [
+       {
+        "expressionId": "DED11BCA95284F3C8A4533DF64FD02B5",
+        "expression": {
+         "text": "ORDER_STORE_KEY",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "ORDER_STORE_KEY",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "1152FF8B98504D309747B883CE29D278",
+            "subType": "column",
+            "name": "ORDER_STORE_KEY"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "5D15CB80A04A4C8D997A9260A6E1A55A",
+          "subType": "logical_table",
+          "name": "ORDER_FACT"
+         }
+        ]
+       },
+       {
+        "expressionId": "F6ADB88910D6438EBD338BAA386CEB30",
+        "expression": {
+         "text": "STORE_KEY",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "STORE_KEY",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "021BF7D49D1A41AE966A9739AA180D2D",
+            "subType": "column",
+            "name": "STORE_KEY"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+          "subType": "logical_table",
+          "name": "STORE_DIM"
+         }
+        ]
+       }
+      ],
+      "alias": "STORE_KEY",
+      "lookupTable": {
+       "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+       "subType": "logical_table",
+       "name": "STORE_DIM"
+      }
+     },
+     {
+      "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+      "name": "DESC",
+      "category": "DESC",
+      "type": "system",
+      "displayFormat": "text",
+      "dataType": {
+       "type": "utf8_char",
+       "precision": 100,
+       "scale": 0
+      },
+      "expressions": [
+       {
+        "expressionId": "4D13DE00C17941E888E41E99B6AAE5A8",
+        "expression": {
+         "text": "STORE_NAME",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "STORE_NAME",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "0C4BEEEB53DE4634A2BE0C79C0EB959C",
+            "subType": "column",
+            "name": "STORE_NAME"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+          "subType": "logical_table",
+          "name": "STORE_DIM"
+         }
+        ]
+       }
+      ],
+      "alias": "STORE_NAME",
+      "lookupTable": {
+       "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+       "subType": "logical_table",
+       "name": "STORE_DIM"
+      }
+     }
+    ],
+    "attributeLookupTable": {
+     "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+     "subType": "logical_table",
+     "name": "STORE_DIM"
+    },
+    "keyForm": {
+     "id": "45C11FA478E745FEA08D781CEA190FE5",
+     "name": "ID"
+    },
+    "displays": {
+     "reportDisplays": [
+      {
+       "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+       "name": "DESC"
+      }
+     ],
+     "browseDisplays": [
+      {
+       "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+       "name": "DESC"
+      }
+     ]
+    },
+    "sorts": {},
+    "relationships": [
+     {
+      "parent": {
+       "objectId": "EAD7F93400BF440C83C41419DBF2E17E",
+       "subType": "attribute",
+       "name": "Region"
+      },
+      "child": {
+       "objectId": "854CFD98AC1E4CD68FC0FA75B9A17594",
+       "subType": "attribute",
+       "name": "Store"
+      },
+      "relationshipTable": {
+       "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+       "subType": "logical_table",
+       "name": "STORE_DIM"
+      },
+      "relationshipType": "one_to_many"
+     }
+    ],
+    "nonAggregatable": false,
+    "autoDetectLookupTable": true
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "9B0445D348354586AA1EBA2DBC97032B",
+     "subType": "attribute",
+     "name": "Product",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "forms": [
+     {
+      "id": "45C11FA478E745FEA08D781CEA190FE5",
+      "name": "ID",
+      "category": "ID",
+      "type": "system",
+      "displayFormat": "number",
+      "dataType": {
+       "type": "int64",
+       "precision": 8,
+       "scale": 0
+      },
+      "expressions": [
+       {
+        "expressionId": "E7456CDD660A442EA37899DF7138A2B8",
+        "expression": {
+         "text": "PRODUCT_KEY",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "PRODUCT_KEY",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "2C1EB4DE89F34373887F82F33961A1BE",
+            "subType": "column",
+            "name": "PRODUCT_KEY"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "5D15CB80A04A4C8D997A9260A6E1A55A",
+          "subType": "logical_table",
+          "name": "ORDER_FACT"
+         }
+        ]
+       },
+       {
+        "expressionId": "9B4C7878CD594259B0C0E195F88543AB",
+        "expression": {
+         "text": "PRODUCT_KEY",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "PRODUCT_KEY",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "92AEFD8F75654F539739676266BE9F61",
+            "subType": "column",
+            "name": "PRODUCT_KEY"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "7751DF0514D64104A56548A014AB7253",
+          "subType": "logical_table",
+          "name": "PRODUCT_DIM"
+         }
+        ]
+       }
+      ],
+      "alias": "PRODUCT_KEY",
+      "lookupTable": {
+       "objectId": "7751DF0514D64104A56548A014AB7253",
+       "subType": "logical_table",
+       "name": "PRODUCT_DIM"
+      }
+     },
+     {
+      "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+      "name": "DESC",
+      "category": "DESC",
+      "type": "system",
+      "displayFormat": "text",
+      "dataType": {
+       "type": "utf8_char",
+       "precision": 150,
+       "scale": 0
+      },
+      "expressions": [
+       {
+        "expressionId": "86E10C0549FD409D9135AD213F684D3B",
+        "expression": {
+         "text": "PRODUCT_NAME",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "PRODUCT_NAME",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "80441289FD404F2C88A020BF04060D54",
+            "subType": "column",
+            "name": "PRODUCT_NAME"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "7751DF0514D64104A56548A014AB7253",
+          "subType": "logical_table",
+          "name": "PRODUCT_DIM"
+         }
+        ]
+       }
+      ],
+      "alias": "PRODUCT_NAME",
+      "lookupTable": {
+       "objectId": "7751DF0514D64104A56548A014AB7253",
+       "subType": "logical_table",
+       "name": "PRODUCT_DIM"
+      }
+     }
+    ],
+    "attributeLookupTable": {
+     "objectId": "7751DF0514D64104A56548A014AB7253",
+     "subType": "logical_table",
+     "name": "PRODUCT_DIM"
+    },
+    "keyForm": {
+     "id": "45C11FA478E745FEA08D781CEA190FE5",
+     "name": "ID"
+    },
+    "displays": {
+     "reportDisplays": [
+      {
+       "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+       "name": "DESC"
+      }
+     ],
+     "browseDisplays": [
+      {
+       "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+       "name": "DESC"
+      }
+     ]
+    },
+    "sorts": {},
+    "relationships": [
+     {
+      "parent": {
+       "objectId": "D2A1321AC2AE45CAA719BC68730D8317",
+       "subType": "attribute",
+       "name": "Category"
+      },
+      "child": {
+       "objectId": "9B0445D348354586AA1EBA2DBC97032B",
+       "subType": "attribute",
+       "name": "Product"
+      },
+      "relationshipTable": {
+       "objectId": "7751DF0514D64104A56548A014AB7253",
+       "subType": "logical_table",
+       "name": "PRODUCT_DIM"
+      },
+      "relationshipType": "one_to_many"
+     }
+    ],
+    "nonAggregatable": false,
+    "autoDetectLookupTable": true
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "A9DB3C84879F4F57819A7A7BFB518507",
+     "subType": "attribute",
+     "name": "Day",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "forms": [
+     {
+      "id": "45C11FA478E745FEA08D781CEA190FE5",
+      "name": "ID",
+      "category": "ID",
+      "type": "system",
+      "displayFormat": "number",
+      "dataType": {
+       "type": "int64",
+       "precision": 8,
+       "scale": 0
+      },
+      "expressions": [
+       {
+        "expressionId": "63A512BCB4AC42ABA978EDB9902F1B2A",
+        "expression": {
+         "text": "ORDER_DATE_KEY",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "ORDER_DATE_KEY",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "871C62FBF0E04F968482C728084A50EB",
+            "subType": "column",
+            "name": "ORDER_DATE_KEY"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "5D15CB80A04A4C8D997A9260A6E1A55A",
+          "subType": "logical_table",
+          "name": "ORDER_FACT"
+         }
+        ]
+       },
+       {
+        "expressionId": "B575DE5DF22342E988499C33DF2DB557",
+        "expression": {
+         "text": "DATE_KEY",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "DATE_KEY",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "B02BE2D4448640B79BF3169E849A4C9B",
+            "subType": "column",
+            "name": "DATE_KEY"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+          "subType": "logical_table",
+          "name": "DATE_DIM"
+         }
+        ]
+       }
+      ],
+      "alias": "DATE_KEY",
+      "lookupTable": {
+       "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+       "subType": "logical_table",
+       "name": "DATE_DIM"
+      }
+     },
+     {
+      "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+      "name": "DESC",
+      "category": "DESC",
+      "type": "system",
+      "displayFormat": "date",
+      "dataType": {
+       "type": "date",
+       "precision": 10,
+       "scale": 0
+      },
+      "expressions": [
+       {
+        "expressionId": "77464646F08D4C0FAC58A14B5E3F29E6",
+        "expression": {
+         "text": "FULL_DATE",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "FULL_DATE",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "501C00D4EE9D4017A90AF74478A3635D",
+            "subType": "column",
+            "name": "FULL_DATE"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+          "subType": "logical_table",
+          "name": "DATE_DIM"
+         }
+        ]
+       }
+      ],
+      "alias": "FULL_DATE",
+      "lookupTable": {
+       "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+       "subType": "logical_table",
+       "name": "DATE_DIM"
+      }
+     }
+    ],
+    "attributeLookupTable": {
+     "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+     "subType": "logical_table",
+     "name": "DATE_DIM"
+    },
+    "keyForm": {
+     "id": "45C11FA478E745FEA08D781CEA190FE5",
+     "name": "ID"
+    },
+    "displays": {
+     "reportDisplays": [
+      {
+       "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+       "name": "DESC"
+      }
+     ],
+     "browseDisplays": [
+      {
+       "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+       "name": "DESC"
+      }
+     ]
+    },
+    "sorts": {},
+    "relationships": [
+     {
+      "parent": {
+       "objectId": "FCC42217F759485DB03D155EAA9B727A",
+       "subType": "attribute",
+       "name": "Month"
+      },
+      "child": {
+       "objectId": "A9DB3C84879F4F57819A7A7BFB518507",
+       "subType": "attribute",
+       "name": "Day"
+      },
+      "relationshipTable": {
+       "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+       "subType": "logical_table",
+       "name": "DATE_DIM"
+      },
+      "relationshipType": "one_to_many"
+     }
+    ],
+    "nonAggregatable": false,
+    "autoDetectLookupTable": true
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "A0B193BE721E4C10B161B49A5086F97F",
+     "subType": "attribute",
+     "name": "Order Channel",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "forms": [
+     {
+      "id": "45C11FA478E745FEA08D781CEA190FE5",
+      "name": "ID",
+      "category": "ID",
+      "type": "system",
+      "displayFormat": "text",
+      "dataType": {
+       "type": "utf8_char",
+       "precision": 20,
+       "scale": 0
+      },
+      "expressions": [
+       {
+        "expressionId": "2CB3D80EA5424A729428BF66C5ACFEA2",
+        "expression": {
+         "text": "ORDER_CHANNEL",
+         "tokens": [
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "ORDER_CHANNEL",
+           "type": "column_reference",
+           "target": {
+            "dateCreated": "2026-06-11T02:54:52.497Z",
+            "dateModified": "2026-06-11T02:54:52.497Z",
+            "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+            "acg": 255,
+            "objectId": "83D463BBD45E410B9873652078955B41",
+            "subType": "column",
+            "name": "ORDER_CHANNEL"
+           }
+          },
+          {
+           "level": "resolved",
+           "state": "initial",
+           "value": "",
+           "type": "end_of_text"
+          }
+         ]
+        },
+        "tables": [
+         {
+          "objectId": "5D15CB80A04A4C8D997A9260A6E1A55A",
+          "subType": "logical_table",
+          "name": "ORDER_FACT"
+         }
+        ]
+       }
+      ],
+      "alias": "ORDER_CHANNEL",
+      "lookupTable": {
+       "objectId": "5D15CB80A04A4C8D997A9260A6E1A55A",
+       "subType": "logical_table",
+       "name": "ORDER_FACT"
+      }
+     }
+    ],
+    "attributeLookupTable": {
+     "objectId": "5D15CB80A04A4C8D997A9260A6E1A55A",
+     "subType": "logical_table",
+     "name": "ORDER_FACT"
+    },
+    "keyForm": {
+     "id": "45C11FA478E745FEA08D781CEA190FE5",
+     "name": "ID"
+    },
+    "displays": {
+     "reportDisplays": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID"
+      }
+     ],
+     "browseDisplays": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID"
+      }
+     ]
+    },
+    "sorts": {},
+    "relationships": [],
+    "nonAggregatable": false,
+    "autoDetectLookupTable": true
+   }
+  ]
+ },
+ "factMetrics": {
+  "offset": 0,
+  "limit": -1,
+  "total": 4,
+  "factMetrics": [
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "C3331A42A2054CC19665490F06554DDD",
+     "subType": "fact_metric",
+     "name": "NET_REVENUE",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "fact": {
+     "dataType": {
+      "type": "double",
+      "precision": 8,
+      "scale": 2
+     },
+     "expressions": [
+      {
+       "expressionId": "127B6FD1A37C4EDD9A22E8468947FA03",
+       "expression": {
+        "text": "NET_REVENUE",
+        "tokens": [
+         {
+          "level": "resolved",
+          "state": "initial",
+          "value": "NET_REVENUE",
+          "type": "column_reference",
+          "target": {
+           "dateCreated": "2026-06-11T02:54:52.497Z",
+           "dateModified": "2026-06-11T02:54:52.497Z",
+           "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+           "acg": 255,
+           "objectId": "2358BF7FA6BD44998507B95725612D64",
+           "subType": "column",
+           "name": "NET_REVENUE"
+          }
+         },
+         {
+          "level": "resolved",
+          "state": "initial",
+          "value": "",
+          "type": "end_of_text"
+         }
+        ]
+       },
+       "tables": [
+        {
+         "objectId": "5D15CB80A04A4C8D997A9260A6E1A55A",
+         "subType": "logical_table",
+         "name": "ORDER_FACT"
+        }
+       ]
+      }
+     ],
+     "extensions": [],
+     "entryLevel": []
+    },
+    "function": "sum",
+    "functionProperties": [
+     {
+      "name": "UseLookupForAttributes",
+      "value": {
+       "type": "boolean",
+       "value": "false"
+      }
+     }
+    ],
+    "dimty": {
+     "dimtyUnits": [
+      {
+       "dimtyUnitType": "report_base_level",
+       "aggregation": "normal",
+       "filtering": "apply",
+       "groupBy": true
+      }
+     ],
+     "excludeAttribute": false,
+     "allowAddingUnit": true
+    },
+    "metricSubtotals": [
+     {
+      "definition": {
+       "objectId": "96C487AF4D12472A910C1ACACFB56EFB",
+       "subType": "system_subtotal",
+       "name": "Total"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "078C50834B484EE29948FA9DD5300ADF",
+       "subType": "system_subtotal",
+       "name": "Count"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B328C60462634223B2387D4ADABEEB53",
+       "subType": "system_subtotal",
+       "name": "Average"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "00B7BFFF967F42C4B71A4B53D90FB095",
+       "subType": "system_subtotal",
+       "name": "Minimum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B1F4AA7DE683441BA559AA6453C5113E",
+       "subType": "system_subtotal",
+       "name": "Maximum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "54E7BFD129514717A92BC44CF1FE5A32",
+       "subType": "system_subtotal",
+       "name": "Product"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "83A663067F7E43B2ABF67FD38ECDC7FE",
+       "subType": "system_subtotal",
+       "name": "Median"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "36226A4048A546139BE0AF5F24737BA8",
+       "subType": "system_subtotal",
+       "name": "Mode"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "7FBA414995194BBAB2CF1BB599209824",
+       "subType": "system_subtotal",
+       "name": "Standard Deviation"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "1769DBFCCF2D4392938E40418C6E065E",
+       "subType": "system_subtotal",
+       "name": "Variance"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "E1853D5A36C74F59A9F8DEFB3F9527A1",
+       "subType": "system_subtotal",
+       "name": "Geometric Mean"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "F225147A4CA0BB97368A5689D9675E73",
+       "subType": "system_subtotal",
+       "name": "Aggregation"
+      },
+      "implementation": {
+       "objectId": "96C487AF4D12472A910C1ACACFB56EFB",
+       "subType": "system_subtotal",
+       "name": "Total"
+      }
+     }
+    ],
+    "format": {
+     "header": [],
+     "values": []
+    },
+    "metricFormatType": "reserved"
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "4C2FA40DDACF483E909724459CECD0AC",
+     "subType": "fact_metric",
+     "name": "GROSS_PROFIT",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "fact": {
+     "dataType": {
+      "type": "double",
+      "precision": 8,
+      "scale": 2
+     },
+     "expressions": [
+      {
+       "expressionId": "68A5D6212D3B4CA3AE112F146E198733",
+       "expression": {
+        "text": "GROSS_PROFIT",
+        "tokens": [
+         {
+          "level": "resolved",
+          "state": "initial",
+          "value": "GROSS_PROFIT",
+          "type": "column_reference",
+          "target": {
+           "dateCreated": "2026-06-11T02:54:52.497Z",
+           "dateModified": "2026-06-11T02:54:52.497Z",
+           "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+           "acg": 255,
+           "objectId": "E411AA7426BC4FC69F13110FDB307362",
+           "subType": "column",
+           "name": "GROSS_PROFIT"
+          }
+         },
+         {
+          "level": "resolved",
+          "state": "initial",
+          "value": "",
+          "type": "end_of_text"
+         }
+        ]
+       },
+       "tables": [
+        {
+         "objectId": "5D15CB80A04A4C8D997A9260A6E1A55A",
+         "subType": "logical_table",
+         "name": "ORDER_FACT"
+        }
+       ]
+      }
+     ],
+     "extensions": [],
+     "entryLevel": []
+    },
+    "function": "sum",
+    "functionProperties": [
+     {
+      "name": "UseLookupForAttributes",
+      "value": {
+       "type": "boolean",
+       "value": "false"
+      }
+     }
+    ],
+    "dimty": {
+     "dimtyUnits": [
+      {
+       "dimtyUnitType": "report_base_level",
+       "aggregation": "normal",
+       "filtering": "apply",
+       "groupBy": true
+      }
+     ],
+     "excludeAttribute": false,
+     "allowAddingUnit": true
+    },
+    "metricSubtotals": [
+     {
+      "definition": {
+       "objectId": "96C487AF4D12472A910C1ACACFB56EFB",
+       "subType": "system_subtotal",
+       "name": "Total"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "078C50834B484EE29948FA9DD5300ADF",
+       "subType": "system_subtotal",
+       "name": "Count"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B328C60462634223B2387D4ADABEEB53",
+       "subType": "system_subtotal",
+       "name": "Average"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "00B7BFFF967F42C4B71A4B53D90FB095",
+       "subType": "system_subtotal",
+       "name": "Minimum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B1F4AA7DE683441BA559AA6453C5113E",
+       "subType": "system_subtotal",
+       "name": "Maximum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "54E7BFD129514717A92BC44CF1FE5A32",
+       "subType": "system_subtotal",
+       "name": "Product"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "83A663067F7E43B2ABF67FD38ECDC7FE",
+       "subType": "system_subtotal",
+       "name": "Median"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "36226A4048A546139BE0AF5F24737BA8",
+       "subType": "system_subtotal",
+       "name": "Mode"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "7FBA414995194BBAB2CF1BB599209824",
+       "subType": "system_subtotal",
+       "name": "Standard Deviation"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "1769DBFCCF2D4392938E40418C6E065E",
+       "subType": "system_subtotal",
+       "name": "Variance"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "E1853D5A36C74F59A9F8DEFB3F9527A1",
+       "subType": "system_subtotal",
+       "name": "Geometric Mean"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "F225147A4CA0BB97368A5689D9675E73",
+       "subType": "system_subtotal",
+       "name": "Aggregation"
+      },
+      "implementation": {
+       "objectId": "96C487AF4D12472A910C1ACACFB56EFB",
+       "subType": "system_subtotal",
+       "name": "Total"
+      }
+     }
+    ],
+    "format": {
+     "header": [],
+     "values": []
+    },
+    "metricFormatType": "reserved"
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "2B54F0E3EE4F4E35A382B39C8433CAB6",
+     "subType": "fact_metric",
+     "name": "QUANTITY_ORDERED",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "fact": {
+     "dataType": {
+      "type": "int64",
+      "precision": 8,
+      "scale": 0
+     },
+     "expressions": [
+      {
+       "expressionId": "C2F94E4728154683B5DAAA206340CCB2",
+       "expression": {
+        "text": "QUANTITY_ORDERED",
+        "tokens": [
+         {
+          "level": "resolved",
+          "state": "initial",
+          "value": "QUANTITY_ORDERED",
+          "type": "column_reference",
+          "target": {
+           "dateCreated": "2026-06-11T02:54:52.497Z",
+           "dateModified": "2026-06-11T02:54:52.497Z",
+           "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+           "acg": 255,
+           "objectId": "691CED4C7ADE41258636AF79121CAA92",
+           "subType": "column",
+           "name": "QUANTITY_ORDERED"
+          }
+         },
+         {
+          "level": "resolved",
+          "state": "initial",
+          "value": "",
+          "type": "end_of_text"
+         }
+        ]
+       },
+       "tables": [
+        {
+         "objectId": "5D15CB80A04A4C8D997A9260A6E1A55A",
+         "subType": "logical_table",
+         "name": "ORDER_FACT"
+        }
+       ]
+      }
+     ],
+     "extensions": [],
+     "entryLevel": []
+    },
+    "function": "sum",
+    "functionProperties": [
+     {
+      "name": "UseLookupForAttributes",
+      "value": {
+       "type": "boolean",
+       "value": "false"
+      }
+     }
+    ],
+    "dimty": {
+     "dimtyUnits": [
+      {
+       "dimtyUnitType": "report_base_level",
+       "aggregation": "normal",
+       "filtering": "apply",
+       "groupBy": true
+      }
+     ],
+     "excludeAttribute": false,
+     "allowAddingUnit": true
+    },
+    "metricSubtotals": [
+     {
+      "definition": {
+       "objectId": "96C487AF4D12472A910C1ACACFB56EFB",
+       "subType": "system_subtotal",
+       "name": "Total"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "078C50834B484EE29948FA9DD5300ADF",
+       "subType": "system_subtotal",
+       "name": "Count"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B328C60462634223B2387D4ADABEEB53",
+       "subType": "system_subtotal",
+       "name": "Average"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "00B7BFFF967F42C4B71A4B53D90FB095",
+       "subType": "system_subtotal",
+       "name": "Minimum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B1F4AA7DE683441BA559AA6453C5113E",
+       "subType": "system_subtotal",
+       "name": "Maximum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "54E7BFD129514717A92BC44CF1FE5A32",
+       "subType": "system_subtotal",
+       "name": "Product"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "83A663067F7E43B2ABF67FD38ECDC7FE",
+       "subType": "system_subtotal",
+       "name": "Median"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "36226A4048A546139BE0AF5F24737BA8",
+       "subType": "system_subtotal",
+       "name": "Mode"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "7FBA414995194BBAB2CF1BB599209824",
+       "subType": "system_subtotal",
+       "name": "Standard Deviation"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "1769DBFCCF2D4392938E40418C6E065E",
+       "subType": "system_subtotal",
+       "name": "Variance"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "E1853D5A36C74F59A9F8DEFB3F9527A1",
+       "subType": "system_subtotal",
+       "name": "Geometric Mean"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "F225147A4CA0BB97368A5689D9675E73",
+       "subType": "system_subtotal",
+       "name": "Aggregation"
+      },
+      "implementation": {
+       "objectId": "96C487AF4D12472A910C1ACACFB56EFB",
+       "subType": "system_subtotal",
+       "name": "Total"
+      }
+     }
+    ],
+    "format": {
+     "header": [],
+     "values": []
+    },
+    "metricFormatType": "reserved"
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:54:52.497Z",
+     "dateModified": "2026-06-11T02:54:52.497Z",
+     "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+     "acg": 255,
+     "objectId": "6CD8AF360D1B40259910F69C0122F3E5",
+     "subType": "fact_metric",
+     "name": "ORDER_ID",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "fact": {
+     "dataType": {
+      "type": "utf8_char",
+      "precision": 20,
+      "scale": 0
+     },
+     "expressions": [
+      {
+       "expressionId": "41139E0B57434355A14C1B555F0C8B83",
+       "expression": {
+        "text": "ORDER_ID",
+        "tokens": [
+         {
+          "level": "resolved",
+          "state": "initial",
+          "value": "ORDER_ID",
+          "type": "column_reference",
+          "target": {
+           "dateCreated": "2026-06-11T02:54:52.497Z",
+           "dateModified": "2026-06-11T02:54:52.497Z",
+           "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+           "acg": 255,
+           "objectId": "217118E54335470FAF5BDB78FF07955A",
+           "subType": "column",
+           "name": "ORDER_ID"
+          }
+         },
+         {
+          "level": "resolved",
+          "state": "initial",
+          "value": "",
+          "type": "end_of_text"
+         }
+        ]
+       },
+       "tables": [
+        {
+         "objectId": "5D15CB80A04A4C8D997A9260A6E1A55A",
+         "subType": "logical_table",
+         "name": "ORDER_FACT"
+        }
+       ]
+      }
+     ],
+     "extensions": [],
+     "entryLevel": []
+    },
+    "function": "count",
+    "functionProperties": [
+     {
+      "name": "UseLookupForAttributes",
+      "value": {
+       "type": "boolean",
+       "value": "false"
+      }
+     },
+     {
+      "name": "Distinct",
+      "value": {
+       "type": "boolean",
+       "value": "true"
+      }
+     }
+    ],
+    "dimty": {
+     "dimtyUnits": [
+      {
+       "dimtyUnitType": "report_base_level",
+       "aggregation": "normal",
+       "filtering": "apply",
+       "groupBy": true
+      }
+     ],
+     "excludeAttribute": false,
+     "allowAddingUnit": true
+    },
+    "metricSubtotals": [
+     {
+      "definition": {
+       "objectId": "96C487AF4D12472A910C1ACACFB56EFB",
+       "subType": "system_subtotal",
+       "name": "Total"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "078C50834B484EE29948FA9DD5300ADF",
+       "subType": "system_subtotal",
+       "name": "Count"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B328C60462634223B2387D4ADABEEB53",
+       "subType": "system_subtotal",
+       "name": "Average"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "00B7BFFF967F42C4B71A4B53D90FB095",
+       "subType": "system_subtotal",
+       "name": "Minimum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B1F4AA7DE683441BA559AA6453C5113E",
+       "subType": "system_subtotal",
+       "name": "Maximum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "54E7BFD129514717A92BC44CF1FE5A32",
+       "subType": "system_subtotal",
+       "name": "Product"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "83A663067F7E43B2ABF67FD38ECDC7FE",
+       "subType": "system_subtotal",
+       "name": "Median"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "36226A4048A546139BE0AF5F24737BA8",
+       "subType": "system_subtotal",
+       "name": "Mode"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "7FBA414995194BBAB2CF1BB599209824",
+       "subType": "system_subtotal",
+       "name": "Standard Deviation"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "1769DBFCCF2D4392938E40418C6E065E",
+       "subType": "system_subtotal",
+       "name": "Variance"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "E1853D5A36C74F59A9F8DEFB3F9527A1",
+       "subType": "system_subtotal",
+       "name": "Geometric Mean"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "F225147A4CA0BB97368A5689D9675E73",
+       "subType": "system_subtotal",
+       "name": "Aggregation"
+      },
+      "implementation": {
+       "objectId": "B1F4AA7DE683441BA559AA6453C5113E",
+       "subType": "system_subtotal",
+       "name": "Maximum"
+      }
+     }
+    ],
+    "format": {
+     "header": [],
+     "values": []
+    },
+    "metricFormatType": "reserved"
+   }
+  ]
+ },
+ "metrics": {
+  "offset": 0,
+  "limit": -1,
+  "total": 3,
+  "metrics": [
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:55:03.048Z",
+     "dateModified": "2026-06-11T02:55:03.048Z",
+     "versionId": "717D54A62B49024DA91D46B13AD2159E",
+     "acg": 255,
+     "objectId": "11D0F479626041DAB61CFA7C349AE9DE",
+     "subType": "metric",
+     "name": "Total Net Revenue",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "expression": {
+     "text": "Sum(NET_REVENUE)",
+     "tokens": [
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "Sum",
+       "type": "function",
+       "target": {
+        "dateCreated": "2025-05-29T19:58:08.059Z",
+        "dateModified": "2025-05-29T19:58:08.059Z",
+        "versionId": "CD5315C011DF671600088AA0669A0C20",
+        "acg": 255,
+        "objectId": "8107C31BDD9911D3B98100C04F2233EA",
+        "subType": "function",
+        "name": "Sum",
+        "description": "Returns the sum of all values in the ValueList.  This is a group-value function."
+       }
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "<",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "UseLookupForAttributes",
+       "type": "identifier"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "=",
+       "type": "function"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "False",
+       "type": "boolean"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": ">",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "(",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "NET_REVENUE",
+       "type": "object_reference",
+       "target": {
+        "dateCreated": "2026-06-11T02:54:52.497Z",
+        "dateModified": "2026-06-11T02:54:52.497Z",
+        "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+        "acg": 255,
+        "objectId": "C3331A42A2054CC19665490F06554DDD",
+        "subType": "fact_metric",
+        "name": "NET_REVENUE"
+       }
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": ")",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "{",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "~",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "}",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "",
+       "type": "end_of_text"
+      }
+     ]
+    },
+    "dimty": {
+     "dimtyUnits": [
+      {
+       "dimtyUnitType": "report_base_level",
+       "aggregation": "normal",
+       "filtering": "none",
+       "groupBy": true
+      }
+     ],
+     "excludeAttribute": false,
+     "allowAddingUnit": true
+    },
+    "conditionality": {
+     "embedMethod": "report_into_metric_filter",
+     "removeElements": true
+    },
+    "metricSubtotals": [
+     {
+      "definition": {
+       "objectId": "96C487AF4D12472A910C1ACACFB56EFB",
+       "subType": "system_subtotal",
+       "name": "Total"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "078C50834B484EE29948FA9DD5300ADF",
+       "subType": "system_subtotal",
+       "name": "Count"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B328C60462634223B2387D4ADABEEB53",
+       "subType": "system_subtotal",
+       "name": "Average"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "00B7BFFF967F42C4B71A4B53D90FB095",
+       "subType": "system_subtotal",
+       "name": "Minimum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B1F4AA7DE683441BA559AA6453C5113E",
+       "subType": "system_subtotal",
+       "name": "Maximum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "54E7BFD129514717A92BC44CF1FE5A32",
+       "subType": "system_subtotal",
+       "name": "Product"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "83A663067F7E43B2ABF67FD38ECDC7FE",
+       "subType": "system_subtotal",
+       "name": "Median"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "36226A4048A546139BE0AF5F24737BA8",
+       "subType": "system_subtotal",
+       "name": "Mode"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "7FBA414995194BBAB2CF1BB599209824",
+       "subType": "system_subtotal",
+       "name": "Standard Deviation"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "1769DBFCCF2D4392938E40418C6E065E",
+       "subType": "system_subtotal",
+       "name": "Variance"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "E1853D5A36C74F59A9F8DEFB3F9527A1",
+       "subType": "system_subtotal",
+       "name": "Geometric Mean"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "F225147A4CA0BB97368A5689D9675E73",
+       "subType": "system_subtotal",
+       "name": "Aggregation"
+      }
+     }
+    ],
+    "aggregateFromBase": true,
+    "formulaJoinType": "default",
+    "smartTotal": "decomposable_false",
+    "dataType": {
+     "type": "reserved",
+     "precision": 0,
+     "scale": 0
+    },
+    "format": {
+     "header": [],
+     "values": []
+    },
+    "subtotalFromBase": false,
+    "metricFormatType": "reserved",
+    "thresholds": [],
+    "embeddedObjects": [
+     {
+      "id": "7DB65280B549A50D078991BECBDF82ED",
+      "subType": "agg_metric",
+      "expression": {
+       "text": "Sum(NET_REVENUE)",
+       "tokens": [
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "Sum",
+         "type": "function",
+         "target": {
+          "dateCreated": "2025-05-29T19:58:08.059Z",
+          "dateModified": "2025-05-29T19:58:08.059Z",
+          "versionId": "CD5315C011DF671600088AA0669A0C20",
+          "acg": 255,
+          "objectId": "8107C31BDD9911D3B98100C04F2233EA",
+          "subType": "function",
+          "name": "Sum",
+          "description": "Returns the sum of all values in the ValueList.  This is a group-value function."
+         }
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "<",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "UseLookupForAttributes",
+         "type": "identifier"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "=",
+         "type": "function"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "False",
+         "type": "boolean"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": ">",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "(",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "NET_REVENUE",
+         "type": "object_reference",
+         "target": {
+          "dateCreated": "2026-06-11T02:54:52.497Z",
+          "dateModified": "2026-06-11T02:54:52.497Z",
+          "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+          "acg": 255,
+          "objectId": "C3331A42A2054CC19665490F06554DDD",
+          "subType": "fact_metric",
+          "name": "NET_REVENUE"
+         }
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": ")",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "",
+         "type": "end_of_text"
+        }
+       ]
+      }
+     }
+    ],
+    "pushDownBehavior": "automatic"
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:55:03.048Z",
+     "dateModified": "2026-06-11T02:55:03.048Z",
+     "versionId": "717D54A62B49024DA91D46B13AD2159E",
+     "acg": 255,
+     "objectId": "003ECB8FC2CB4336B8BD403570B0AA00",
+     "subType": "metric",
+     "name": "Total Gross Profit",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "expression": {
+     "text": "Sum(GROSS_PROFIT)",
+     "tokens": [
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "Sum",
+       "type": "function",
+       "target": {
+        "dateCreated": "2025-05-29T19:58:08.059Z",
+        "dateModified": "2025-05-29T19:58:08.059Z",
+        "versionId": "CD5315C011DF671600088AA0669A0C20",
+        "acg": 255,
+        "objectId": "8107C31BDD9911D3B98100C04F2233EA",
+        "subType": "function",
+        "name": "Sum",
+        "description": "Returns the sum of all values in the ValueList.  This is a group-value function."
+       }
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "<",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "UseLookupForAttributes",
+       "type": "identifier"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "=",
+       "type": "function"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "False",
+       "type": "boolean"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": ">",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "(",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "GROSS_PROFIT",
+       "type": "object_reference",
+       "target": {
+        "dateCreated": "2026-06-11T02:54:52.497Z",
+        "dateModified": "2026-06-11T02:54:52.497Z",
+        "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+        "acg": 255,
+        "objectId": "4C2FA40DDACF483E909724459CECD0AC",
+        "subType": "fact_metric",
+        "name": "GROSS_PROFIT"
+       }
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": ")",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "{",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "~",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "}",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "",
+       "type": "end_of_text"
+      }
+     ]
+    },
+    "dimty": {
+     "dimtyUnits": [
+      {
+       "dimtyUnitType": "report_base_level",
+       "aggregation": "normal",
+       "filtering": "none",
+       "groupBy": true
+      }
+     ],
+     "excludeAttribute": false,
+     "allowAddingUnit": true
+    },
+    "conditionality": {
+     "embedMethod": "report_into_metric_filter",
+     "removeElements": true
+    },
+    "metricSubtotals": [
+     {
+      "definition": {
+       "objectId": "96C487AF4D12472A910C1ACACFB56EFB",
+       "subType": "system_subtotal",
+       "name": "Total"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "078C50834B484EE29948FA9DD5300ADF",
+       "subType": "system_subtotal",
+       "name": "Count"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B328C60462634223B2387D4ADABEEB53",
+       "subType": "system_subtotal",
+       "name": "Average"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "00B7BFFF967F42C4B71A4B53D90FB095",
+       "subType": "system_subtotal",
+       "name": "Minimum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B1F4AA7DE683441BA559AA6453C5113E",
+       "subType": "system_subtotal",
+       "name": "Maximum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "54E7BFD129514717A92BC44CF1FE5A32",
+       "subType": "system_subtotal",
+       "name": "Product"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "83A663067F7E43B2ABF67FD38ECDC7FE",
+       "subType": "system_subtotal",
+       "name": "Median"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "36226A4048A546139BE0AF5F24737BA8",
+       "subType": "system_subtotal",
+       "name": "Mode"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "7FBA414995194BBAB2CF1BB599209824",
+       "subType": "system_subtotal",
+       "name": "Standard Deviation"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "1769DBFCCF2D4392938E40418C6E065E",
+       "subType": "system_subtotal",
+       "name": "Variance"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "E1853D5A36C74F59A9F8DEFB3F9527A1",
+       "subType": "system_subtotal",
+       "name": "Geometric Mean"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "F225147A4CA0BB97368A5689D9675E73",
+       "subType": "system_subtotal",
+       "name": "Aggregation"
+      }
+     }
+    ],
+    "aggregateFromBase": true,
+    "formulaJoinType": "default",
+    "smartTotal": "decomposable_false",
+    "dataType": {
+     "type": "reserved",
+     "precision": 0,
+     "scale": 0
+    },
+    "format": {
+     "header": [],
+     "values": []
+    },
+    "subtotalFromBase": false,
+    "metricFormatType": "reserved",
+    "thresholds": [],
+    "embeddedObjects": [
+     {
+      "id": "C50B6BA202403656344063913F5C67D8",
+      "subType": "agg_metric",
+      "expression": {
+       "text": "Sum(GROSS_PROFIT)",
+       "tokens": [
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "Sum",
+         "type": "function",
+         "target": {
+          "dateCreated": "2025-05-29T19:58:08.059Z",
+          "dateModified": "2025-05-29T19:58:08.059Z",
+          "versionId": "CD5315C011DF671600088AA0669A0C20",
+          "acg": 255,
+          "objectId": "8107C31BDD9911D3B98100C04F2233EA",
+          "subType": "function",
+          "name": "Sum",
+          "description": "Returns the sum of all values in the ValueList.  This is a group-value function."
+         }
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "<",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "UseLookupForAttributes",
+         "type": "identifier"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "=",
+         "type": "function"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "False",
+         "type": "boolean"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": ">",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "(",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "GROSS_PROFIT",
+         "type": "object_reference",
+         "target": {
+          "dateCreated": "2026-06-11T02:54:52.497Z",
+          "dateModified": "2026-06-11T02:54:52.497Z",
+          "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+          "acg": 255,
+          "objectId": "4C2FA40DDACF483E909724459CECD0AC",
+          "subType": "fact_metric",
+          "name": "GROSS_PROFIT"
+         }
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": ")",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "",
+         "type": "end_of_text"
+        }
+       ]
+      }
+     }
+    ],
+    "pushDownBehavior": "automatic"
+   },
+   {
+    "information": {
+     "dateCreated": "2026-06-11T02:55:03.048Z",
+     "dateModified": "2026-06-11T02:55:03.048Z",
+     "versionId": "717D54A62B49024DA91D46B13AD2159E",
+     "acg": 255,
+     "objectId": "9F428B57068E4DA5BD4D0E45B0FF75E5",
+     "subType": "metric",
+     "name": "Order Count",
+     "destinationFolderId": "80808BA0E03949BD988ABBF0C116BE5E"
+    },
+    "expression": {
+     "text": "Count(ORDER_ID)",
+     "tokens": [
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "Count",
+       "type": "function",
+       "target": {
+        "dateCreated": "2025-05-29T19:58:08.059Z",
+        "dateModified": "2025-05-29T19:58:08.059Z",
+        "versionId": "CD5315C011DF671600088AA0669A0C20",
+        "acg": 255,
+        "objectId": "8107C31CDD9911D3B98100C04F2233EA",
+        "subType": "function",
+        "name": "Count",
+        "description": "Returns the number of values the ValueList. This is a group-value function."
+       }
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "<",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "Distinct",
+       "type": "identifier"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "=",
+       "type": "function"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "True",
+       "type": "boolean"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": ",",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "UseLookupForAttributes",
+       "type": "identifier"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "=",
+       "type": "function"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "False",
+       "type": "boolean"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": ">",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "(",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "ORDER_ID",
+       "type": "object_reference",
+       "target": {
+        "dateCreated": "2026-06-11T02:54:52.497Z",
+        "dateModified": "2026-06-11T02:54:52.497Z",
+        "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+        "acg": 255,
+        "objectId": "6CD8AF360D1B40259910F69C0122F3E5",
+        "subType": "fact_metric",
+        "name": "ORDER_ID"
+       }
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": ")",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "{",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "~",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "}",
+       "type": "character"
+      },
+      {
+       "level": "resolved",
+       "state": "initial",
+       "value": "",
+       "type": "end_of_text"
+      }
+     ]
+    },
+    "dimty": {
+     "dimtyUnits": [
+      {
+       "dimtyUnitType": "report_base_level",
+       "aggregation": "normal",
+       "filtering": "none",
+       "groupBy": true
+      }
+     ],
+     "excludeAttribute": false,
+     "allowAddingUnit": true
+    },
+    "conditionality": {
+     "embedMethod": "report_into_metric_filter",
+     "removeElements": true
+    },
+    "metricSubtotals": [
+     {
+      "definition": {
+       "objectId": "96C487AF4D12472A910C1ACACFB56EFB",
+       "subType": "system_subtotal",
+       "name": "Total"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "078C50834B484EE29948FA9DD5300ADF",
+       "subType": "system_subtotal",
+       "name": "Count"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B328C60462634223B2387D4ADABEEB53",
+       "subType": "system_subtotal",
+       "name": "Average"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "00B7BFFF967F42C4B71A4B53D90FB095",
+       "subType": "system_subtotal",
+       "name": "Minimum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "B1F4AA7DE683441BA559AA6453C5113E",
+       "subType": "system_subtotal",
+       "name": "Maximum"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "54E7BFD129514717A92BC44CF1FE5A32",
+       "subType": "system_subtotal",
+       "name": "Product"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "83A663067F7E43B2ABF67FD38ECDC7FE",
+       "subType": "system_subtotal",
+       "name": "Median"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "36226A4048A546139BE0AF5F24737BA8",
+       "subType": "system_subtotal",
+       "name": "Mode"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "7FBA414995194BBAB2CF1BB599209824",
+       "subType": "system_subtotal",
+       "name": "Standard Deviation"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "1769DBFCCF2D4392938E40418C6E065E",
+       "subType": "system_subtotal",
+       "name": "Variance"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "E1853D5A36C74F59A9F8DEFB3F9527A1",
+       "subType": "system_subtotal",
+       "name": "Geometric Mean"
+      }
+     },
+     {
+      "definition": {
+       "objectId": "F225147A4CA0BB97368A5689D9675E73",
+       "subType": "system_subtotal",
+       "name": "Aggregation"
+      }
+     }
+    ],
+    "aggregateFromBase": true,
+    "formulaJoinType": "default",
+    "smartTotal": "decomposable_false",
+    "dataType": {
+     "type": "reserved",
+     "precision": 0,
+     "scale": 0
+    },
+    "format": {
+     "header": [],
+     "values": []
+    },
+    "subtotalFromBase": true,
+    "metricFormatType": "reserved",
+    "thresholds": [],
+    "embeddedObjects": [
+     {
+      "id": "FB08BE7FED4883046261C2A95D2BE8BB",
+      "subType": "agg_metric",
+      "expression": {
+       "text": "Count(ORDER_ID)",
+       "tokens": [
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "Count",
+         "type": "function",
+         "target": {
+          "dateCreated": "2025-05-29T19:58:08.059Z",
+          "dateModified": "2025-05-29T19:58:08.059Z",
+          "versionId": "CD5315C011DF671600088AA0669A0C20",
+          "acg": 255,
+          "objectId": "8107C31CDD9911D3B98100C04F2233EA",
+          "subType": "function",
+          "name": "Count",
+          "description": "Returns the number of values the ValueList. This is a group-value function."
+         }
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "<",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "Distinct",
+         "type": "identifier"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "=",
+         "type": "function"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "True",
+         "type": "boolean"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": ",",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "UseLookupForAttributes",
+         "type": "identifier"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "=",
+         "type": "function"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "False",
+         "type": "boolean"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": ">",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "(",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "ORDER_ID",
+         "type": "object_reference",
+         "target": {
+          "dateCreated": "2026-06-11T02:54:52.497Z",
+          "dateModified": "2026-06-11T02:54:52.497Z",
+          "versionId": "84B42A0C924A8022105EC3BFDBA5539B",
+          "acg": 255,
+          "objectId": "6CD8AF360D1B40259910F69C0122F3E5",
+          "subType": "fact_metric",
+          "name": "ORDER_ID"
+         }
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": ")",
+         "type": "character"
+        },
+        {
+         "level": "resolved",
+         "state": "initial",
+         "value": "",
+         "type": "end_of_text"
+        }
+       ]
+      }
+     }
+    ],
+    "pushDownBehavior": "automatic"
+   }
+  ]
+ },
+ "links": {
+  "offset": 0,
+  "limit": -1,
+  "total": 0,
+  "links": []
+ },
+ "hierarchy": {
+  "relationships": [
+   {
+    "parent": {
+     "objectId": "8A31FB1D1D454A7D943C5D18DA2F3F1B",
+     "subType": "attribute",
+     "name": "Year"
+    },
+    "child": {
+     "objectId": "FCC42217F759485DB03D155EAA9B727A",
+     "subType": "attribute",
+     "name": "Month"
+    },
+    "relationshipTable": {
+     "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+     "subType": "logical_table",
+     "name": "DATE_DIM"
+    },
+    "relationshipType": "one_to_many"
+   },
+   {
+    "parent": {
+     "objectId": "EAD7F93400BF440C83C41419DBF2E17E",
+     "subType": "attribute",
+     "name": "Region"
+    },
+    "child": {
+     "objectId": "854CFD98AC1E4CD68FC0FA75B9A17594",
+     "subType": "attribute",
+     "name": "Store"
+    },
+    "relationshipTable": {
+     "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+     "subType": "logical_table",
+     "name": "STORE_DIM"
+    },
+    "relationshipType": "one_to_many"
+   },
+   {
+    "parent": {
+     "objectId": "D2A1321AC2AE45CAA719BC68730D8317",
+     "subType": "attribute",
+     "name": "Category"
+    },
+    "child": {
+     "objectId": "9B0445D348354586AA1EBA2DBC97032B",
+     "subType": "attribute",
+     "name": "Product"
+    },
+    "relationshipTable": {
+     "objectId": "7751DF0514D64104A56548A014AB7253",
+     "subType": "logical_table",
+     "name": "PRODUCT_DIM"
+    },
+    "relationshipType": "one_to_many"
+   },
+   {
+    "parent": {
+     "objectId": "FCC42217F759485DB03D155EAA9B727A",
+     "subType": "attribute",
+     "name": "Month"
+    },
+    "child": {
+     "objectId": "A9DB3C84879F4F57819A7A7BFB518507",
+     "subType": "attribute",
+     "name": "Day"
+    },
+    "relationshipTable": {
+     "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+     "subType": "logical_table",
+     "name": "DATE_DIM"
+    },
+    "relationshipType": "one_to_many"
+   }
+  ],
+  "isolatedAttributes": [
+   {
+    "objectId": "A0B193BE721E4C10B161B49A5086F97F",
+    "subType": "attribute",
+    "name": "Order Channel"
+   }
+  ]
+ },
+ "attributeRelationships": {
+  "Region": {
+   "relationships": [
+    {
+     "parent": {
+      "objectId": "EAD7F93400BF440C83C41419DBF2E17E",
+      "subType": "attribute",
+      "name": "Region"
+     },
+     "child": {
+      "objectId": "854CFD98AC1E4CD68FC0FA75B9A17594",
+      "subType": "attribute",
+      "name": "Store"
+     },
+     "relationshipTable": {
+      "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+      "subType": "logical_table",
+      "name": "STORE_DIM"
+     },
+     "relationshipType": "one_to_many"
+    }
+   ]
+  },
+  "Category": {
+   "relationships": [
+    {
+     "parent": {
+      "objectId": "D2A1321AC2AE45CAA719BC68730D8317",
+      "subType": "attribute",
+      "name": "Category"
+     },
+     "child": {
+      "objectId": "9B0445D348354586AA1EBA2DBC97032B",
+      "subType": "attribute",
+      "name": "Product"
+     },
+     "relationshipTable": {
+      "objectId": "7751DF0514D64104A56548A014AB7253",
+      "subType": "logical_table",
+      "name": "PRODUCT_DIM"
+     },
+     "relationshipType": "one_to_many"
+    }
+   ]
+  },
+  "Year": {
+   "relationships": [
+    {
+     "parent": {
+      "objectId": "8A31FB1D1D454A7D943C5D18DA2F3F1B",
+      "subType": "attribute",
+      "name": "Year"
+     },
+     "child": {
+      "objectId": "FCC42217F759485DB03D155EAA9B727A",
+      "subType": "attribute",
+      "name": "Month"
+     },
+     "relationshipTable": {
+      "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+      "subType": "logical_table",
+      "name": "DATE_DIM"
+     },
+     "relationshipType": "one_to_many"
+    }
+   ]
+  },
+  "Month": {
+   "relationships": [
+    {
+     "parent": {
+      "objectId": "8A31FB1D1D454A7D943C5D18DA2F3F1B",
+      "subType": "attribute",
+      "name": "Year"
+     },
+     "child": {
+      "objectId": "FCC42217F759485DB03D155EAA9B727A",
+      "subType": "attribute",
+      "name": "Month"
+     },
+     "relationshipTable": {
+      "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+      "subType": "logical_table",
+      "name": "DATE_DIM"
+     },
+     "relationshipType": "one_to_many"
+    },
+    {
+     "parent": {
+      "objectId": "FCC42217F759485DB03D155EAA9B727A",
+      "subType": "attribute",
+      "name": "Month"
+     },
+     "child": {
+      "objectId": "A9DB3C84879F4F57819A7A7BFB518507",
+      "subType": "attribute",
+      "name": "Day"
+     },
+     "relationshipTable": {
+      "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+      "subType": "logical_table",
+      "name": "DATE_DIM"
+     },
+     "relationshipType": "one_to_many"
+    }
+   ]
+  },
+  "Store": {
+   "relationships": [
+    {
+     "parent": {
+      "objectId": "EAD7F93400BF440C83C41419DBF2E17E",
+      "subType": "attribute",
+      "name": "Region"
+     },
+     "child": {
+      "objectId": "854CFD98AC1E4CD68FC0FA75B9A17594",
+      "subType": "attribute",
+      "name": "Store"
+     },
+     "relationshipTable": {
+      "objectId": "AB1D7AAA17A74767AD5866D5D335C690",
+      "subType": "logical_table",
+      "name": "STORE_DIM"
+     },
+     "relationshipType": "one_to_many"
+    }
+   ]
+  },
+  "Product": {
+   "relationships": [
+    {
+     "parent": {
+      "objectId": "D2A1321AC2AE45CAA719BC68730D8317",
+      "subType": "attribute",
+      "name": "Category"
+     },
+     "child": {
+      "objectId": "9B0445D348354586AA1EBA2DBC97032B",
+      "subType": "attribute",
+      "name": "Product"
+     },
+     "relationshipTable": {
+      "objectId": "7751DF0514D64104A56548A014AB7253",
+      "subType": "logical_table",
+      "name": "PRODUCT_DIM"
+     },
+     "relationshipType": "one_to_many"
+    }
+   ]
+  },
+  "Day": {
+   "relationships": [
+    {
+     "parent": {
+      "objectId": "FCC42217F759485DB03D155EAA9B727A",
+      "subType": "attribute",
+      "name": "Month"
+     },
+     "child": {
+      "objectId": "A9DB3C84879F4F57819A7A7BFB518507",
+      "subType": "attribute",
+      "name": "Day"
+     },
+     "relationshipTable": {
+      "objectId": "BA9F072B540349BCA4A66E8FA184DDA8",
+      "subType": "logical_table",
+      "name": "DATE_DIM"
+     },
+     "relationshipType": "one_to_many"
+    }
+   ]
+  },
+  "Order Channel": {
+   "relationships": []
+  }
+ }
+}
