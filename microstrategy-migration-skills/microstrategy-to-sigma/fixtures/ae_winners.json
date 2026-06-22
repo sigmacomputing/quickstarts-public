@@ -1,0 +1,23 @@
+{
+ "Monthly Revenue Trend": {
+  "quirkKeyCol": "MONTH_NUMBER",
+  "quirkDescCol": "MONTH_NAME",
+  "parentKeyCols": [
+   "YEAR"
+  ],
+  "winners": [
+   {"Month Number": 1, "Year": 2024},
+   {"Month Number": 2, "Year": 2026},
+   {"Month Number": 3, "Year": 2025},
+   {"Month Number": 4, "Year": 2026},
+   {"Month Number": 5, "Year": 2026},
+   {"Month Number": 6, "Year": 2024},
+   {"Month Number": 7, "Year": 2025},
+   {"Month Number": 8, "Year": 2024},
+   {"Month Number": 9, "Year": 2025},
+   {"Month Number": 10, "Year": 2025},
+   {"Month Number": 11, "Year": 2025},
+   {"Month Number": 12, "Year": 2025}
+  ]
+ }
+}

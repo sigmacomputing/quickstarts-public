@@ -1,0 +1,396 @@
+{
+ "id": "77EFB43F5B441BA7B6EEECAB4D92A7EF",
+ "name": "Orders Performance Overview",
+ "datasets": [
+  {
+   "name": "Revenue by Region and Category",
+   "id": "5C8ABD78BC4EA7F4AF876E97091E6BA5",
+   "availableObjects": [
+    {
+     "id": "6140BFA7309B406AA76A90454BC7BB53",
+     "name": "Region",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "varChar",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "13AF74581AA84A46B8FD2D1BBA073150",
+     "name": "Category",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "varChar",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "413D98E4993B4D6ABB2DC440F7B31971",
+     "name": "Total Net Revenue",
+     "type": "metric"
+    },
+    {
+     "id": "653830C2CB684809B7030FBBEA498C8C",
+     "name": "Total Gross Profit",
+     "type": "metric"
+    },
+    {
+     "id": "5393F49A94A443E79E38CB3855B0272F",
+     "name": "Profit Margin Pct",
+     "type": "metric"
+    }
+   ],
+   "rows": [
+    {
+     "id": "6140BFA7309B406AA76A90454BC7BB53",
+     "name": "Region",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "varChar",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "13AF74581AA84A46B8FD2D1BBA073150",
+     "name": "Category",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "varChar",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "id": "00000000000000000000000000000000",
+     "name": "Metrics",
+     "type": "templateMetrics",
+     "elements": [
+      {
+       "name": "Total Net Revenue",
+       "id": "413D98E4993B4D6ABB2DC440F7B31971",
+       "type": "metric",
+       "dataType": "reserved"
+      },
+      {
+       "name": "Total Gross Profit",
+       "id": "653830C2CB684809B7030FBBEA498C8C",
+       "type": "metric",
+       "dataType": "reserved"
+      },
+      {
+       "name": "Profit Margin Pct",
+       "id": "5393F49A94A443E79E38CB3855B0272F",
+       "type": "metric",
+       "dataType": "reserved"
+      }
+     ]
+    }
+   ],
+   "pageBy": []
+  },
+  {
+   "name": "Monthly Revenue Trend",
+   "id": "864205BFBA4B4E6E863C3FB42FB0A406",
+   "availableObjects": [
+    {
+     "id": "C025482DAE4C4BFDA72E8297D981ABAC",
+     "name": "Year",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "decimal",
+       "baseFormCategory": "ID",
+       "baseFormType": "number"
+      }
+     ]
+    },
+    {
+     "id": "C3292DAD4FAF404F88590CB19C3930F9",
+     "name": "Month",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+       "name": "DESC",
+       "dataType": "varChar",
+       "baseFormCategory": "DESC",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "413D98E4993B4D6ABB2DC440F7B31971",
+     "name": "Total Net Revenue",
+     "type": "metric"
+    },
+    {
+     "id": "145746BAC65E4BF39E83149A843A3DF7",
+     "name": "Order Count",
+     "type": "metric"
+    }
+   ],
+   "rows": [
+    {
+     "id": "C025482DAE4C4BFDA72E8297D981ABAC",
+     "name": "Year",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "decimal",
+       "baseFormCategory": "ID",
+       "baseFormType": "number"
+      }
+     ]
+    },
+    {
+     "id": "C3292DAD4FAF404F88590CB19C3930F9",
+     "name": "Month",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "CCFBE2A5EADB4F50941FB879CCF1721C",
+       "name": "DESC",
+       "dataType": "varChar",
+       "baseFormCategory": "DESC",
+       "baseFormType": "text"
+      }
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "id": "00000000000000000000000000000000",
+     "name": "Metrics",
+     "type": "templateMetrics",
+     "elements": [
+      {
+       "name": "Total Net Revenue",
+       "id": "413D98E4993B4D6ABB2DC440F7B31971",
+       "type": "metric",
+       "dataType": "reserved"
+      },
+      {
+       "name": "Order Count",
+       "id": "145746BAC65E4BF39E83149A843A3DF7",
+       "type": "metric",
+       "dataType": "reserved"
+      }
+     ]
+    }
+   ],
+   "pageBy": []
+  },
+  {
+   "name": "Channel Performance",
+   "id": "69759BAD734F3EB9308219B61D916432",
+   "availableObjects": [
+    {
+     "id": "E951AA8437BF46BB860E98F0DB349617",
+     "name": "Order Channel",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "varChar",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "413D98E4993B4D6ABB2DC440F7B31971",
+     "name": "Total Net Revenue",
+     "type": "metric"
+    },
+    {
+     "id": "3BF64C66D95D41888EE5EEDEFAFB7C69",
+     "name": "Units Sold",
+     "type": "metric"
+    },
+    {
+     "id": "145746BAC65E4BF39E83149A843A3DF7",
+     "name": "Order Count",
+     "type": "metric"
+    }
+   ],
+   "rows": [
+    {
+     "id": "E951AA8437BF46BB860E98F0DB349617",
+     "name": "Order Channel",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "varChar",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "id": "00000000000000000000000000000000",
+     "name": "Metrics",
+     "type": "templateMetrics",
+     "elements": [
+      {
+       "name": "Total Net Revenue",
+       "id": "413D98E4993B4D6ABB2DC440F7B31971",
+       "type": "metric",
+       "dataType": "reserved"
+      },
+      {
+       "name": "Units Sold",
+       "id": "3BF64C66D95D41888EE5EEDEFAFB7C69",
+       "type": "metric",
+       "dataType": "reserved"
+      },
+      {
+       "name": "Order Count",
+       "id": "145746BAC65E4BF39E83149A843A3DF7",
+       "type": "metric",
+       "dataType": "reserved"
+      }
+     ]
+    }
+   ],
+   "pageBy": []
+  }
+ ],
+ "currentChapter": "K123",
+ "chapters": [
+  {
+   "key": "K65",
+   "name": "Revenue by Region and Category",
+   "pages": [
+    {
+     "key": "K85",
+     "name": "Page 1",
+     "visualizations": [
+      {
+       "key": "K86",
+       "name": "Visualization 1",
+       "visualizationType": "grid"
+      }
+     ]
+    }
+   ],
+   "filters": [
+    {
+     "key": "K201",
+     "name": "Region",
+     "source": {
+      "id": "6140BFA7309B406AA76A90454BC7BB53",
+      "name": "Region"
+     }
+    }
+   ]
+  },
+  {
+   "key": "K69",
+   "name": "Monthly Revenue Trend",
+   "pages": [
+    {
+     "key": "K120",
+     "name": "Page 1",
+     "visualizations": [
+      {
+       "key": "K121",
+       "name": "Visualization 1",
+       "visualizationType": "grid"
+      }
+     ],
+     "selectors": [
+      {
+       "key": "K124",
+       "name": "Year",
+       "selectorType": "attribute_selector_lists",
+       "source": {
+        "id": "C025482DAE4C4BFDA72E8297D981ABAC",
+        "name": "Year"
+       },
+       "multiSelectionAllowed": true,
+       "hasAll": true,
+       "targets": [
+        {
+         "key": "K121"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "filters": []
+  },
+  {
+   "key": "K123",
+   "name": "Channel Performance",
+   "pages": [
+    {
+     "key": "K158",
+     "name": "Page 1",
+     "visualizations": [
+      {
+       "key": "K159",
+       "name": "Visualization 1",
+       "visualizationType": "grid"
+      }
+     ],
+     "selectors": [
+      {
+       "key": "K160",
+       "name": "Order Channel",
+       "selectorType": "attribute_selector_lists",
+       "source": {
+        "id": "E951AA8437BF46BB860E98F0DB349617",
+        "name": "Order Channel"
+       },
+       "multiSelectionAllowed": true,
+       "hasAll": true,
+       "targets": [
+        {
+         "key": "K159"
+        }
+       ]
+      },
+      {
+       "key": "K162",
+       "name": "Panel Selector 1",
+       "selectorType": "panel_selector_button_bar",
+       "targets": []
+      }
+     ]
+    }
+   ],
+   "filters": []
+  }
+ ]
+}
