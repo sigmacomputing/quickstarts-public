@@ -40,10 +40,9 @@ base = $stdin.gets.chomp
 base = "https://aws-api.sigmacomputing.com" if base.empty?
 
 print "Client ID: "
-cid = $stdin.noecho(&:gets).chomp
-puts
+cid = $stdin.gets.chomp
 
-print "Client Secret: "
+print "Client Secret (will be hidden): "
 sec = $stdin.noecho(&:gets).chomp
 puts
 
