@@ -1,0 +1,121 @@
+{
+  "analyses": [
+    {
+      "analysisId": "orders-overview",
+      "name": "Orders Overview",
+      "dataset_ids": [
+        "ds-orders-enriched"
+      ],
+      "dataset_source_types": [
+        "CustomSql"
+      ],
+      "recommended_path": "quicksight-to-sigma",
+      "priority_tier": "moderate",
+      "score": 3.21,
+      "views": null,
+      "calc_buckets": {
+        "a": 3,
+        "b": 0,
+        "c": 0
+      },
+      "blockers": [
+        "2 restructuring/join/transform/RLS/param feature(s)"
+      ],
+      "cluster_id": "cluster-01-customers"
+    },
+    {
+      "analysisId": "sales-deep-dive",
+      "name": "Sales Deep Dive",
+      "dataset_ids": [
+        "ds-orders-enriched",
+        "ds-customers"
+      ],
+      "dataset_source_types": [
+        "CustomSql",
+        "RelationalTable"
+      ],
+      "recommended_path": "quicksight-to-sigma-with-scout",
+      "priority_tier": "needs-gap-scout",
+      "score": 0.89,
+      "views": null,
+      "calc_buckets": {
+        "a": 4,
+        "b": 1,
+        "c": 1
+      },
+      "blockers": [
+        "2 unhandled feature(s) (window calc / exotic visual / free-form layout / FilterGroups)",
+        "8 restructuring/join/transform/RLS/param feature(s)"
+      ],
+      "cluster_id": "cluster-01-customers"
+    },
+    {
+      "analysisId": "exec-ml-board",
+      "name": "Exec ML Board",
+      "dataset_ids": [
+        "ds-orders-enriched"
+      ],
+      "dataset_source_types": [
+        "CustomSql"
+      ],
+      "recommended_path": "quicksight-to-sigma-with-scout",
+      "priority_tier": "needs-gap-scout",
+      "score": 0.27,
+      "views": null,
+      "calc_buckets": {
+        "a": 1,
+        "b": 0,
+        "c": 3
+      },
+      "blockers": [
+        "7 unhandled feature(s) (window calc / exotic visual / free-form layout / FilterGroups)",
+        "1 restructuring/join/transform/RLS/param feature(s)"
+      ],
+      "cluster_id": "cluster-01-customers"
+    }
+  ],
+  "dm_clusters": [
+    {
+      "id": "cluster-01-customers",
+      "dataset_ids": [
+        "ds-customers",
+        "ds-orders-enriched"
+      ],
+      "dataset_names": [
+        "Customers",
+        "Orders Enriched"
+      ],
+      "analysisIds": [
+        "orders-overview",
+        "sales-deep-dive",
+        "exec-ml-board"
+      ],
+      "analysis_names": [
+        "Orders Overview",
+        "Sales Deep Dive",
+        "Exec ML Board"
+      ],
+      "shared_source_types": [
+        "CustomSql",
+        "RelationalTable"
+      ],
+      "cluster_size": 3
+    }
+  ],
+  "summary": {
+    "analyses_total": 3,
+    "analyses_ready": 1,
+    "analyses_need_scout": 2,
+    "analyses_blocked": 0,
+    "analyses_retire": 0,
+    "cluster_count": 1,
+    "usage_available": false,
+    "suggested_batch": [
+      {
+        "analysisId": "orders-overview",
+        "name": "Orders Overview",
+        "cluster_id": "cluster-01-customers"
+      }
+    ]
+  }
+}

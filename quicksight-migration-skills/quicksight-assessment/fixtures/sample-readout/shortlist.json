@@ -1,0 +1,79 @@
+{
+  "usage_available": false,
+  "value_basis": "complexity-only proxy (sheets + visuals/4)",
+  "analyses": [
+    {
+      "name": "Orders Overview",
+      "id": "orders-overview",
+      "sheets": 1,
+      "visuals": 5,
+      "views": null,
+      "users": null,
+      "auto": 8,
+      "hint": 0,
+      "manual": 2,
+      "unhandled": 0,
+      "calc_buckets": {
+        "a": 3,
+        "b": 0,
+        "c": 0
+      },
+      "dataset_source_types": [
+        "CustomSql"
+      ],
+      "value": 22.5,
+      "cost": 6,
+      "score": 3.21,
+      "tag": "moderate"
+    },
+    {
+      "name": "Sales Deep Dive",
+      "id": "sales-deep-dive",
+      "sheets": 2,
+      "visuals": 8,
+      "views": null,
+      "users": null,
+      "auto": 9,
+      "hint": 0,
+      "manual": 8,
+      "unhandled": 2,
+      "calc_buckets": {
+        "a": 4,
+        "b": 1,
+        "c": 1
+      },
+      "dataset_source_types": [
+        "CustomSql",
+        "RelationalTable"
+      ],
+      "value": 40.0,
+      "cost": 44,
+      "score": 0.89,
+      "tag": "needs-gap-scout"
+    },
+    {
+      "name": "Exec ML Board",
+      "id": "exec-ml-board",
+      "sheets": 1,
+      "visuals": 4,
+      "views": null,
+      "users": null,
+      "auto": 2,
+      "hint": 0,
+      "manual": 1,
+      "unhandled": 7,
+      "calc_buckets": {
+        "a": 1,
+        "b": 0,
+        "c": 3
+      },
+      "dataset_source_types": [
+        "CustomSql"
+      ],
+      "value": 20.0,
+      "cost": 73,
+      "score": 0.27,
+      "tag": "needs-gap-scout"
+    }
+  ]
+}
