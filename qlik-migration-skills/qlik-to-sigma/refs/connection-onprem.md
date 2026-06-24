@@ -16,14 +16,22 @@ python3 scripts/qlik-discover.py --app <appId> --out extract/
 
 Everything downstream (converter, DM/workbook build, parity) is identical to Cloud.
 
-> **Validation status:** the shim's Engine/QIX layer is **live-verified** — a full
-> discovery run through the shim produced output **identical (order-insensitive)**
-> to a qlik-cli run on the same app (script, charts, master items, layout, KPI/
-> bucket snapshot values). The QIX protocol is the same on-prem and Cloud. The
-> **QRS layer and on-prem auth bootstrap are code-complete but not yet live-run**
-> (Cloud has no QRS) — on your first on-prem engagement, expect to debug there
-> first, not in discovery/conversion. Without QRS, only `appName`/`lastReloadTime`
-> metadata degrade — discovery still completes.
+> **Validation status — read before promising on-prem.** The shim's command/output
+> layer is verified **output-identical to qlik-cli** — a full discovery run through
+> the shim produced output **identical (order-insensitive)** to a qlik-cli run on the
+> same app (script, charts, master items, layout, KPI/bucket snapshot values).
+> **Important: that run was against a live Qlik _Cloud_ tenant, not an on-prem
+> server.** The QIX protocol is identical on-prem and Cloud, so the command-parsing
+> and output-shaping logic carries over — but the **on-prem-specific path has not yet
+> been run live anywhere:** certificate/JWT auth, the QRS layer (Cloud has no QRS),
+> and the Engine transport *against an on-prem server* (WebSocket to :4747 with
+> `X-Qlik-User`, or through a virtual proxy) are all **code-complete but unproven
+> end-to-end**. Your first on-prem engagement is the first live test — expect to
+> debug there (auth / ports / proxy), not in discovery or conversion. Failure is
+> bounded, though: a QRS failure is non-fatal (the shim warns and continues), so only
+> `appName`/`lastReloadTime`/Section-Access metadata degrade — discovery still
+> completes off the Engine layer. Only an empty load script (an Engine-layer read)
+> hard-fails.
 
 > **QlikView is NOT covered.** It's a different product (.qvw + the old QMS API,
 > no QIX engine surface in this form). If the customer says "Qlik on-prem",
