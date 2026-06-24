@@ -72,6 +72,11 @@ drop it silently.
 - [ ] **No clipped titles/values.** KPI bands are ≥ 5 grid rows (titles hide below that); side
       charts are ≥ 6 columns wide (narrower truncates the title); table tiles show all rows
       without cutting off the summary bar.
+- [ ] **Trend/comparison KPIs are tall enough to show the spark.** A KPI stacks title → value →
+      comparison → sparkline and drops the lower items first when short, so a KPI carrying a
+      sparkline or delta needs ~8+ grid rows (~240px), not 5. If you built a sparkline but the
+      render shows only the number, grow the tile's `gridRow` span and re-export before concluding
+      it failed — a too-short tile makes a real spark look missing.
 - [ ] **Even heights.** Charts in one band share an inner row span; sibling chart bands match.
 - [ ] **Right chart kind & formatting.** The rendered viz matches the source (no silently-dropped
       log scale, data labels, `$`/`%` formats, or palette).
@@ -112,6 +117,9 @@ drop it silently.
 - [ ] **Containers are for bands, not decoration.** No chart wrapped in its own card *inside* a band
       container (card-in-card flattens hierarchy). Separate content levels with spacing, type, and
       dividers before adding another container. *AI tell: nested cards.*
+- [ ] **Tables use the presentation style.** `table` / `pivot-table` elements carry
+      `tableStyle: {preset: presentation}` (roomier than the dense `spreadsheet` default) unless the
+      source is a true data grid; any source in-cell **data bars** are carried over (`dataBars`).
 
 ## Building clean in the first place (so the gate rarely fails)
 
@@ -128,7 +136,7 @@ header band → control band → KPI band → chart rows → detail row. Verifie
 |---|---|---|
 | Header | rows `1 / 4`, style `#0F172A` + `round` | full-width title text, inner `1 / 25` |
 | Control row | 3 rows | controls side-by-side, inner row `1 / 4` |
-| KPI row | ≥ 5 rows | N KPIs side-by-side, equal col spans (true peers → equal is correct here) |
+| KPI row | ≥ 5 rows (≥ 8 if KPIs carry a sparkline/comparison) | N KPIs side-by-side, equal col spans (true peers → equal is correct here) |
 | Chart row | 11–12 rows | 2–3 charts side-by-side, identical inner row span, each ≥ 6 cols |
 | Detail table | content + summary (~4 rows + ~0.7/row) | never a fixed 20 (dead space) |
 
@@ -144,6 +152,14 @@ doesn't dictate otherwise — §3 fidelity caveat):
   rest to the neutral surface.
 - **Let type carry hierarchy.** Header title > section titles > KPI values > labels — don't flatten
   everything to one size.
+
+**Table style — default to `presentation`.** Set `tableStyle: {preset: presentation}` on every
+`table` / `pivot-table` element (roomier rows, lighter grid lines — matches how most source BI tools
+present tables and reads better than Sigma's dense `spreadsheet` default). Keep `spreadsheet` only when
+the source is explicitly a dense data grid. This is spec-authorable and round-trips but is **frequently
+dropped** in migrations — set it deliberately. While you're styling the table, carry over any source
+in-cell bars with `conditionalFormats: [{type: dataBars, columnIds: [<aggregate col id>], scheme: ["#a4dfc0","#4caf7d"]}]`
+(also spec-authorable, also commonly dropped). See sigma-workbooks `tables.md` for the full field set.
 
 ## Known render caveats (not fixable via spec — keep titles short, drop redundant legends)
 

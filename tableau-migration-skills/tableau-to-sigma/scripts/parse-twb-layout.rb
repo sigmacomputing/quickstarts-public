@@ -69,10 +69,22 @@ end
 # Filter columns use a column-instance level reference like
 #   `[federated.X].[none:c2ec6b07-...:qk]`
 # where `none` is the derivation and `qk`/`nk` is pivot/key qualifier. Strip
-# both and extract the GUID.
+# both and extract the column id.
+#
+# Two id shapes occur:
+#   - raw warehouse columns → a 36-char hex GUID (`c2ec6b07-...`)
+#   - CALCULATED fields      → the calc's internal id (`Calculation_<digits>`)
+# Both are registered in COL_BY_GUID (the latter keyed by its `Calculation_…`
+# head), so resolving either form lets a filter bound to a calc field surface a
+# real caption instead of being silently dropped by the auto-control builder
+# ("shared filter has no resolvable column_caption"). The raw-GUID behaviour is
+# unchanged — we only add the calc-id alternative.
+#   - raw warehouse columns by FRIENDLY NAME (`none:Region:nk`) — simple
+#     columns whose instance ref uses the column name rather than a GUID; the
+#     friendly head (`Region`) is registered in COL_BY_GUID too.
 def guid_from_param(param)
   return nil if param.nil? || param.empty?
-  m = param.match(/\.\[(?:[a-z\-]+:)?([0-9a-f\-]{36})(?::[a-z]+)?\]$/i)
+  m = param.match(/\.\[(?:[a-z\-]+:)?([0-9a-f\-]{36}|Calculation_\d+|[A-Za-z_][\w. ]*)(?::[a-z]+)?\]$/i)
   m && m[1]
 end
 
@@ -190,7 +202,15 @@ def parse_shelf(shelf_str)
           'measure_count' => 0, 'has_measure_names' => false }
   return out if shelf_str.nil? || shelf_str.strip.empty?
   shelf_str.split('/').each do |f|
-    raw_field = f.strip
+    # Nested shelves wrap the field list in parens —
+    #   `([ds].[none:A:nk] / [ds].[none:B:nk])`
+    # — so split('/') leaves a leading '(' on the first field and a trailing
+    # ')' on the last. Strip surrounding parens/whitespace; otherwise
+    # guid_from_param / classify_shelf_field (both anchored on a trailing ']')
+    # miss, and the nested dim keeps its raw federated GUID and POSTs as a
+    # broken `[Master/<guid>:nk])` dependency. (Field refs never contain
+    # parens, so this is safe for flat and ≥2-level nested shelves alike.)
+    raw_field = f.strip.gsub(/\A[(\s]+/, '').gsub(/[)\s]+\z/, '')
     next if raw_field.empty?
     role, deriv = classify_shelf_field(raw_field)
     case role
@@ -218,6 +238,26 @@ end
 # - rows_shelf / cols_shelf: structured summary of dims/measures on each shelf
 # - is_crosstab: convenience flag — true when the worksheet is a Tableau crosstab
 #   (Text/Square mark + dims on both shelves, or Measure Names crosstab)
+# Top-level datasource calc definitions — the SOURCE OF TRUTH for a calc's
+# formula. Worksheet <datasource-dependencies> blocks carry CACHED copies that
+# go stale when the calc is later edited in the datasource (caught live on
+# WINPROBE: the funnel's [Return Rate] dependency block said SUM/COUNTD while
+# the top-level datasource — and Tableau's actual evaluation + CSV export —
+# said SUM/COUNT). Keyed by internal column name; used to OVERRIDE the
+# per-worksheet formula on name match.
+ds_calc_formulas = {}
+xml.elements.each('/workbook/datasources/datasource') do |ds|
+  ds_label = (ds.attributes['caption'] || ds.attributes['name']).to_s
+  next if ds_label.start_with?('Parameter')
+  ds.elements.each('column') do |col|
+    calc = col.elements['calculation']
+    next unless calc && calc.attributes['class'] == 'tableau'
+    f = calc.attributes['formula']
+    next if f.nil? || f.empty?
+    ds_calc_formulas[col.attributes['name'].to_s] = f
+  end
+end
+
 worksheets = {}
 xml.elements.each('//worksheet') do |ws|
   name = ws.attributes['name']
@@ -254,6 +294,19 @@ xml.elements.each('//worksheet') do |ws|
     sort_info = {
       direction: s.attributes['direction'],
       column:    s.attributes['column']
+    }
+  end
+  # "Sort field X by measure Y" lands as <computed-sort column='<dim ref>'
+  # direction='ASC|DESC' using='<measure column-instance ref>'/> — a DIFFERENT
+  # element from <sort>. Window-function worksheets (pareto / rank) rely on it:
+  # Sigma Cumulative* / Rank follow the chart's xAxis sort, so dropping the
+  # computed-sort silently re-accumulates in natural order and every cumulative
+  # value diverges. `using` is carried so build-charts can sort by the measure.
+  if sort_info.nil? && (cs = ws.elements['.//computed-sort'])
+    sort_info = {
+      direction: (cs.attributes['direction'].to_s =~ /desc/i ? 'descending' : 'ascending'),
+      column:    cs.attributes['column'],
+      using:     cs.attributes['using']
     }
   end
 
@@ -333,7 +386,11 @@ xml.elements.each('//worksheet') do |ws|
     deriv = ci.attributes['derivation']
     next if col.nil? || deriv.nil?
     next unless ci.attributes['type'] == 'quantitative'
-    next if %w[None User].include?(deriv)
+    # 'None' = raw (non-aggregated) usage — not a measure. 'User' IS a measure:
+    # a user-aggregated calc field (ratio KPIs like Gross Margin Pct). Excluding
+    # it made every calc-measure KPI read as 0-measure and fall through to the
+    # flat-table flow (bead 3w4d — "CSV has only 1 column" KPI drops).
+    next if deriv == 'None'
     measures << { 'column' => col.to_s, 'derivation' => deriv.to_s }
   end
   # Conservative: only flag dual_axis when Tableau explicitly synchronized two
@@ -413,7 +470,7 @@ xml.elements.each('//worksheet') do |ws|
     cls  = calc.attributes['class']
     formula = calc.attributes['formula']
     next if formula.nil? || formula.empty?
-    calcs << {
+    entry = {
       'name'    => col.attributes['name'],
       'caption' => col.attributes['caption'],
       'datatype'=> col.attributes['datatype'],
@@ -421,6 +478,22 @@ xml.elements.each('//worksheet') do |ws|
       'class'   => cls,
       'formula' => formula
     }
+    # Tableau numeric bins are calc columns with class='bin': `formula` is the
+    # base field ref, `size` (or a `size-parameter` ref) is the bin width and
+    # `peg` the bin origin. Surfaced so build-charts-from-signals.rb can emit
+    # the Sigma-native BinFixed/BinRange translation (beads-sigma-t67b).
+    if cls == 'bin'
+      entry['bin_size'] = calc.attributes['size'] || calc.attributes['size-parameter']
+      entry['bin_peg']  = calc.attributes['peg']
+    end
+    # Stale-dependency override: the top-level datasource definition wins over
+    # the worksheet's cached copy (see ds_calc_formulas above).
+    ds_f = ds_calc_formulas[col.attributes['name'].to_s]
+    if cls == 'tableau' && ds_f && ds_f != formula
+      entry['stale_dependency_formula'] = formula
+      entry['formula'] = ds_f
+    end
+    calcs << entry
   end
 
   # Worksheet-level "Show Mark Labels" toggle. Tableau emits this on the
@@ -456,14 +529,20 @@ xml.elements.each('//worksheet') do |ws|
     (rows_shelf['measure_count'] + cols_shelf['measure_count'] + measures.size) >= 2
   is_crosstab = is_text_mark && (both_have_dims || measure_names_crosstab)
 
-  # KPI signal: Text/Square mark with ZERO dims on both shelves AND ≥1 measure
-  # (on shelves or on the worksheet's Marks card). Tableau "scorecard" /
-  # "big number" tiles match this shape — they're not detail lists, not
-  # crosstabs, just a single aggregated value rendered as text. Maps to
-  # Sigma kpi-chart. beads-sigma-bw3.
+  # KPI signal: Text/Square/AUTOMATIC mark with ZERO dims on both shelves AND
+  # ≥1 measure (on shelves or on the worksheet's Marks card). Tableau
+  # "scorecard" / "big number" tiles match this shape — they're not detail
+  # lists, not crosstabs, just a single aggregated value rendered as text.
+  # Maps to Sigma kpi-chart. beads-sigma-bw3.
+  # Automatic mark included (bead 3w4d): Tableau's default mark for a
+  # zero-dim single-measure sheet renders as a big-number text table — the
+  # FATSCALE rehearsal lost 14/40 tiles because these fell through to the
+  # CSV-driven flow (1-column CSV → zone dropped).
+  kpi_capable_mark = is_text_mark || mark_class.to_s.downcase == 'automatic' ||
+                     mark_class.to_s.empty?
   total_dim_count = rows_shelf['dim_count'] + cols_shelf['dim_count']
   total_measure_count = rows_shelf['measure_count'] + cols_shelf['measure_count'] + measures.size
-  is_kpi = is_text_mark && !is_crosstab &&
+  is_kpi = kpi_capable_mark && !is_crosstab &&
            total_dim_count == 0 && total_measure_count >= 1
 
   worksheets[name] = {
@@ -565,6 +644,29 @@ end
 #     as a bar in our experience but is not deterministic; we emit "automatic" so
 #     the agent KNOWS to look at the PNG before committing to a Sigma kind.
 #   - Geographic encoding presence beats mark class for map detection.
+# Tableau "Show Me" picks a mark for an Automatic worksheet deterministically
+# from the shelf structure. Replicate the high-value rules so an Automatic sheet
+# isn't blindly defaulted to a bar (the #1 first-pass fidelity miss — a time
+# series silently became bars). Conservative: only fires for mark=Automatic;
+# anything it can't classify still falls back to bar (and gets image-confirmed
+# downstream, since the kind was inferred not declared).
+DATE_GRAIN_DERIV = %w[tyr tqr tmn twk tdy thr tmi tsc yr qr mn wk dy hr mi sc].freeze
+def infer_automatic_kind(meta)
+  rs = meta[:rows_shelf] || {}
+  cs = meta[:cols_shelf] || {}
+  fields = (rs['fields'] || []) + (cs['fields'] || [])
+  dims = fields.select { |f| f['role'] == 'dim' }
+  meas = fields.select { |f| f['role'] == 'measure' }
+  has_date_dim = dims.any? { |f| DATE_GRAIN_DERIV.include?(f['derivation'].to_s.downcase) }
+  # 1) continuous date dimension + a measure → time-series LINE
+  return 'line' if has_date_dim && !meas.empty?
+  # 2) a measure on BOTH axes (rows AND cols), ≤1 dim → SCATTER
+  return 'scatter' if rs['measure_count'].to_i >= 1 && cs['measure_count'].to_i >= 1 && dims.size <= 1
+  # 3) categorical dim(s) + measure → BAR (Tableau's default for cat × measure)
+  return 'bar' if !dims.empty? && !meas.empty?
+  'bar'
+end
+
 def chart_kind_for(meta)
   return nil unless meta
   mc       = (meta[:mark_class] || '').downcase
@@ -592,10 +694,73 @@ def chart_kind_for(meta)
   when 'square'     then (meta[:is_crosstab] ? 'pivot-table' : (meta[:is_kpi] ? 'kpi' : 'table'))
   when 'text'       then (meta[:is_crosstab] ? 'pivot-table' : (meta[:is_kpi] ? 'kpi' : 'table'))
   when 'shape'      then 'scatter'
-  when 'automatic'  then 'automatic'              # Tableau's default-pick — verify against PNG
+  # Automatic is Tableau's default-pick — but a zero-dim single-measure sheet
+  # under Automatic renders as a big-number text table, i.e. a KPI (bead 3w4d).
+  when 'automatic'
+    # A measure on BOTH axes is unambiguously a scatter (not a big-number KPI),
+    # so it overrides the zero-dim KPI heuristic; otherwise zero-dim → KPI.
+    inferred = infer_automatic_kind(meta)
+    inferred == 'scatter' ? 'scatter' : (meta[:is_kpi] ? 'kpi' : inferred)
   when ''           then 'other'
   else 'other'
   end
+end
+
+# Map a Tableau zone `type-v2` (+ presence of a worksheet name) to our
+# zone-level kind label. Shared by the flat-zone loop and the nested
+# zone-tree builder so the two never diverge.
+def zone_kind(type_v2, caption)
+  case type_v2
+  when 'layout-basic', 'layout-flow' then 'container'
+  when 'text'                        then 'text'
+  when 'title'                       then 'title'
+  when 'filter'                      then 'filter'
+  when 'paramctrl'                   then 'parameter'
+  when 'color'                       then 'legend'
+  when 'empty'                       then 'spacer'
+  when 'dashboard-object'            then 'dashboard-object'
+  when nil
+    # No type-v2 + a worksheet name → this is the chart tile
+    caption ? 'chart' : 'container'
+  else type_v2
+  end
+end
+
+# Build a NESTED zone tree for a dashboard, preserving Tableau's container
+# hierarchy (layout-basic / layout-flow, nested arbitrarily). Each node carries
+# enough to drive a faithful Sigma container layout — kind, caption, bounds,
+# flow direction (vert/horz for layout-flow), the resolved filter/param target
+# column, and `children` (direct-child zones only). This is ADDITIVE: the flat
+# `zones` list (below) is preserved for every downstream consumer that wants the
+# geometry-banded path; the layout builder prefers the tree when present.
+def build_zone_tree(z)
+  type_v2 = z.attributes['type-v2']
+  caption = z.attributes['name']
+  param   = z.attributes['param']
+  kind    = zone_kind(type_v2, caption)
+  node = {
+    'id'      => z.attributes['id'],
+    'kind'    => kind,
+    'caption' => caption,
+    'x_pct'   => pct(z.attributes['x']),
+    'y_pct'   => pct(z.attributes['y']),
+    'w_pct'   => pct(z.attributes['w']),
+    'h_pct'   => pct(z.attributes['h'])
+  }
+  # layout-flow's `param` is the stack direction; a vertical flow stacks its
+  # children top-to-bottom (the classic left filter-rail), horizontal L→R.
+  node['direction'] = (param == 'vert' ? 'vert' : 'horz') if type_v2 == 'layout-flow'
+  # filter/param zones resolve their target column from `param` (a column GUID).
+  if kind == 'filter' || kind == 'parameter'
+    g = guid_from_param(param)
+    info = g ? COL_BY_GUID[g] : nil
+    node['filter_column_caption']  = info && info[:caption]
+    node['filter_column_datatype'] = info && info[:datatype]
+  end
+  kids = []
+  z.elements.each('zone') { |cz| next if cz.attributes['id'].nil?; kids << build_zone_tree(cz) }
+  node['children'] = kids unless kids.empty?
+  node
 end
 
 dashboards = []
@@ -612,23 +777,15 @@ xml.elements.each('//dashboard') do |d|
     view_ref = z.attributes['param']
 
     # Translate Tableau zone type-v2 → our zone-level kind label
-    kind = case type_v2
-           when 'layout-basic', 'layout-flow' then 'container'
-           when 'text'                        then 'text'
-           when 'title'                       then 'title'
-           when 'filter'                      then 'filter'
-           when 'paramctrl'                   then 'parameter'
-           when 'color'                       then 'legend'
-           when 'empty'                       then 'spacer'
-           when 'dashboard-object'            then 'dashboard-object'
-           when nil
-             # No type-v2 + a worksheet name → this is the chart tile
-             caption ? 'chart' : 'container'
-           else type_v2
-           end
+    kind = zone_kind(type_v2, caption)
 
     ws_meta    = caption ? worksheets[caption] : nil
     chart_kind = kind == 'chart' ? chart_kind_for(ws_meta) : nil
+    # The chart kind was INFERRED from shelves (Tableau mark=Automatic), not
+    # declared — flag it so the builder routes it to image confirmation.
+    chart_kind_inferred = kind == 'chart' &&
+                          ws_meta&.dig(:mark_class).to_s.downcase == 'automatic' &&
+                          chart_kind != 'kpi'
 
     # Resolve filter-zone param GUID → column caption when this is a filter
     # zone, so downstream tools don't need to re-walk the .twb.
@@ -649,6 +806,7 @@ xml.elements.each('//dashboard') do |d|
       'w_pct'        => pct(z.attributes['w']),
       'h_pct'        => pct(z.attributes['h']),
       'chart_kind'   => chart_kind,
+      'chart_kind_inferred' => chart_kind_inferred,
       'mark_class'   => ws_meta&.dig(:mark_class),
       'geo_role'     => ws_meta&.dig(:geo_role),
       # New per-worksheet signal fields (nil for non-chart zones)
@@ -672,9 +830,23 @@ xml.elements.each('//dashboard') do |d|
       'filter_column_datatype' => (kind == 'filter' || kind == 'parameter' ? filter_col_datatype : nil)
     }
   end
+  # A "storyboard" dashboard is Tableau's story container (sequential story
+  # points in a flipboard zone) — flag it so downstream layout builders don't
+  # treat the flipboard chrome as a regular chart page. The story itself is
+  # parsed into story-plan.json below (beads-sigma-y6b).
+  is_story = d.attributes['type-v2'] == 'storyboard' || !d.elements['.//story-points'].nil?
+  # Nested container tree (additive — see build_zone_tree). Walk the direct
+  # children of the dashboard's <zones> root so nesting is preserved.
+  zone_tree = []
+  if (root = d.elements['zones'])
+    root.elements.each('zone') { |z| next if z.attributes['id'].nil?; zone_tree << build_zone_tree(z) }
+  end
+
   dashboards << {
     'dashboard' => d.attributes['name'],
-    'zones'     => zones
+    'is_story'  => is_story,
+    'zones'     => zones,
+    'zone_tree' => zone_tree
   }
 end
 
@@ -802,19 +974,34 @@ end
 
 # Detect which worksheet calcs reference a parameter so the build script knows
 # which calcs to translate via Switch(). A calc references a parameter when its
-# formula contains `[Parameters].[X]` OR a bare `[X]` whose caption matches a
-# known parameter caption.
-param_caption_set = parameters.map { |p| p['caption'] }.compact.to_set rescue parameters.map { |p| p['caption'] }
+# formula contains `[Parameters].[X]` OR a bare `[X]` matching a known param.
+#
+# X may be the parameter's CAPTION ("Switch Metric") or its internal NAME
+# ("[Parameter 5]") depending on the .twb version. The auto-control builder keys
+# its orphan check on the caption, so a calc that references a param by name was
+# previously misflagged "orphan parameter" and its control silently skipped.
+# Resolve every ref — by name or caption — to the canonical caption so the
+# builder sees the param as referenced.
+param_caption_to_caption = {}
+parameters.each do |p|
+  cap = p['caption']
+  next if cap.nil? || cap.to_s.empty?
+  param_caption_to_caption[cap] = cap
+  nm = p['name'].to_s.gsub(/^\[|\]$/, '')
+  param_caption_to_caption[nm] = cap unless nm.empty?
+end
 worksheets.each do |_ws_name, w|
   next unless w[:calculations]
   w[:calculations].each do |c|
     f = c['formula'].to_s
     refs = []
-    # Explicit `[Parameters].[X]` references
-    f.scan(/\[Parameters?(?:\s*\([^)]*\))?\]\s*\.\s*\[([^\]]+)\]/i).flatten.each { |x| refs << x }
-    # Bare bracket-refs that match a parameter caption verbatim
+    # Explicit `[Parameters].[X]` references — X may be name or caption.
+    f.scan(/\[Parameters?(?:\s*\([^)]*\))?\]\s*\.\s*\[([^\]]+)\]/i).flatten.each do |x|
+      refs << (param_caption_to_caption[x] || x)
+    end
+    # Bare bracket-refs that resolve to a known parameter (by name or caption).
     f.scan(/\[([^\]\/]+)\]/).flatten.each do |x|
-      refs << x if param_caption_set.include?(x)
+      refs << param_caption_to_caption[x] if param_caption_to_caption.key?(x)
     end
     c['parameter_refs'] = refs.uniq unless refs.empty?
   end
@@ -835,8 +1022,64 @@ xml.elements.each('//shared-view') do |sv|
   end
 end
 
+## ---- Tableau stories (story points) ----------------------------------------
+# A Tableau story is a sequential slide deck: each <story-point> captures a
+# dashboard or worksheet plus a navigator caption. XML shapes in the wild:
+#   <story name='X'> ... <flipboard><story-points><story-point .../>   (older)
+#   <dashboard name='X' type-v2='storyboard'> ... same flipboard tree  (newer)
+# We match on //story-points so both shapes parse, and resolve each point's
+# captured-sheet against the dashboard/worksheet name sets so the downstream
+# builder (scripts/build-story-pages.rb) knows whether the point's Sigma page
+# clones a whole dashboard page or a single worksheet element. Output:
+# story-plan.json in the same directory as OUT (only when stories exist).
+# beads-sigma-y6b.
+stories = []
+dashboard_names = dashboards.map { |d| d['dashboard'] }
+xml.elements.each('//story-points') do |spn|
+  # Enclosing story container = nearest ancestor carrying a name attribute
+  # (<story name=...> or <dashboard name=... type-v2='storyboard'>).
+  story_name = nil
+  anc = spn.parent
+  while anc
+    nm = anc.respond_to?(:attributes) && anc.attributes ? anc.attributes['name'] : nil
+    unless nm.to_s.empty?
+      story_name = nm
+      break
+    end
+    anc = anc.respond_to?(:parent) ? anc.parent : nil
+  end
+  points = []
+  spn.elements.each('story-point') do |sp|
+    a = sp.attributes
+    cap = a['caption']
+    cap = sp.elements['caption'].text if (cap.nil? || cap.to_s.empty?) && sp.elements['caption']
+    captured = a['captured-sheet']
+    kind = if captured.nil?                          then 'unknown'
+           elsif dashboard_names.include?(captured)  then 'dashboard'
+           elsif worksheets.key?(captured)           then 'worksheet'
+           else 'unknown'
+           end
+    points << {
+      'id'             => a['id'],
+      'caption'        => cap,
+      'captured_sheet' => captured,
+      'sheet_kind'     => kind
+    }
+  end
+  next if points.empty?
+  stories << { 'story' => story_name, 'points' => points }
+end
+unless stories.empty?
+  story_plan_path = File.join(File.dirname(File.expand_path(OUT)), 'story-plan.json')
+  File.write(story_plan_path, JSON.pretty_generate(stories))
+  puts "wrote #{story_plan_path} (#{stories.size} story(ies), " \
+       "#{stories.sum { |st| st['points'].size }} story point(s)) — " \
+       'run scripts/build-story-pages.rb to emit one Sigma page per story point'
+end
+
 meta = {
   'worksheets'     => worksheets.transform_values { |v| v.transform_keys(&:to_s) },
+  'stories'        => stories,
   'shared_filters' => shared_filters,
   'parameters'     => parameters,
   'column_aliases' => column_aliases,

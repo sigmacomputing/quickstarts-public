@@ -54,10 +54,6 @@ OptionParser.new do |p|
        'Auto-recommend without UX prompt when top score >= --auto-pick-threshold AND no other candidate within --auto-pick-tie-window of it. Sets `auto_picked: true` on the result so the caller can WARN about inherited columns.') { |_| opts[:auto_pick] = true }
   p.on('--auto-pick-threshold F', Float, 'Min score for auto-pick (default 0.55).')                  { |v| opts[:auto_pick_threshold] = v }
   p.on('--auto-pick-tie-window F', Float, 'Gap from top score within which other candidates count as a tie that disables auto-pick (default 0.05).') { |v| opts[:auto_pick_tie_window] = v }
-  p.on('--specs-cache P',
-       'JSON cache {"dms":[…list entries…],"specs":{dmId:spec}} prefetched by an orchestrator ' \
-       '(e.g. migrate-qlik.rb prefetches it CONCURRENTLY with source discovery). When supplied, ' \
-       'the DM list + spec fetches are served from the cache (missing specs still fetched live).') { |v| opts[:specs_cache] = v }
 end.parse!
 %i[sig out].each { |k| abort "missing --#{k}" unless opts[k] }
 
@@ -109,31 +105,21 @@ end
 # fetch all DMs (cheap — one list call per 100), sort by updatedAt desc
 # (recent DMs are usually more relevant), then take the first --limit for
 # parallel spec-fetch + scoring. Stable tiebreaker by name. beads-sigma-3kw.
-cache = nil
-if opts[:specs_cache] && File.exist?(opts[:specs_cache])
-  cache = (JSON.parse(File.read(opts[:specs_cache])) rescue nil)
-  warn "specs-cache: #{opts[:specs_cache]} (#{(cache['dms'] || []).size} DMs, #{(cache['specs'] || {}).size} specs)" if cache
-end
-
 all_dms = []
-if cache
-  all_dms = cache['dms'] || []
-else
-  page = nil
-  hard_cap = 500
-  loop do
-    qs = "limit=100"
-    qs += "&page=#{page}" if page
-    r = http_get("/v2/dataModels?#{qs}")
-    break unless r.code.to_i == 200
-    data = JSON.parse(r.body)
-    rows = data['entries'] || data['dataModels'] || []
-    break if rows.empty?
-    all_dms.concat(rows)
-    break if all_dms.size >= hard_cap
-    page = data['nextPage']
-    break if page.nil? || page.empty?
-  end
+page = nil
+hard_cap = 500
+loop do
+  qs = "limit=100"
+  qs += "&page=#{page}" if page
+  r = http_get("/v2/dataModels?#{qs}")
+  break unless r.code.to_i == 200
+  data = JSON.parse(r.body)
+  rows = data['entries'] || data['dataModels'] || []
+  break if rows.empty?
+  all_dms.concat(rows)
+  break if all_dms.size >= hard_cap
+  page = data['nextPage']
+  break if page.nil? || page.empty?
 end
 
 # Deterministic ranking: updatedAt desc, then name asc.
@@ -166,23 +152,7 @@ dm_failures = []
 require 'thread'
 mu = Mutex.new
 queue = Queue.new
-# Serve specs from the orchestrator's prefetch cache when present; only DMs
-# missing from the cache go to the network. Cached entries may be raw strings
-# (the spec endpoint can answer YAML) — parse JSON-else-YAML, same as below.
-if cache
-  (cache['specs'] || {}).each do |dm_id, spec|
-    if spec.is_a?(String)
-      spec = begin
-        JSON.parse(spec)
-      rescue JSON::ParserError
-        (YAML.safe_load(spec, permitted_classes: [Date, Time]) rescue nil)
-      end
-    end
-    dm_specs[dm_id] = spec if spec
-  end
-end
-all_dms.take(opts[:limit]).reject { |dm| dm_specs.key?(dm['dataModelId'] || dm['id']) }
-       .each { |dm| queue << dm }
+all_dms.take(opts[:limit]).each { |dm| queue << dm }
 threads = 5.times.map do
   Thread.new do
     until queue.empty?
@@ -343,20 +313,29 @@ end
 best = candidates.first
 second = candidates[1]
 
-# Auto-pick gate: only fires when (a) --auto-pick flag is set, (b) top score
-# clears the auto-pick threshold, and (c) the next candidate is at least
-# auto_pick_tie_window below the top. The tie check protects against silently
-# picking the wrong one of two very-close candidates (e.g., a duplicate DM).
+# Auto-pick gate (reuse-first). Fires when --auto-pick is set and the top
+# candidate (a) clears the auto-pick threshold AND (b) COVERS ALL of the
+# workbook's source tables (table_match 1.0). Table coverage is the safety
+# invariant: a DM that sources every table the workbook needs can satisfy every
+# column ref through its element set, so reusing it is safe; a DM missing a table
+# is never auto-picked (its denorm view can't resolve the missing columns).
+#
+# We deliberately DO NOT block on a score tie here. A tie among table-covering
+# candidates is duplicate-DM SPRAWL (the same star modeled two or three times) —
+# exactly what reuse-first exists to collapse — so we take the top (the
+# deterministic tie-break already prefers a name match, then the fewest extra
+# columns, over the most-recently-updated set). A column-SUPERSET (every
+# referenced column present, column_match 1.0) is the safest case and always
+# qualifies. Callers should reuse `recommended_dm_id` only when `auto_picked`.
 auto_pick_threshold  = opts[:auto_pick_threshold]  || 0.55
 auto_pick_tie_window = opts[:auto_pick_tie_window] || 0.05
 tie_with_second      = best && second && (best['score'] - second['score']) < auto_pick_tie_window
-# A same-score tie is safe to pick through when the deterministic tie-break
-# landed on an exact workbook-name match — the hazard the tie window guards
-# against is arbitrary ordering among lookalikes, which no longer applies.
 best_name_matches    = best && !sig_name_norm.empty? && normalize_col(best['dm_name']) == sig_name_norm
-auto_picked          = opts[:auto_pick] && best && best['score'] >= auto_pick_threshold && (!tie_with_second || best_name_matches)
+best_covers_tables   = best && best['table_match'].to_f >= 1.0
+best_is_superset     = best_covers_tables && best['column_match'].to_f >= 1.0
+auto_picked          = !!(opts[:auto_pick] && best && best['score'] >= auto_pick_threshold && best_covers_tables)
 
-# Standard recommend path keeps the old semantics.
+# Standard recommend path keeps the old semantics (printed for human opt-in).
 recommended_via_std  = best && best['score'] >= opts[:min_score]
 recommended_dm_id    = (auto_picked || recommended_via_std) ? best['dm_id'] : nil
 
@@ -364,11 +343,11 @@ rationale =
   if best.nil?
     'no DMs in org'
   elsif auto_picked
-    "AUTO-PICKED at score #{best['score']} (>= #{auto_pick_threshold}, no tie within #{auto_pick_tie_window}). #{best['shared_columns'].size}/#{tableau_columns.size} cols matched. Caller must WARN about #{best['extra_columns']} inherited columns."
-  elsif best['score'] >= 0.85
-    "auto-reuse candidate (#{best['shared_columns'].size}/#{tableau_columns.size} cols, #{best['shared_tables'].size}/#{tableau_tables.size} tables)"
-  elsif opts[:auto_pick] && best['score'] >= auto_pick_threshold && tie_with_second
-    "would auto-pick but second candidate at #{second['score']} is within #{auto_pick_tie_window} — TIE — falling back to ASK USER"
+    kind = best_is_superset ? 'column-superset' : 'covers all source tables'
+    tie  = tie_with_second ? " (collapsing a #{best['score']}-score tie — duplicate-DM sprawl)" : ''
+    "AUTO-PICKED at score #{best['score']} — #{kind}#{tie}. #{best['shared_columns'].size}/#{tableau_columns.size} cols, #{best['shared_tables'].size}/#{tableau_tables.size} tables matched. Caller must WARN about #{best['extra_columns']} inherited columns."
+  elsif opts[:auto_pick] && best['score'] >= auto_pick_threshold && !best_covers_tables
+    "score #{best['score']} clears the bar but the candidate is MISSING source table(s) #{best['missing_tables'].join(', ')} — not a safe reuse — build a new DM"
   elsif best['score'] >= opts[:min_score]
     'ambiguous match — ASK USER before reusing'
   else

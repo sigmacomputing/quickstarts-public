@@ -1,0 +1,290 @@
+{
+ "id": "4F27F7F7F7466B9416E954BE3C30CDCD",
+ "name": "A.Retail_Insights_S",
+ "definition": {
+  "availableObjects": {
+   "attributes": [
+    {
+     "name": "Brand",
+     "id": "8A1CD432B44A2309988B1C94F4C153FC",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "name": "Date First Available",
+     "id": "FB1F47960547486B804E9D9960E9AC54",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "date",
+       "baseFormCategory": "ID",
+       "baseFormType": "date"
+      }
+     ]
+    },
+    {
+     "name": "Date",
+     "id": "1171307D3A4ADB7E1ADEB28FD1B23357",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "date",
+       "baseFormCategory": "ID",
+       "baseFormType": "date"
+      }
+     ]
+    },
+    {
+     "name": "Store Location",
+     "id": "E3F009A14B40467D093FBF85E180F5DC",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "name": "Product Color",
+     "id": "1A2049792549119306AB0F85029691D4",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "name": "Product Description",
+     "id": "7A1975468A45AB07167E788057D72DF3",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "name": "Product SKU",
+     "id": "4C3172B2DC4516D3A9DA969DB37B8AD8",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "name": "Product Image",
+     "id": "B10318651E420A306D9B289ABFB47358",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "HTMLTag"
+      }
+     ]
+    },
+    {
+     "name": "Product Line",
+     "id": "221E6F97E347D6C30D7DBE9ADB3DC117",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "name": "Product Link",
+     "id": "1286CC9C6E4B46EE2C3772ADD39A92D6",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "name": "Product Name",
+     "id": "DDCC58443A4BBE5174B660A2634862B9",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "name": "Product Size",
+     "id": "14AC6DAB5F48D0FAB2ACDABF55901DDD",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "name": "Product Type",
+     "id": "D3E16995924F32064CF2A59F14CE8934",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "name": "Ranking in Product Line",
+     "id": "146FBF580D4BA169BFA4599083C42578",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "integer",
+       "baseFormCategory": "ID",
+       "baseFormType": "number"
+      }
+     ]
+    }
+   ],
+   "metrics": [
+    {
+     "name": "Order Quantity",
+     "id": "4B8B19E95D4FC21E8CC47AB69BCBAD34",
+     "type": "metric",
+     "dataType": "integer"
+    },
+    {
+     "name": "Avg Unit Sold",
+     "id": "6FF531FC054B7BAFA43BE48FCC1CC523",
+     "type": "metric",
+     "dataType": "integer"
+    },
+    {
+     "name": "Inventory",
+     "id": "DB459FF2FE4409CB93AD459E0D0D8346",
+     "type": "metric",
+     "dataType": "integer"
+    },
+    {
+     "name": "Inventory Capacity",
+     "id": "B3F01E11624E8C6186676086EC634AB3",
+     "type": "metric",
+     "dataType": "integer"
+    },
+    {
+     "name": "Product Cost",
+     "id": "5F0E0C02D143361F771510A4F56ECC20",
+     "type": "metric",
+     "dataType": "double"
+    },
+    {
+     "name": "Product Inventory",
+     "id": "BDDCABFE06473E8DB27390BC2A0DB187",
+     "type": "metric",
+     "dataType": "double"
+    },
+    {
+     "name": "Product List Price",
+     "id": "08BE14FDE84FBA9B04B590B6B1BCFC7A",
+     "type": "metric",
+     "dataType": "double"
+    },
+    {
+     "name": "Product Rating",
+     "id": "B8D9E394F34A1738E6FC3C86FF80DA13",
+     "type": "metric",
+     "dataType": "double"
+    },
+    {
+     "name": "Product YTD Revenue",
+     "id": "A44C21A90144C538894BCA9580E79F59",
+     "type": "metric",
+     "dataType": "integer"
+    },
+    {
+     "name": "Product YTD Sales",
+     "id": "919C7E763C4D6752B1B9219AE27EA032",
+     "type": "metric",
+     "dataType": "integer"
+    },
+    {
+     "name": "Overstock Percentage",
+     "id": "7C5C17133145223F396A13B08C7B71D9",
+     "type": "metric",
+     "dataType": "double"
+    },
+    {
+     "name": "Total Sales",
+     "id": "296827D8D948253C7FA3569A9F8B5B5C",
+     "type": "metric",
+     "dataType": "double"
+    },
+    {
+     "name": "Row Count - A.Retail_Insights_S.xlsx",
+     "id": "8857C1D87E4C7EB6594368916111CB10",
+     "type": "metric",
+     "dataType": "reserved"
+    }
+   ],
+   "customGroups": [],
+   "consolidations": [],
+   "hierarchies": []
+  }
+ },
+ "promptOrdering": []
+}

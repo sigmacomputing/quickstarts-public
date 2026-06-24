@@ -71,7 +71,7 @@ The `scripts/tableau-discover.rb` helper produces all Phase-1 artifacts in one g
 eval "$(scripts/get-tableau-token.sh)"
 ruby scripts/tableau-discover.rb \
   --workbook-name "Orders Conversion Test" \
-  --datasource-name "ORDER_FACT (MY_CONNECTION.ORDER_FACT)+ (New Virtual Connection)" \
+  --datasource-name "ORDER_FACT (CSA.ORDER_FACT)+ (New Virtual Connection)" \
   --out /tmp/orders
 ```
 
@@ -106,7 +106,7 @@ The colon is part of the secret, **not** a name/secret separator. Copy the full 
 
 `read-metadata` returns `fieldName` and `fieldCaption`. For fields belonging to **joined
 logical tables** in a virtual connection, `fieldName` is a GUID like
-`66792cbd-306e-3a9b-882a-f08cd73bb433 (DATE_DIM (MY_CONNECTION.DATE_DIM)1)` — use `fieldCaption` for
+`66792cbd-306e-3a9b-882a-f08cd73bb433 (DATE_DIM (CSA.DATE_DIM)1)` — use `fieldCaption` for
 the human-readable name. Calculations also have `fieldName == fieldCaption`, no GUID.
 
 GraphQL's `name` field is always the display name — prefer GraphQL for calc-formula

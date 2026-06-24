@@ -83,6 +83,11 @@
 #   9  control lint violations — dead controls / ghost targets / partial
 #      reach / source filter signals with zero controls
 #      (gate 7; scripts/lib/control_lint.rb)
+#  10  Phase 6f visual render missing — no valid Sigma render PNG was produced,
+#      so the mandatory full-dashboard visual comparison could not have run
+#      ("declared done on HTTP 200" regression; gate 8). Render with
+#      scripts/sigma-export-png.py --page <pageId>, Read it against the source
+#      dashboard PNG, then re-run. Escape hatch: --skip-visual-gate "<reason>".
 #
 # Prints a per-gate summary to stdout regardless of exit code.
 
@@ -108,6 +113,9 @@ OptionParser.new do |p|
   p.on('--min-layout-elements N', Integer) { |v| opts[:min_layout_elements] = v }
   p.on('--allow-missing-tiles N', Integer, 'tolerate N unmatched dashboard zones in the tile census') { |v| opts[:allow_missing_tiles] = v }
   p.on('--skip-parity-gate REASON', 'waive gate 1 (Phase 6 source-parity) — REQUIRED reason string. Use ONLY when source parity is genuinely unavailable (e.g. no source workspace/dataset/warehouse access). The reason MUST be named in your migration report.') { |v| opts[:skip_parity] = v }
+  p.on('--sigma-render PATH', 'gate 8: path to the rendered Sigma dashboard PNG (default: <workdir>/sigma-render.png; also accepts <workdir>/screenshots/_manifest.json)') { |v| opts[:sigma_render] = v }
+  p.on('--skip-visual-gate REASON', 'waive gate 8 (Phase 6f visual render) — REQUIRED reason string. Use ONLY when the workbook genuinely cannot be rendered (e.g. export API unavailable). The reason MUST be named in your migration report.') { |v| opts[:skip_visual] = v }
+  p.on('--skip-visual-tiles REASON', 'waive gate 9 (build-from-signals tile image-verification) — REQUIRED reason string. The reason MUST be named in your migration report.') { |v| opts[:skip_visual_tiles] = v }
 end.parse!
 abort('--workdir (or --tableau) required') unless opts[:tab]
 
@@ -547,6 +555,106 @@ else
         warn "[SKIP] gate 7/7: GET /v2/workbooks/#{wb_id}/spec returned HTTP #{res.code} — cannot lint"
       end
     end
+  end
+end
+
+# ---------------------------------------------------------------------------
+# Gate 8 — Phase 6f visual render (the "declared done on HTTP 200" regression)
+# CSV value parity (gate 1) confirms the DATA matches; it cannot catch a
+# visually-broken workbook (dropped log scale, missing labels, overlaps, dead
+# zones, wrong chart kind, palette drift). Phase 6f is documented MANDATORY but
+# had no machine enforcement, so a conversion could pass every gate above and
+# ship without anyone ever rendering — let alone reading — the Sigma PNG.
+# This gate requires a VALID render artifact to exist as proof the visual
+# comparison could run. It does not (and cannot) verify the human/agent read it
+# — but you cannot compare a PNG you never produced.
+# ---------------------------------------------------------------------------
+if opts[:skip_visual]
+  puts "[SKIP] gate 8: Phase 6f visual render WAIVED via --skip-visual-gate (#{opts[:skip_visual]})."
+  puts "       This waiver MUST be named in the migration report — the workbook was NOT visually verified."
+else
+  default_render = File.join(opts[:tab], 'sigma-render.png')
+  manifest_path  = File.join(opts[:tab], 'screenshots', '_manifest.json')
+  render_path    = opts[:sigma_render] || (File.exist?(default_render) ? default_render : nil)
+
+  # Validate a candidate PNG: real PNG magic bytes + non-trivial size (a blank /
+  # error / truncated export is often a few hundred bytes).
+  MIN_PNG_BYTES = 5_000
+  valid_png = lambda do |path|
+    next false unless path && File.file?(path)
+    next false unless File.size(path) >= MIN_PNG_BYTES
+    File.binread(path, 8) == "\x89PNG\r\n\x1a\n".b
+  end
+
+  ok_png = nil
+  if valid_png.call(render_path)
+    ok_png = render_path
+  elsif opts[:sigma_render].nil? && File.exist?(manifest_path)
+    # Fall back to the per-element screenshot manifest (export-chart-png.rb):
+    # accept if it lists at least one rendered PNG that validates.
+    entries = (JSON.parse(File.read(manifest_path)) rescue nil)
+    entries = entries.values if entries.is_a?(Hash)
+    if entries.is_a?(Array)
+      cand = entries.map { |e| e.is_a?(Hash) ? (e['path'] || e['file']) : e }.compact
+      ok_png = cand.find { |p| valid_png.call(p) || valid_png.call(File.join(opts[:tab], 'screenshots', File.basename(p.to_s))) }
+    end
+  end
+
+  if ok_png.nil?
+    warn '[FAIL] gate 8: Phase 6f visual render missing — no valid Sigma render PNG found.'
+    warn "       Looked for: #{opts[:sigma_render] || default_render}" \
+         "#{opts[:sigma_render] ? '' : " (and #{manifest_path})"}"
+    warn '       CSV parity passing does NOT mean the workbook renders correctly. Render the full'
+    warn '       page and READ it against the source dashboard PNG before declaring done:'
+    warn "         python3 scripts/sigma-export-png.py --workbook <id> --page <pageId> --out #{default_render}"
+    warn '       then re-run this gate. See SKILL.md Phase 6f. Escape hatch (genuinely un-renderable'
+    warn '       workbooks only): --skip-visual-gate "<reason>" (name it in your report).'
+    exit 10
+  end
+  size_kb = (File.size(ok_png) / 1024.0).round
+  puts "[OK] gate 8: Phase 6f visual render present (#{ok_png}, #{size_kb} KB) — " \
+       'valid PNG produced for source-vs-target comparison'
+  # Soft nudge: the conversion result should record that the comparison ran.
+  if File.exist?(summary_path)
+    s = (JSON.parse(File.read(summary_path)) rescue {})
+    unless s['screenshot_path'] || s['visual_checked']
+      warn "[WARN] gate 8: parity-final.json records no screenshot_path/visual_checked flag — " \
+           'render exists but confirm you actually compared it to the source and noted any divergence.'
+    end
+  end
+end
+
+# Gate 9 — Visual-verify tiles (build-from-signals). Tiles whose Tableau data
+# export came back EMPTY (action-filter-gated etc.) are built from .twb signals
+# and cannot be value-diffed, so they must be confirmed by IMAGE comparison
+# (verify-visual-tiles.rb). Without this gate they'd pass parity silently. No-op
+# (and invisible to other converters) when the sidecar is absent.
+vv_sidecar = File.join(opts[:tab], 'visual-verify-tiles.json')
+if File.exist?(vv_sidecar)
+  vtiles = (JSON.parse(File.read(vv_sidecar)) rescue [])
+  if opts[:skip_visual_tiles]
+    puts "[SKIP] gate 9: #{vtiles.size} build-from-signals tile(s) visual-verify WAIVED (#{opts[:skip_visual_tiles]})."
+  elsif vtiles.any?
+    man_path = File.join(opts[:tab], 'visual-verify', 'manifest.json')
+    man = File.exist?(man_path) ? (JSON.parse(File.read(man_path)) rescue nil) : nil
+    if man.nil?
+      warn "[FAIL] gate 9: #{vtiles.size} tile(s) had EMPTY data exports (built from .twb signals) but no"
+      warn "       visual-verify/manifest.json exists — run: ruby scripts/verify-visual-tiles.rb"
+      warn "       --workbook #{opts[:wb] || '<id>'} --tableau-dir #{opts[:tab]}, then READ each"
+      warn '       <tile>.tableau.png vs <tile>.sigma.png pair and mark "visual_verified": true.'
+      exit 11
+    end
+    unverified = man.reject { |m| m['visual_verified'] }
+    if unverified.any?
+      warn "[FAIL] gate 9: #{unverified.size}/#{man.size} build-from-signals tile(s) NOT visually verified: " \
+           "#{unverified.map { |m| m['worksheet'] }.join(', ')}."
+      warn '       These tiles have no value actuals (empty Tableau export). READ each'
+      warn "       <tile>.tableau.png vs <tile>.sigma.png under #{File.join(opts[:tab], 'visual-verify')}/,"
+      warn '       confirm trend/axis/magnitudes match, and set "visual_verified": true per tile in'
+      warn '       visual-verify/manifest.json. Escape hatch: --skip-visual-tiles "<reason>" (name it in your report).'
+      exit 11
+    end
+    puts "[OK] gate 9: #{man.size} build-from-signals tile(s) image-verified (empty data export → visual parity)"
   end
 end
 

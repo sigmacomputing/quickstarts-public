@@ -56,6 +56,7 @@ require 'optparse'
 require 'fileutils'
 require 'open3'
 require 'time'
+require_relative 'lib/scout_gate'
 
 $stdout.sync = true # lane/foreground progress lines interleave correctly
 
@@ -127,7 +128,10 @@ OptionParser.new do |o|
   o.on('--answers JSON')      { |v| opts[:answers]  = v }
   o.on('--yes')               {     opts[:yes]      = true }
   o.on('--from-discovery DIR'){ |v| opts[:from]     = File.expand_path(v) }
+  o.on('--reuse-dm ID')       { |v| opts[:reuse_dm] = v }
+  o.on('--no-reuse')          {     opts[:no_reuse] = true }
   o.on('--dry-run')           {     opts[:dry_run]  = true }
+  o.on('--skip-layout-lint')  {     opts[:skip_layout_lint] = true }
 end.parse!
 
 abort 'missing --app (or --from-discovery)' unless opts[:app] || opts[:from]
@@ -355,6 +359,10 @@ mark('phase2-convert')
 hdr('2.5', TOTAL, 'DM-reuse scan')
 if opts[:dry_run]
   puts '   skipped (--dry-run: no Sigma access)'
+elsif opts[:reuse_dm]
+  puts "   explicit --reuse-dm #{opts[:reuse_dm]} — scan skipped, will reuse that DM"
+elsif opts[:no_reuse]
+  puts '   --no-reuse — scan skipped, building new'
 else
   begin
     sig_path = File.join(WORK, 'dm-signature.json')
@@ -363,12 +371,20 @@ else
           '--database', opts[:database], '--schema', opts[:schema], '--out', sig_path])
     match_path = File.join(WORK, 'dm-match.json')
     fp_cmd = ['ruby', File.join(HERE, 'vendor', 'find-or-pick-dm.rb'),
-              '--workbook-signature', sig_path, '--out', match_path]
+              '--workbook-signature', sig_path, '--out', match_path,
+              '--auto-pick', '--auto-pick-threshold', '0.5']
     cache_path = File.join(WORK, 'dm-specs-cache.json')
     fp_cmd += ['--specs-cache', cache_path] if File.exist?(cache_path)
     _, _fp_st = Open3.capture2e(*fp_cmd) # exit 1 = no candidate ≥ min-score (normal)
-    cands = ((JSON.parse(File.read(match_path))['candidates'] rescue nil) || []).first(3)
-    if cands.any?
+    match = (JSON.parse(File.read(match_path)) rescue {}) || {}
+    cands = (match['candidates'] || []).first(3)
+    # reuse-first: the picker sets auto_picked ONLY when the top candidate covers
+    # ALL of this app's source tables (a safe superset) and collapses dup-DM ties.
+    if match['auto_picked'] && match['recommended_dm_id']
+      opts[:reuse_dm] = match['recommended_dm_id']
+      puts "   DM-REUSE (auto): #{match['rationale']}"
+      puts "   WARNING: #{match['warning']}" if match['warning']
+    elsif cands.any?
       puts '   top candidate(s) — default is BUILD NEW; to reuse, follow SKILL.md Phase 2.5:'
       cands.each { |c| puts "     score #{format('%.2f', c['score'] || 0)}  #{c['dm_id']}  '#{c['dm_name']}'" }
     else
@@ -452,6 +468,45 @@ if opts[:answers]
   answers = (JSON.parse(opts[:answers]) rescue abort('FATAL: --answers is not valid JSON'))
 end
 
+# RUN-EACH-TIME GAP-SCOUT GATE (bead beads-sigma-5l5e). Untranslated measures
+# are scout-eligible — the gap-scout must ATTEMPT a Sigma translation for each
+# before the degradation is accepted. --yes does NOT skip this; it only accepts
+# measures already scouted (validated or escalated). Recorded to the ledger by
+# scout-validate.py via lib/scout_gate.py.
+scout_gaps = questions.select { |q| q['id'] == 'measure_no_sigma_equiv' }
+unless scout_gaps.empty?
+  gid = ->(q) { 'measure:' + (q['measure'] || q['detail'].to_s.gsub(/\s+/, ' ').strip[0, 80]).to_s }
+  gap_ids = scout_gaps.map { |q| gid.call(q) }.uniq
+  buckets = ScoutGate.classify(WORK, gap_ids)
+  if buckets[:unscouted].any?
+    unattended = opts[:yes] || opts[:answers]
+    if unattended
+      # Regression fix (gap-scout PR #153 made this a hard `exit 11` that overrode
+      # --yes, stalling the unattended/demo path). Under --yes/--answers the gate is
+      # ADVISORY: these measures take their "proceed" default (already in the decisions
+      # list) and the run flows through. Record as accepted so re-runs don't re-surface
+      # them; recommend the gap-scout for anyone who wants a faithful translation.
+      warn "   gap-scout: #{buckets[:unscouted].size} untranslated measure(s) not scouted — proceeding (unattended); recording as accepted degradations."
+      warn '   (optional: run scripts/gap-scout.md on these to persist a faithful Sigma translation)'
+      buckets[:unscouted].each { |id| ScoutGate.record(WORK, gap_id: id, feature: 'measure', status: 'accepted') }
+    else
+      # Interactive: the same measures already appear as review questions and exit via
+      # the OPEN QUESTIONS block below (exit 10). Just nudge toward the scout.
+      puts
+      puts '-------------------- GAP-SCOUT RECOMMENDED --------------------'
+      puts "#{buckets[:unscouted].size} of #{gap_ids.size} untranslated measure(s) have no faithful translation yet:"
+      buckets[:unscouted].each { |id| puts "  --gap-id '#{id}'" }
+      puts ''
+      puts 'Optional: spawn a gap-scout per measure (scripts/gap-scout.md) with the --gap-id above'
+      puts "plus --workdir #{WORK} to persist a translation; or re-run with --yes to accept the"
+      puts 'degradation defaults. These also appear in OPEN QUESTIONS below.'
+      puts '---------------------------------------------------------------'
+    end
+  else
+    puts "   gap-scout: all #{gap_ids.size} untranslated measure(s) accounted for (validated or escalated)"
+  end
+end
+
 if questions.any? && !opts[:yes] && answers.nil?
   block = {
     'status' => 'decisions_needed',
@@ -509,23 +564,58 @@ run!(['python3', File.join(HERE, 'gen-denorm-sql.py'),
       '--reconcile', reconcile, '--database', opts[:database], '--schema', opts[:schema],
       '--connection', opts[:conn], '--out', denorm_out])
 
-dm_cmd = ['python3', File.join(HERE, 'build-sigma-dm.py'),
-          '--converter-out', conv_out_path, '--reconcile', reconcile,
-          '--denorm', denorm_out, '--measures', File.join(WORK, 'measures.json'),
-          '--name', "#{base_name} (Qlik→Sigma)",
-          '--out', File.join(WORK, 'dm-result.json'), '--spec-out', File.join(WORK, 'dm-spec.json')]
-# --folder: explicit flag wins; else the folder pre-resolved concurrently with
-# discovery (identical preference order), saving build-sigma-dm.py the lookup.
-if (fid = opts[:folder] || prep[:folder_id])
-  dm_cmd += ['--folder', fid]
+# Resolve the reuse denorm element UP FRONT so an unsuitable reuse DM falls back
+# to building fresh instead of binding the workbook to the wrong element. The
+# Qlik workbook is built against ONE denormalized all-columns element — the
+# custom-SQL element (build-sigma-dm.py names it so Sigma auto-labels it
+# "Custom SQL"). A reused DM that lacks it (a star-shaped or non-Qlik-origin DM,
+# even if it covers the same tables) has no safe single element to bind to, so we
+# DON'T reuse it — `els.first` there would silently pick a dimension element.
+reuse_denorm_eid = nil
+reuse_star_count = 0
+if opts[:reuse_dm] && !opts[:dry_run]
+  require 'sigma_rest'
+  els = (Sigma.request(:get, "/v2/dataModels/#{opts[:reuse_dm]}/elements")['entries'] rescue []) || []
+  cs = els.find { |e| e['name'] == 'Custom SQL' }
+  eid = cs && (cs['elementId'] || cs['id'])
+  if eid
+    reuse_denorm_eid = eid
+    reuse_star_count = [els.size - 1, 0].max
+  else
+    puts "   WARNING: reuse DM #{opts[:reuse_dm]} has no 'Custom SQL' denorm element " \
+         "(elements: #{els.map { |e| e['name'] }.compact.join(', ')}) — not a Qlik-shaped " \
+         "DM; building a fresh DM instead"
+    opts[:reuse_dm] = nil
+  end
 end
-dm_cmd << '--dry-run' if opts[:dry_run]
-run!(dm_cmd)
-dm_res = JSON.parse(File.read(File.join(WORK, 'dm-result.json')))
-DM_ID = dm_res['dataModelId']
-puts "   dataModelId = #{DM_ID || '(dry-run)'}  denorm element #{dm_res['denormElementId']}  " \
-     "#{dm_res['starElements']} star element(s), #{dm_res['metricsKept']} metric(s)" \
-     "#{dm_res['metricsDropped'].to_a.any? ? "; dropped: #{dm_res['metricsDropped'].join(', ')}" : ''}"
+
+if reuse_denorm_eid
+  # REUSE path — skip the DM POST and build against the existing denorm element.
+  dm_res = { 'dataModelId' => opts[:reuse_dm], 'denormElementId' => reuse_denorm_eid,
+             'folderId' => (opts[:folder] || prep[:folder_id]),
+             'starElements' => reuse_star_count, 'metricsKept' => nil,
+             'metricsDropped' => [], 'reused' => true }
+  DM_ID = opts[:reuse_dm]
+  puts "   REUSING DM #{DM_ID}  ·  denorm element 'Custom SQL' (#{reuse_denorm_eid})  — convert + POST skipped"
+else
+  dm_cmd = ['python3', File.join(HERE, 'build-sigma-dm.py'),
+            '--converter-out', conv_out_path, '--reconcile', reconcile,
+            '--denorm', denorm_out, '--measures', File.join(WORK, 'measures.json'),
+            '--name', "#{base_name} (Qlik→Sigma)",
+            '--out', File.join(WORK, 'dm-result.json'), '--spec-out', File.join(WORK, 'dm-spec.json')]
+  # --folder: explicit flag wins; else the folder pre-resolved concurrently with
+  # discovery (identical preference order), saving build-sigma-dm.py the lookup.
+  if (fid = opts[:folder] || prep[:folder_id])
+    dm_cmd += ['--folder', fid]
+  end
+  dm_cmd << '--dry-run' if opts[:dry_run]
+  run!(dm_cmd)
+  dm_res = JSON.parse(File.read(File.join(WORK, 'dm-result.json')))
+  DM_ID = dm_res['dataModelId']
+  puts "   dataModelId = #{DM_ID || '(dry-run)'}  denorm element #{dm_res['denormElementId']}  " \
+       "#{dm_res['starElements']} star element(s), #{dm_res['metricsKept']} metric(s)" \
+       "#{dm_res['metricsDropped'].to_a.any? ? "; dropped: #{dm_res['metricsDropped'].join(', ')}" : ''}"
+end
 mark('phase3-dm')
 
 # ---------------------------------------------------------------------------
@@ -563,6 +653,38 @@ else
   puts "   layout applied (#{sheets.size} Qlik sheet grid(s) → 24-col Sigma grid, row-scale ≥2)"
 end
 mark('phase5-layout')
+
+# ---------------------------------------------------------------------------
+# Phase 5b — Visual QA: render each content page to a FULL-PAGE PNG so the
+# layout can be reviewed against refs/layout-visual-qa.md AND compared to the
+# source Qlik sheet capture (scripts/qlik-screenshot.py) — matching the other
+# migration skills' visual-QA gate. Render is non-fatal (a transient export
+# failure must not sink a green migration); the REVIEW is the gate.
+# ---------------------------------------------------------------------------
+unless opts[:dry_run]
+  vqa = File.join(WORK, 'visual-qa'); FileUtils.mkdir_p(vqa)
+  # Page ids come from the LOCAL spec the builder wrote — deterministic. (The
+  # live GET /spec readback proved flaky inside the pipeline, silently yielding
+  # zero pages; POST preserves these ids so the local copy is authoritative.)
+  wbspec = (JSON.parse(File.read(File.join(WORK, 'wb-spec.json'))) rescue {})
+  content_pages = (wbspec['pages'] || []).reject { |p| p['id'].to_s.downcase.include?('data') }
+  tok = (Sigma.auth_token rescue ENV['SIGMA_API_TOKEN'])
+  pngs = []
+  content_pages.each do |pg|
+    out = File.join(vqa, "#{pg['id']}.png")
+    _o, st = Open3.capture2e({ 'SIGMA_API_TOKEN' => tok.to_s }, 'python3',
+                             File.join(HERE, 'sigma-export-png.py'),
+                             '--workbook', WB_ID, '--page', pg['id'], '--out', out, '--w', '1800', '--h', '1000')
+    st.success? ? (pngs << out) : (puts "   [warn] visual-QA render failed for page #{pg['id']}")
+  end
+  puts "   ✓ rendered #{pngs.size}/#{content_pages.size} full-page PNG(s) for visual QA → #{vqa}"
+  if pngs.any?
+    puts '   VISUAL QA (mandatory review — do not skip): open each PNG and check vs'
+    puts '   refs/layout-visual-qa.md AND the source Qlik sheet capture — populated controls,'
+    puts '   titles present, right chart kinds, sensible colors/heights, no overlaps/dead zones.'
+  end
+end
+mark('phase5b-visual-qa')
 
 # ---------------------------------------------------------------------------
 # Phase 6 — Parity (freshness banner FIRST, then columns + values + buckets)
@@ -715,12 +837,36 @@ parity_ok = err_cols.empty? && entries.size.positive? && divergent.zero?
 # source-signal coverage check (filterpanes/listboxes in the app but zero
 # controls in the spec = the silently-dropped class this gate exists to
 # kill). RED here blocks GREEN exactly like a parity failure.
-puts
-puts '   ── CONTROL LINT (gate 7: every filterpane/listbox a WORKING control) ──'
 $LOAD_PATH.unshift File.expand_path('lib', HERE)
+require 'layout_lint'
 require 'control_lint'
 live = Sigma.request(:get, "/v2/workbooks/#{WB_ID}/spec") rescue {}
 live_spec = live.is_a?(Hash) ? (live['spec'] || live) : {}
+
+# 6d — layout-quality lint, gate 6 (scripts/lib/layout_lint.rb, shared —
+# vendored byte-identical across the migration plugins). Flags raw-id element
+# display names, controls orphaned outside containers on a banded page, and
+# generic Sigma auto-page titles in the header band. RED here blocks GREEN like
+# a parity or control failure. --skip-layout-lint bypasses. Verified clean
+# against shipped Qlik migrations (Retail Orders, Exec Overview, Shipping Perf).
+puts
+puts '   ── LAYOUT LINT (gate 6: titles / orphan controls / header band) ──'
+if opts[:skip_layout_lint]
+  puts '     [SKIP] --skip-layout-lint'
+  layout_ok = true
+else
+  layout_violations = LayoutLint.lint(live_spec)
+  if layout_violations.empty?
+    puts '     [OK] layout lint clean'
+  else
+    puts "     [FAIL] #{layout_violations.size} layout-lint violation(s):"
+    layout_violations.each { |v| puts "       - #{v}" }
+  end
+  layout_ok = layout_violations.empty?
+end
+
+puts
+puts '   ── CONTROL LINT (gate 7: every filterpane/listbox a WORKING control) ──'
 ctl_scope = (JSON.parse(File.read(File.join(WORK, 'control-scope.json'))) rescue nil)
 ctl_violations = ControlLint.lint(live_spec, scope: ctl_scope)
 ctl_rows = ControlLint.controls_report(live_spec)
@@ -745,10 +891,12 @@ puts "workbookId  : #{WB_ID}"
 puts "PARITY      : #{parity_ok ? 'GREEN' : 'RED'} — #{entries.size} cols resolve (#{err_cols.size} error), " \
      "KPIs: #{kpi_results.count('MATCH')} match / #{kpi_results.count('STALE-EXPLAINED')} stale-explained / #{divergent} divergent, " \
      "#{bucket_warns} bucket warning(s)"
+puts "LAYOUT      : #{layout_ok ? 'GREEN' : 'RED'} — gate 6 layout lint" \
+     "#{(defined?(layout_violations) && layout_violations && layout_violations.any?) ? ", #{layout_violations.size} violation(s)" : (opts[:skip_layout_lint] ? ' (skipped)' : '')}"
 puts "CONTROLS    : #{control_ok ? 'GREEN' : 'RED'} — gate 7 control lint, #{ctl_rows.size} control(s) checked" \
      "#{ctl_violations.any? ? ", #{ctl_violations.size} violation(s)" : ''}"
 puts "freshness   : Qlik last reload #{app_meta['lastReloadTime'] || '?'} (#{stale_days} days ago)" if stale_days
 puts "warnings    : #{conv_warnings.size} converter, #{(wb_res['warnings'] || []).size} workbook-build" if conv_warnings.any? || (wb_res['warnings'] || []).any?
 puts '======================================='
 phase_summary
-exit(parity_ok && control_ok ? 0 : 3)
+exit(parity_ok && layout_ok && control_ok ? 0 : 3)

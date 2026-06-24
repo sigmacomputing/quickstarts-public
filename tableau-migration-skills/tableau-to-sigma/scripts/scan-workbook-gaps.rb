@@ -56,23 +56,23 @@ INVENTORY = [
   { name: 'Cross-extract drift (live warehouse newer than extract)', pat: /<connection\s[^>]*\bclass='hyper'|<extract\s/,
     status: :manual, blurb: "Tableau extract data range typically lags the live warehouse by months/years (extract has 2023-2024, live warehouse has 2024-2027). Chart actuals WILL diverge on date axes — this is expected, not a converter bug. Tier as YELLOW with error_summary 'extract-vs-live drift'; document the extract refresh date alongside the live warehouse range." },
   { name: 'Table-calc INDEX/LOOKUP/TOTAL/RANK/ZN/IIF', pat: /\b(INDEX\(\)|LOOKUP\(|TOTAL\(|RANK\b|RANK_DENSE|RANK_PERCENTILE|\bZN\(|\bIIF\(|\bCOUNTD\()/,
-    status: :auto, blurb: 'Auto-translated to Sigma RowNumber/Lag/Lead/Rank/Coalesce/If/CountDistinct.' },
+    status: :auto, blurb: 'Auto-translated when plotted (WINPROBE-validated, bead 427; refs/window-functions.md): RANK family → Rank/RankDense/RankPercentile(agg, "desc" — Tableau default direction); INDEX() → RowNumber(); LOOKUP(agg, ±n) → Lag/Lead(agg, n); standalone TOTAL(agg) → hidden two-level grouped helper; pareto RUNNING_SUM/TOTAL → CumulativeSum(PercentOfTotal(agg, "grand_total")); ZN/IIF/COUNTD → Coalesce/If/CountDistinct. Tableau <computed-sort> carries into xAxis.sort (cumulative/rank follow it).' },
   { name: 'Negative number format (parens)',           pat: /;\s*\([^)]*\)/,
     status: :auto, blurb: 'Parens-on-negative segment translates to Sigma d3-format with ( prefix.' },
   { name: 'Axis range / scale override (log, fixed min/max)', pat: /<encoding\s+attr='space'[^>]*(?:scale='log'|range-type='fixed')/,
     status: :auto, blurb: 'Per-axis log scale and fixed min/max translate to Sigma xAxis/yAxis format.scale (type / domain).' },
   { name: 'Show Mark Labels worksheet toggle',         pat: /<format\s+attr='mark-labels-show'\s+value='true'/,
     status: :auto, blurb: "Worksheet-level Show Mark Labels toggle emits Sigma dataLabel:{labels:shown}." },
+  { name: 'FIXED LOD calc (incl. nested)',             pat: /\{\s*FIXED\b/i,
+    status: :auto, blurb: 'Auto-translated when plotted. Single-level {FIXED dims : AGG(m)}: hidden two-level grouped helper element (visibleAsSource:false; inner grouping = FIXED dims computing the LOD aggregate, outer = chart dims computing the 2nd-stage aggregate; chart Max()es the outer calc). Nested {FIXED ... {FIXED ...}}: auto-decomposed into a helper-element chain (innermost first; outer levels source the inner WITH groupingId) via build-charts-from-signals.rb → -lod-chains.json sidecar. ⚠ single-level helper is exact iff carried chart dims are functionally dependent on the FIXED dims — the build emits a per-chart verify warning. Never SumOver/CountOver in master/DM calc columns (silent error).' },
 
   # HINT — surfaces a translated formula or setup note as a WARN; agent acts
   { name: 'IF/ELSEIF chain calc',                      pat: /\bIF\b[^']+\bELSEIF\b[^']+\bEND\b/i,
     status: :hint, blurb: 'WARN with suggested Sigma If(...) chain or Switch(). Agent adds to master.' },
   { name: 'Ratio calc (SUM/SUM, SUM/COUNT)',           pat: /SUM\s*\([^)]+\)\s*\/\s*(?:SUM|COUNT)\s*\(/i,
     status: :hint, blurb: 'WARN suggests Sum(x) / NullIf(Sum(y), 0) — agent wires on master.' },
-  { name: 'FIXED LOD calc',                            pat: /\{\s*FIXED\b/i,
-    status: :hint, blurb: 'WARN with suggested Sigma window aggregate or Custom SQL element.' },
   { name: 'INCLUDE/EXCLUDE LOD',                       pat: /\{\s*(INCLUDE|EXCLUDE)\b/i,
-    status: :hint, blurb: 'WARN with chart-grouping adjustment suggestion.' },
+    status: :manual, blurb: 'Needs the chart-grouping context: INCLUDE = add the dim to the chart grouping and use the plain aggregate; EXCLUDE = remove it (or OVER(PARTITION BY view-dims-minus-excluded) via Custom SQL). The skill surfaces the formula + suggestion; customer wires it post-publish.' },
   { name: 'Reference lines / bands / trendlines',      pat: /<(reference-line|reference-band|reference-distribution|trendline-model)\b/,
     status: :hint, blurb: 'WARN per chart; agent adds Sigma referenceMarks manually post-publish (see beads-sigma-7ak).' },
   { name: 'Color encoding on measure',                 pat: /<encoding attr='color'[^>]+field-type='quantitative'/,
@@ -84,17 +84,19 @@ INVENTORY = [
   { name: 'Forecast / trendline model',                pat: /<forecast\b/,
     status: :manual, blurb: 'No Sigma forecast primitive; agent emits a note + Custom SQL option (beads-sigma-yi0).' },
   { name: 'Story points (sequential narrative)',       pat: /<story\b/,
-    status: :manual, blurb: 'Each story point becomes a separate Sigma page; navigation control added by hand (beads-sigma-y6b).' },
+    status: :hint, blurb: 'Each story point becomes a separate Sigma page: parse-twb-layout.rb writes story-plan.json, then scripts/build-story-pages.rb emits caption-named pages with the annotation atop (refs/story-points.md, beads-sigma-y6b).' },
   { name: 'Drill hierarchies',                         pat: /<drill-paths>|<drill-path /,
     status: :manual, blurb: 'Hierarchies map to pivot rowsBy OR a segmented drill-level control (beads-sigma-jbw).' },
 
   # UNHANDLED — feature actively used in real workbooks but not surfaced yet
   # (numeric-range param moved to auto in commit 1d3445d — scout discovered the
   # number-range controlType is correct)
-  { name: 'WINDOW_* aggregates (WINDOW_SUM/AVG/MAX...)', pat: /\bWINDOW_(SUM|AVG|MIN|MAX|COUNT|MEDIAN|PERCENTILE|VAR|STDEV)\b/,
-    status: :unhandled, blurb: 'Skill warns; needs translation to Sigma Cumulative*/Moving* or Custom SQL (beads-sigma-427).' },
+  { name: 'WINDOW_* aggregates (SUM/AVG/MIN/MAX/COUNT/STDEV)', pat: /\bWINDOW_(SUM|AVG|MIN|MAX|COUNT|STDEV)\b(?!P)/,
+    status: :auto, blurb: 'Auto-translated when plotted (WINPROBE-validated, bead 427; refs/window-functions.md): bounded WINDOW_*(agg, -n[, m]) → Moving*(agg, n[, m]) as a chart yAxis viz formula; agg/WINDOW_SUM(agg) share → PercentOfTotal(agg, "grand_total"); unbounded WINDOW_MAX/MIN/SUM → hidden two-level grouped helper (consumer re-aggregates Max/Min, NEVER Sum). One DM base element, zero Custom SQL. Compute-using/addressing overrides beyond Table(Across)/simple partitions stay manual (flagged).' },
   { name: 'RUNNING_* totals',                          pat: /\bRUNNING_(SUM|AVG|COUNT|MIN|MAX)\b/,
-    status: :unhandled, blurb: 'Skill warns; translates to Sigma CumulativeSum/Avg in non-grouping context (beads-sigma-427).' },
+    status: :auto, blurb: 'Auto-translated when plotted: RUNNING_* → Sigma Cumulative* as a chart yAxis viz formula (follows the xAxis sort; auto-partitions by chart color/series). Pareto RUNNING_SUM/TOTAL → CumulativeSum(PercentOfTotal(agg, "grand_total")). WINPROBE-validated (bead 427).' },
+  { name: 'Window calcs with NO validated Sigma mapping', pat: /\b(WINDOW_(MEDIAN|PERCENTILE|CORR|COVARP?|VARP?|STDEVP)|PREVIOUS_VALUE|RANK_(UNIQUE|MODIFIED))\s*\(|\bSIZE\s*\(\s*\)/,
+    status: :manual, blurb: 'WINDOW_MEDIAN/PERCENTILE/CORR/COVAR(P)/VAR(P)/STDEVP, PREVIOUS_VALUE, SIZE(), RANK_UNIQUE/MODIFIED — no validated Sigma chart-formula equivalent; port via a Custom SQL DM element (ANSI OVER(...)) or re-author in Sigma. build-charts flags these, never guesses.' },
   { name: 'Tableau SCRIPT_* (R/Python)',               pat: /\bSCRIPT_(REAL|STR|INT|BOOL)\b/,
     status: :unhandled, blurb: 'No Sigma equivalent. Customer rewrites in SQL/Python via Custom SQL or external prep.' },
   { name: 'Phone / mobile-specific layout',            pat: /<device-layout\b|<phone-layout\b/,
@@ -137,6 +139,138 @@ def detect_point_map_geo_role_gaps(content)
   }]
 end
 
+# ---- Data-blend detection (beads-sigma-iq8) --------------------------------
+# A worksheet BLENDS (vs joins) when it pulls fields from 2+ real datasources:
+# the worksheet's <view> lists multiple <datasource> refs and carries a
+# <datasource-dependencies datasource='<secondary>'> block naming the fields it
+# pulls from the secondary. Linking fields are approximated as the captions
+# that appear in BOTH the primary's and the secondary's dependency blocks
+# (Tableau links blends on same-named fields by default). A <join> inside ONE
+# <datasource> is a join, not a blend — it never produces a secondary
+# datasource-dependencies block, so it never matches here.
+#
+# Output: blend-plan.json next to the gaps report + one gap-report row, with a
+# per-blend ROUTE picked by comparing the primary/secondary <connection>
+# blocks (decision tree in refs/blending.md):
+#   same-warehouse-repoint   — same warehouse: ONE DM, two elements + a
+#                              relationship on the linking fields; repoint
+#                              connectionId by DEEP-WALKING the DM spec
+#                              (joins[].left/right nest sources recursively —
+#                              a top-level-only swap misses them)
+#   materialize-via-vds      — secondary is a file / extract / published
+#                              source: land it in the primary's warehouse with
+#                              the tableau-vds-to-cdw skill FIRST, then treat
+#                              as same-warehouse-repoint
+#   flag-unreachable         — secondary is a different live system we can
+#                              neither repoint nor land: surface the linking-
+#                              field report and leave the blend manual
+WAREHOUSE_CONN_CLASSES = %w[
+  snowflake redshift bigquery postgres greenplum sqlserver mysql oracle
+  databricks azure-sql synapse vertica teradata presto trino athena saphana
+].freeze
+FILE_CONN_CLASSES = %w[
+  textscan csv msexcel excel-direct hyper webdata-direct google-sheets
+  googlesheets salesforce sqlproxy
+].freeze
+
+def datasource_connections(xml)
+  out = {}
+  xml.elements.each('/workbook/datasources/datasource') do |ds|
+    name = ds.attributes['name'].to_s
+    next if name.empty? || name == 'Parameters' || name.start_with?('Parameters ')
+    conns = []
+    ds.elements.each('.//connection') do |c|
+      a = c.attributes
+      cls = a['class'].to_s
+      next if cls.empty? || cls == 'federated' # wrapper; real conns are nested
+      conns << {
+        'class'    => cls,
+        'server'   => a['server'],
+        'dbname'   => a['dbname'],
+        'schema'   => a['schema'],
+        'filename' => a['filename']
+      }.compact
+    end
+    out[name] = {
+      'name'        => name,
+      'caption'     => ds.attributes['caption'] || name,
+      'connections' => conns.uniq
+    }
+  end
+  out
+end
+
+def route_blend(primary_conns, secondary_conns)
+  same = primary_conns.any? do |pc|
+    secondary_conns.any? do |sc|
+      pc['class'] == sc['class'] && pc['server'].to_s == sc['server'].to_s &&
+        (pc['dbname'].nil? || sc['dbname'].nil? || pc['dbname'] == sc['dbname'] ||
+         pc['dbname'].to_s.casecmp(sc['dbname'].to_s).zero?)
+    end
+  end
+  return 'same-warehouse-repoint' if same
+  s_classes = secondary_conns.map { |c| c['class'] }
+  return 'materialize-via-vds' if s_classes.any? { |c| FILE_CONN_CLASSES.include?(c) } ||
+                                  s_classes.empty?
+  return 'materialize-via-vds' unless s_classes.any? { |c| WAREHOUSE_CONN_CLASSES.include?(c) }
+  'flag-unreachable'
+end
+
+ROUTE_BLURB = {
+  'same-warehouse-repoint' => 'both sources resolve to the SAME warehouse — emit ONE DM with both '                               'sources as elements + a relationship on the linking fields; repoint '                               'connectionId by deep-walking the spec (incl. joins[].left/right nesting)',
+  'materialize-via-vds'    => 'secondary is not in the warehouse — run the tableau-vds-to-cdw skill '                               'to land it in the primary\'s warehouse FIRST, then convert as a '                               'same-warehouse blend',
+  'flag-unreachable'       => 'secondary lives in a different live system — blend stays MANUAL; '                               'use the linking-field report in blend-plan.json to wire it post-publish'
+}.freeze
+
+def detect_blends(xml)
+  return [[], nil] if xml.nil?
+  ds_info = datasource_connections(xml)
+  blends = []
+  xml.elements.each('//worksheet') do |ws|
+    ws_name = ws.attributes['name']
+    used = ws.elements.to_a('.//view/datasources/datasource')
+             .map { |d| d.attributes['name'] }.compact
+             .select { |n| ds_info.key?(n) }
+    next unless used.length >= 2
+    deps = {}
+    ws.elements.each('.//datasource-dependencies') do |dd|
+      dsn = dd.attributes['datasource']
+      next unless dsn
+      caps = dd.elements.to_a('.//column').map do |c|
+        c.attributes['caption'] || c.attributes['name'].to_s.gsub(/^\[|\]$/, '')
+      end
+      deps[dsn] = ((deps[dsn] || []) + caps).uniq
+    end
+    primary = used.first
+    used[1..].each do |sec|
+      next unless deps.key?(sec) && !deps[sec].empty? # must pull fields from it
+      linking = (deps[primary] || []) & (deps[sec] || [])
+      route = route_blend(ds_info[primary]['connections'], ds_info[sec]['connections'])
+      blends << {
+        'worksheet'        => ws_name,
+        'primary'          => primary,
+        'primary_caption'  => ds_info[primary]['caption'],
+        'secondary'        => sec,
+        'secondary_caption'=> ds_info[sec]['caption'],
+        'linking_fields'   => linking,
+        'secondary_fields' => deps[sec],
+        'route'            => route,
+        'recommendation'   => ROUTE_BLURB[route]
+      }
+    end
+  end
+  return [[], nil] if blends.empty?
+  features = blends.group_by { |b| b['route'] }.map do |route, rs|
+    {
+      name:   "Data blending (#{route})",
+      status: route == 'same-warehouse-repoint' ? :hint : :manual,
+      count:  rs.length,
+      blurb:  "#{ROUTE_BLURB[route]}. Worksheets: #{rs.map { |b| b['worksheet'] }.uniq.join(', ')}. "               'Full linking-field report in blend-plan.json; decision tree in refs/blending.md (beads-sigma-iq8).'
+    }
+  end
+  [features, { 'datasources' => ds_info.values, 'blends' => blends }]
+end
+
 def render_md(wb_name, summary, results)
   by_status = results.group_by { |r| r[:status] }
   md = String.new
@@ -169,7 +303,7 @@ def render_md(wb_name, summary, results)
   if (by_status[:unhandled] || []).any?
     md << "1. Review the **Unhandled** features above. For each, the agent will either:\n"
     md << "   - Attempt translation via the `gap-scout` subagent (validates against Sigma API)\n"
-    md << "   - File an issue at github.com/sigmacomputing/quickstarts-public if no translation is possible\n"
+    md << "   - File an issue at github.com/twells89/sigma-migration-skills if no translation is possible\n"
   end
   if (by_status[:manual] || []).any?
     md << "2. The **Manual** features need post-publish work. See `<workbook>-actions.md` after conversion for action-filter mappings.\n"
@@ -177,7 +311,7 @@ def render_md(wb_name, summary, results)
   if (by_status[:hint] || []).any?
     md << "3. The **Hint** features will show as `WARN` lines during conversion with copy-paste-ready Sigma formulas — review each before publishing.\n"
   end
-  md << "\n_Generated by tableau-to-sigma skill. Issues: https://github.com/sigmacomputing/quickstarts-public/issues_\n"
+  md << "\n_Generated by tableau-to-sigma skill. Issues: https://github.com/twells89/sigma-migration-skills/issues_\n"
   md
 end
 
@@ -189,6 +323,7 @@ def main
   content = File.read(inp, encoding: 'utf-8', invalid: :replace)
 
   # Workbook summary via REXML
+  xml = nil
   begin
     xml = REXML::Document.new(content)
     n_dash = xml.elements.to_a('//dashboard').count
@@ -216,8 +351,18 @@ def main
 
   results = categorize(content)
   results.concat(detect_point_map_geo_role_gaps(content))
+  blend_features, blend_plan = detect_blends(xml)
+  results.concat(blend_features)
   md_path = out
   json_path = out.sub(/\.md$/, '.json')
+
+  if blend_plan
+    blend_plan_path = File.join(File.dirname(File.expand_path(out)), 'blend-plan.json')
+    blend_plan['workbook'] = File.basename(inp)
+    File.write(blend_plan_path, JSON.pretty_generate(blend_plan))
+    warn "wrote #{blend_plan_path} (#{blend_plan['blends'].length} blend(s): " +
+         blend_plan['blends'].map { |b| "#{b['worksheet']}→#{b['route']}" }.join(', ') + ')'
+  end
 
   File.write(md_path, render_md(File.basename(inp), summary, results))
   File.write(json_path, JSON.pretty_generate({

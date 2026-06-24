@@ -119,12 +119,6 @@ module Sigma
         refresh_token!
         next
       end
-      if res.code.to_i == 429 && attempts < 6 # Cloudflare 1015 rate limit: transient, retryable
-        wait = [30 * (2**(attempts - 1)), 120].min
-        warn "HTTP 429 #{method.upcase} #{path} -- backing off #{wait}s (attempt #{attempts}/6)"
-        sleep wait
-        next
-      end
       unless res.is_a?(Net::HTTPSuccess)
         raise Error, "#{method.upcase} #{path} -> #{res.code} #{res.message}\n#{res.body}"
       end

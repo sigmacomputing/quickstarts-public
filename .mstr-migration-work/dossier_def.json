@@ -1,0 +1,1328 @@
+{
+ "id": "6CBB996E46637ABCF8974795C457EF09",
+ "name": "Retail Insights",
+ "datasets": [
+  {
+   "name": "A.Retail_Insights_S",
+   "id": "4F27F7F7F7466B9416E954BE3C30CDCD",
+   "availableObjects": [
+    {
+     "id": "8A1CD432B44A2309988B1C94F4C153FC",
+     "name": "Brand",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "FB1F47960547486B804E9D9960E9AC54",
+     "name": "Date First Available",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "date",
+       "baseFormCategory": "ID",
+       "baseFormType": "date"
+      }
+     ]
+    },
+    {
+     "id": "1171307D3A4ADB7E1ADEB28FD1B23357",
+     "name": "Date",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "date",
+       "baseFormCategory": "ID",
+       "baseFormType": "date"
+      }
+     ]
+    },
+    {
+     "id": "E3F009A14B40467D093FBF85E180F5DC",
+     "name": "Store Location",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "1A2049792549119306AB0F85029691D4",
+     "name": "Product Color",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "7A1975468A45AB07167E788057D72DF3",
+     "name": "Product Description",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "4C3172B2DC4516D3A9DA969DB37B8AD8",
+     "name": "Product SKU",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "B10318651E420A306D9B289ABFB47358",
+     "name": "Product Image",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "HTMLTag"
+      }
+     ]
+    },
+    {
+     "id": "221E6F97E347D6C30D7DBE9ADB3DC117",
+     "name": "Product Line",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "1286CC9C6E4B46EE2C3772ADD39A92D6",
+     "name": "Product Link",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "DDCC58443A4BBE5174B660A2634862B9",
+     "name": "Product Name",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "14AC6DAB5F48D0FAB2ACDABF55901DDD",
+     "name": "Product Size",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "D3E16995924F32064CF2A59F14CE8934",
+     "name": "Product Type",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "146FBF580D4BA169BFA4599083C42578",
+     "name": "Ranking in Product Line",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "integer",
+       "baseFormCategory": "ID",
+       "baseFormType": "number"
+      }
+     ]
+    },
+    {
+     "id": "4B8B19E95D4FC21E8CC47AB69BCBAD34",
+     "name": "Order Quantity",
+     "type": "metric"
+    },
+    {
+     "id": "6FF531FC054B7BAFA43BE48FCC1CC523",
+     "name": "Avg Unit Sold",
+     "type": "metric"
+    },
+    {
+     "id": "DB459FF2FE4409CB93AD459E0D0D8346",
+     "name": "Inventory",
+     "type": "metric"
+    },
+    {
+     "id": "B3F01E11624E8C6186676086EC634AB3",
+     "name": "Inventory Capacity",
+     "type": "metric"
+    },
+    {
+     "id": "5F0E0C02D143361F771510A4F56ECC20",
+     "name": "Product Cost",
+     "type": "metric"
+    },
+    {
+     "id": "BDDCABFE06473E8DB27390BC2A0DB187",
+     "name": "Product Inventory",
+     "type": "metric"
+    },
+    {
+     "id": "08BE14FDE84FBA9B04B590B6B1BCFC7A",
+     "name": "Product List Price",
+     "type": "metric"
+    },
+    {
+     "id": "B8D9E394F34A1738E6FC3C86FF80DA13",
+     "name": "Product Rating",
+     "type": "metric"
+    },
+    {
+     "id": "A44C21A90144C538894BCA9580E79F59",
+     "name": "Product YTD Revenue",
+     "type": "metric"
+    },
+    {
+     "id": "919C7E763C4D6752B1B9219AE27EA032",
+     "name": "Product YTD Sales",
+     "type": "metric"
+    },
+    {
+     "id": "7C5C17133145223F396A13B08C7B71D9",
+     "name": "Overstock Percentage",
+     "type": "metric"
+    },
+    {
+     "id": "296827D8D948253C7FA3569A9F8B5B5C",
+     "name": "Total Sales",
+     "type": "metric"
+    },
+    {
+     "id": "8857C1D87E4C7EB6594368916111CB10",
+     "name": "Row Count - A.Retail_Insights_S.xlsx",
+     "type": "metric"
+    }
+   ],
+   "rows": [
+    {
+     "id": "8A1CD432B44A2309988B1C94F4C153FC",
+     "name": "Brand",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "FB1F47960547486B804E9D9960E9AC54",
+     "name": "Date First Available",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "date",
+       "baseFormCategory": "ID",
+       "baseFormType": "date"
+      }
+     ]
+    },
+    {
+     "id": "1171307D3A4ADB7E1ADEB28FD1B23357",
+     "name": "Date",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "date",
+       "baseFormCategory": "ID",
+       "baseFormType": "date"
+      }
+     ]
+    },
+    {
+     "id": "E3F009A14B40467D093FBF85E180F5DC",
+     "name": "Store Location",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "1A2049792549119306AB0F85029691D4",
+     "name": "Product Color",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "7A1975468A45AB07167E788057D72DF3",
+     "name": "Product Description",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "4C3172B2DC4516D3A9DA969DB37B8AD8",
+     "name": "Product SKU",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "B10318651E420A306D9B289ABFB47358",
+     "name": "Product Image",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "HTMLTag"
+      }
+     ]
+    },
+    {
+     "id": "221E6F97E347D6C30D7DBE9ADB3DC117",
+     "name": "Product Line",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "1286CC9C6E4B46EE2C3772ADD39A92D6",
+     "name": "Product Link",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "DDCC58443A4BBE5174B660A2634862B9",
+     "name": "Product Name",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "14AC6DAB5F48D0FAB2ACDABF55901DDD",
+     "name": "Product Size",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "D3E16995924F32064CF2A59F14CE8934",
+     "name": "Product Type",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "UTF8Char",
+       "baseFormCategory": "ID",
+       "baseFormType": "text"
+      }
+     ]
+    },
+    {
+     "id": "146FBF580D4BA169BFA4599083C42578",
+     "name": "Ranking in Product Line",
+     "type": "attribute",
+     "forms": [
+      {
+       "id": "45C11FA478E745FEA08D781CEA190FE5",
+       "name": "ID",
+       "dataType": "integer",
+       "baseFormCategory": "ID",
+       "baseFormType": "number"
+      }
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "id": "00000000000000000000000000000000",
+     "name": "Metrics",
+     "type": "templateMetrics",
+     "elements": [
+      {
+       "name": "Order Quantity",
+       "id": "4B8B19E95D4FC21E8CC47AB69BCBAD34",
+       "type": "metric",
+       "dataType": "integer"
+      },
+      {
+       "name": "Avg Unit Sold",
+       "id": "6FF531FC054B7BAFA43BE48FCC1CC523",
+       "type": "metric",
+       "dataType": "integer"
+      },
+      {
+       "name": "Inventory",
+       "id": "DB459FF2FE4409CB93AD459E0D0D8346",
+       "type": "metric",
+       "dataType": "integer"
+      },
+      {
+       "name": "Inventory Capacity",
+       "id": "B3F01E11624E8C6186676086EC634AB3",
+       "type": "metric",
+       "dataType": "integer"
+      },
+      {
+       "name": "Product Cost",
+       "id": "5F0E0C02D143361F771510A4F56ECC20",
+       "type": "metric",
+       "dataType": "double"
+      },
+      {
+       "name": "Product Inventory",
+       "id": "BDDCABFE06473E8DB27390BC2A0DB187",
+       "type": "metric",
+       "dataType": "double"
+      },
+      {
+       "name": "Product List Price",
+       "id": "08BE14FDE84FBA9B04B590B6B1BCFC7A",
+       "type": "metric",
+       "dataType": "double"
+      },
+      {
+       "name": "Product Rating",
+       "id": "B8D9E394F34A1738E6FC3C86FF80DA13",
+       "type": "metric",
+       "dataType": "double"
+      },
+      {
+       "name": "Product YTD Revenue",
+       "id": "A44C21A90144C538894BCA9580E79F59",
+       "type": "metric",
+       "dataType": "integer"
+      },
+      {
+       "name": "Product YTD Sales",
+       "id": "919C7E763C4D6752B1B9219AE27EA032",
+       "type": "metric",
+       "dataType": "integer"
+      },
+      {
+       "name": "Overstock Percentage",
+       "id": "7C5C17133145223F396A13B08C7B71D9",
+       "type": "metric",
+       "dataType": "double"
+      },
+      {
+       "name": "Total Sales",
+       "id": "296827D8D948253C7FA3569A9F8B5B5C",
+       "type": "metric",
+       "dataType": "double"
+      },
+      {
+       "name": "Row Count - A.Retail_Insights_S.xlsx",
+       "id": "8857C1D87E4C7EB6594368916111CB10",
+       "type": "metric",
+       "dataType": "reserved"
+      }
+     ]
+    }
+   ],
+   "pageBy": []
+  }
+ ],
+ "currentChapter": "K396441",
+ "chapters": [
+  {
+   "key": "K396441",
+   "name": "Analysis",
+   "pages": [
+    {
+     "key": "W396501",
+     "name": "Summary",
+     "visualizations": [],
+     "fields": [
+      {
+       "key": "IGK99",
+       "name": "Image 1",
+       "fieldType": "image"
+      },
+      {
+       "key": "IGK100",
+       "name": "Rectangle",
+       "fieldType": "shape"
+      },
+      {
+       "key": "IGK101",
+       "name": "Image 1 copy",
+       "fieldType": "image"
+      }
+     ],
+     "panelStacks": [
+      {
+       "key": "K14",
+       "name": "Panel Stack 1",
+       "panels": [
+        {
+         "key": "K17",
+         "name": "Panel 1",
+         "visualizations": [
+          {
+           "key": "K25",
+           "name": "Pricelist",
+           "visualizationType": "grid"
+          },
+          {
+           "key": "C7BFB93634F2454CB943A212AC3DF989",
+           "name": "Inventory Alerts",
+           "visualizationType": "microcharts",
+           "columnSets": [
+            {
+             "key": "K24",
+             "name": "Column Set 1"
+            },
+            {
+             "key": "726ACD8255BB431C980D5FEF39330797",
+             "name": "Inventory Performance"
+            }
+           ]
+          },
+          {
+           "key": "W396518",
+           "name": "Inventory YTD",
+           "visualizationType": "bar_chart"
+          }
+         ],
+         "panelStacks": [
+          {
+           "key": "W396505",
+           "name": "Panel Stack 2",
+           "panels": [
+            {
+             "key": "W396506",
+             "name": "Panel 1",
+             "visualizations": [
+              {
+               "key": "K23",
+               "name": "Top Selling Products",
+               "visualizationType": "grid"
+              }
+             ]
+            }
+           ],
+           "currentPanelKey": "W396506"
+          },
+          {
+           "key": "K18",
+           "name": "Panel Stack 1",
+           "panels": [
+            {
+             "key": "K19",
+             "name": "Panel 1",
+             "visualizations": [
+              {
+               "key": "K20",
+               "name": "Sales Trend",
+               "visualizationType": "combo_chart"
+              },
+              {
+               "key": "K21",
+               "name": "Visualization 2",
+               "visualizationType": "kpi"
+              },
+              {
+               "key": "K22",
+               "name": "Visualization 2 copy",
+               "visualizationType": "kpi"
+              }
+             ]
+            }
+           ],
+           "currentPanelKey": "K19"
+          }
+         ]
+        }
+       ],
+       "currentPanelKey": "K17"
+      },
+      {
+       "key": "K26",
+       "name": "mobile menu",
+       "panels": [
+        {
+         "key": "K27",
+         "name": "Panel 1",
+         "visualizations": [],
+         "fields": [
+          {
+           "key": "IGK31",
+           "name": "Image 7",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK33",
+           "name": "Image 7 copy",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK35",
+           "name": "Image 7 copy 1",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK57",
+           "name": "Image 7 copy 1 copy",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK59",
+           "name": "Image 7 copy 1 copy copy",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK71",
+           "name": "Image 7 copy 1 copy copy copy",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK73",
+           "name": "Image 7 copy 1 copy copy copy copy",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK75",
+           "name": "Text 2",
+           "fieldType": "text"
+          },
+          {
+           "key": "IGK77",
+           "name": "Rectangle",
+           "fieldType": "shape"
+          }
+         ]
+        }
+       ],
+       "currentPanelKey": "K27"
+      },
+      {
+       "key": "K78",
+       "name": "Nav for Web",
+       "panels": [
+        {
+         "key": "K79",
+         "name": "Panel 1",
+         "visualizations": [],
+         "fields": [
+          {
+           "key": "IGK81",
+           "name": "Image 3",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK83",
+           "name": "Image 4",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK87",
+           "name": "Image 4 copy copy copy copy",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK97",
+           "name": "Image 6",
+           "fieldType": "image"
+          },
+          {
+           "key": "W8F91E3D8B2C74B9685D19A4617437893",
+           "name": "Text 8",
+           "fieldType": "text"
+          },
+          {
+           "key": "WB5B5B8CCD32849F591638E5C675381A8",
+           "name": "Image 35",
+           "fieldType": "image"
+          },
+          {
+           "key": "W864C783806A646F2AD1FA20ACDAAFC9D",
+           "name": "Image 36",
+           "fieldType": "image"
+          }
+         ]
+        }
+       ],
+       "currentPanelKey": "K79"
+      },
+      {
+       "key": "K102",
+       "name": "Nav for Mobile",
+       "panels": [
+        {
+         "key": "K103",
+         "name": "Panel 1",
+         "visualizations": [],
+         "fields": [
+          {
+           "key": "IGK105",
+           "name": "Image 4",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK106",
+           "name": "Text 1",
+           "fieldType": "text"
+          },
+          {
+           "key": "IGK108",
+           "name": "Image 5",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK109",
+           "name": "Text 1 copy copy",
+           "fieldType": "text"
+          },
+          {
+           "key": "IGK114",
+           "name": "Image 4 copy",
+           "fieldType": "image"
+          }
+         ]
+        }
+       ],
+       "currentPanelKey": "K103"
+      }
+     ]
+    },
+    {
+     "key": "W396572",
+     "name": "Customer",
+     "visualizations": [],
+     "fields": [
+      {
+       "key": "IGK341",
+       "name": "Image 1",
+       "fieldType": "image"
+      },
+      {
+       "key": "IGK342",
+       "name": "Rectangle",
+       "fieldType": "shape"
+      },
+      {
+       "key": "IGK343",
+       "name": "Image 1 copy",
+       "fieldType": "image"
+      }
+     ],
+     "panelStacks": [
+      {
+       "key": "K267",
+       "name": "Panel Stack 1",
+       "panels": [
+        {
+         "key": "K268",
+         "name": "Panel 1",
+         "visualizations": [],
+         "panelStacks": [
+          {
+           "key": "K269",
+           "name": "Panel Stack 1",
+           "panels": [
+            {
+             "key": "K270",
+             "name": "Panel 1",
+             "visualizations": [
+              {
+               "key": "K275",
+               "name": "Customer Raw Data",
+               "visualizationType": "grid"
+              }
+             ],
+             "selectors": [
+              {
+               "key": "IGK279",
+               "name": "Choose Metrics",
+               "summary": "Choose Metrics In List Inventory, Overstock Percentage, Product Cost",
+               "selectorType": "object_replacement",
+               "displayStyle": "hyper_links",
+               "hasAllOption": false,
+               "targets": [
+                {
+                 "key": "K275"
+                }
+               ],
+               "multiSelectionAllowed": true,
+               "currentSelection": {
+                "selectionStatus": "included",
+                "objectItems": [
+                 {
+                  "id": "iDB459FF2FE4409CB93AD459E0D0D8346;DB459FF2FE4409CB93AD459E0D0D8346",
+                  "name": "Inventory"
+                 },
+                 {
+                  "id": "i7C5C17133145223F396A13B08C7B71D9;7C5C17133145223F396A13B08C7B71D9",
+                  "name": "Overstock Percentage"
+                 },
+                 {
+                  "id": "i5F0E0C02D143361F771510A4F56ECC20;5F0E0C02D143361F771510A4F56ECC20",
+                  "name": "Product Cost"
+                 }
+                ]
+               },
+               "availableObjectItems": [
+                {
+                 "id": "iDB459FF2FE4409CB93AD459E0D0D8346;DB459FF2FE4409CB93AD459E0D0D8346",
+                 "name": "Inventory"
+                },
+                {
+                 "id": "iB3F01E11624E8C6186676086EC634AB3;B3F01E11624E8C6186676086EC634AB3",
+                 "name": "Inventory Capacity"
+                },
+                {
+                 "id": "i7C5C17133145223F396A13B08C7B71D9;7C5C17133145223F396A13B08C7B71D9",
+                 "name": "Overstock Percentage"
+                },
+                {
+                 "id": "i5F0E0C02D143361F771510A4F56ECC20;5F0E0C02D143361F771510A4F56ECC20",
+                 "name": "Product Cost"
+                },
+                {
+                 "id": "iBDDCABFE06473E8DB27390BC2A0DB187;BDDCABFE06473E8DB27390BC2A0DB187",
+                 "name": "Product Inventory"
+                },
+                {
+                 "id": "i08BE14FDE84FBA9B04B590B6B1BCFC7A;08BE14FDE84FBA9B04B590B6B1BCFC7A",
+                 "name": "Product List Price"
+                },
+                {
+                 "id": "iB8D9E394F34A1738E6FC3C86FF80DA13;B8D9E394F34A1738E6FC3C86FF80DA13",
+                 "name": "Product Rating"
+                },
+                {
+                 "id": "iA44C21A90144C538894BCA9580E79F59;A44C21A90144C538894BCA9580E79F59",
+                 "name": "Product YTD Revenue"
+                },
+                {
+                 "id": "i919C7E763C4D6752B1B9219AE27EA032;919C7E763C4D6752B1B9219AE27EA032",
+                 "name": "Product YTD Sales"
+                },
+                {
+                 "id": "i296827D8D948253C7FA3569A9F8B5B5C;296827D8D948253C7FA3569A9F8B5B5C",
+                 "name": "Total Sales"
+                },
+                {
+                 "id": "i6FF531FC054B7BAFA43BE48FCC1CC523;6FF531FC054B7BAFA43BE48FCC1CC523",
+                 "name": "Avg Unit Sold"
+                },
+                {
+                 "id": "i4B8B19E95D4FC21E8CC47AB69BCBAD34;4B8B19E95D4FC21E8CC47AB69BCBAD34",
+                 "name": "Order Quantity"
+                }
+               ]
+              },
+              {
+               "key": "IGK290",
+               "name": "Choose Time Attributes",
+               "summary": "Choose Time Attributes In List Year, Quarter, Date",
+               "selectorType": "object_replacement",
+               "displayStyle": "hyper_links",
+               "hasAllOption": false,
+               "targets": [
+                {
+                 "key": "K275"
+                }
+               ],
+               "multiSelectionAllowed": true,
+               "currentSelection": {
+                "selectionStatus": "included",
+                "objectItems": [
+                 {
+                  "id": "UD037305356403F678BD361BB3F05D62E;D037305356403F678BD361BB3F05D62E",
+                  "name": "Year"
+                 },
+                 {
+                  "id": "UE3AFF09DEC47C32F09D897B94573CB3A;E3AFF09DEC47C32F09D897B94573CB3A",
+                  "name": "Quarter"
+                 },
+                 {
+                  "id": "U1171307D3A4ADB7E1ADEB28FD1B23357;1171307D3A4ADB7E1ADEB28FD1B23357",
+                  "name": "Date"
+                 }
+                ]
+               },
+               "availableObjectItems": [
+                {
+                 "id": "UD037305356403F678BD361BB3F05D62E;D037305356403F678BD361BB3F05D62E",
+                 "name": "Year"
+                },
+                {
+                 "id": "UE3AFF09DEC47C32F09D897B94573CB3A;E3AFF09DEC47C32F09D897B94573CB3A",
+                 "name": "Quarter"
+                },
+                {
+                 "id": "U16CD2CDD914B3D670E77018B73D0CCFC;16CD2CDD914B3D670E77018B73D0CCFC",
+                 "name": "Month of Year"
+                },
+                {
+                 "id": "U1171307D3A4ADB7E1ADEB28FD1B23357;1171307D3A4ADB7E1ADEB28FD1B23357",
+                 "name": "Date"
+                }
+               ]
+              },
+              {
+               "key": "W396578",
+               "name": "Choose Geos",
+               "summary": "Choose Geos In List Brand, Month of Year, Quarter, Date First Available",
+               "selectorType": "object_replacement",
+               "displayStyle": "hyper_links",
+               "hasAllOption": false,
+               "targets": [
+                {
+                 "key": "K275"
+                }
+               ],
+               "multiSelectionAllowed": true,
+               "currentSelection": {
+                "selectionStatus": "included",
+                "objectItems": [
+                 {
+                  "id": "U8A1CD432B44A2309988B1C94F4C153FC;8A1CD432B44A2309988B1C94F4C153FC",
+                  "name": "Brand"
+                 },
+                 {
+                  "id": "U16CD2CDD914B3D670E77018B73D0CCFC;16CD2CDD914B3D670E77018B73D0CCFC",
+                  "name": "Month of Year"
+                 },
+                 {
+                  "id": "UE3AFF09DEC47C32F09D897B94573CB3A;E3AFF09DEC47C32F09D897B94573CB3A",
+                  "name": "Quarter"
+                 },
+                 {
+                  "id": "UFB1F47960547486B804E9D9960E9AC54;FB1F47960547486B804E9D9960E9AC54",
+                  "name": "Date First Available"
+                 }
+                ]
+               },
+               "availableObjectItems": [
+                {
+                 "id": "U8A1CD432B44A2309988B1C94F4C153FC;8A1CD432B44A2309988B1C94F4C153FC",
+                 "name": "Brand"
+                },
+                {
+                 "id": "U1171307D3A4ADB7E1ADEB28FD1B23357;1171307D3A4ADB7E1ADEB28FD1B23357",
+                 "name": "Date"
+                },
+                {
+                 "id": "U16CD2CDD914B3D670E77018B73D0CCFC;16CD2CDD914B3D670E77018B73D0CCFC",
+                 "name": "Month of Year"
+                },
+                {
+                 "id": "U0D1345004F4ABB9501FB6481983C1305;0D1345004F4ABB9501FB6481983C1305",
+                 "name": "Month"
+                },
+                {
+                 "id": "UE3AFF09DEC47C32F09D897B94573CB3A;E3AFF09DEC47C32F09D897B94573CB3A",
+                 "name": "Quarter"
+                },
+                {
+                 "id": "UD037305356403F678BD361BB3F05D62E;D037305356403F678BD361BB3F05D62E",
+                 "name": "Year"
+                },
+                {
+                 "id": "UFB1F47960547486B804E9D9960E9AC54;FB1F47960547486B804E9D9960E9AC54",
+                 "name": "Date First Available"
+                },
+                {
+                 "id": "U1A2049792549119306AB0F85029691D4;1A2049792549119306AB0F85029691D4",
+                 "name": "Product Color"
+                },
+                {
+                 "id": "U7A1975468A45AB07167E788057D72DF3;7A1975468A45AB07167E788057D72DF3",
+                 "name": "Product Description"
+                },
+                {
+                 "id": "UB10318651E420A306D9B289ABFB47358;B10318651E420A306D9B289ABFB47358",
+                 "name": "Product Image"
+                },
+                {
+                 "id": "U221E6F97E347D6C30D7DBE9ADB3DC117;221E6F97E347D6C30D7DBE9ADB3DC117",
+                 "name": "Product Line"
+                },
+                {
+                 "id": "U1286CC9C6E4B46EE2C3772ADD39A92D6;1286CC9C6E4B46EE2C3772ADD39A92D6",
+                 "name": "Product Link"
+                },
+                {
+                 "id": "UDDCC58443A4BBE5174B660A2634862B9;DDCC58443A4BBE5174B660A2634862B9",
+                 "name": "Product Name"
+                },
+                {
+                 "id": "U14AC6DAB5F48D0FAB2ACDABF55901DDD;14AC6DAB5F48D0FAB2ACDABF55901DDD",
+                 "name": "Product Size"
+                },
+                {
+                 "id": "U4C3172B2DC4516D3A9DA969DB37B8AD8;4C3172B2DC4516D3A9DA969DB37B8AD8",
+                 "name": "Product SKU"
+                },
+                {
+                 "id": "UD3E16995924F32064CF2A59F14CE8934;D3E16995924F32064CF2A59F14CE8934",
+                 "name": "Product Type"
+                },
+                {
+                 "id": "UE3F009A14B40467D093FBF85E180F5DC;E3F009A14B40467D093FBF85E180F5DC",
+                 "name": "Store Location"
+                }
+               ]
+              }
+             ]
+            }
+           ],
+           "currentPanelKey": "K270"
+          }
+         ]
+        }
+       ],
+       "currentPanelKey": "K268"
+      },
+      {
+       "key": "K297",
+       "name": "mobile menu",
+       "panels": [
+        {
+         "key": "K298",
+         "name": "Panel 1",
+         "visualizations": [],
+         "fields": [
+          {
+           "key": "IGK300",
+           "name": "Image 7",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK302",
+           "name": "Image 7 copy",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK304",
+           "name": "Image 7 copy 1",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK306",
+           "name": "Image 7 copy 1 copy",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK308",
+           "name": "Image 7 copy 1 copy copy",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK310",
+           "name": "Image 7 copy 1 copy copy copy",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK312",
+           "name": "Image 7 copy 1 copy copy copy copy",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK314",
+           "name": "Text 2",
+           "fieldType": "text"
+          },
+          {
+           "key": "IGK316",
+           "name": "Rectangle",
+           "fieldType": "shape"
+          }
+         ]
+        }
+       ],
+       "currentPanelKey": "K298"
+      },
+      {
+       "key": "K317",
+       "name": "Nav for Web",
+       "panels": [
+        {
+         "key": "K318",
+         "name": "Panel 1",
+         "visualizations": [],
+         "fields": [
+          {
+           "key": "IGK320",
+           "name": "Image 3",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK322",
+           "name": "Image 4",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK327",
+           "name": "Image 4 copy copy copy copy",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK333",
+           "name": "Image 5",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK339",
+           "name": "Image 6",
+           "fieldType": "image"
+          },
+          {
+           "key": "WD1D2E97659334754B98B45841E35572E",
+           "name": "Text 10",
+           "fieldType": "text"
+          }
+         ]
+        }
+       ],
+       "currentPanelKey": "K318"
+      },
+      {
+       "key": "K344",
+       "name": "Nav for Mobile",
+       "panels": [
+        {
+         "key": "K345",
+         "name": "Panel 1",
+         "visualizations": [],
+         "fields": [
+          {
+           "key": "IGK347",
+           "name": "Image 4",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK348",
+           "name": "Text 1",
+           "fieldType": "text"
+          },
+          {
+           "key": "IGK351",
+           "name": "Image 5",
+           "fieldType": "image"
+          },
+          {
+           "key": "IGK352",
+           "name": "Text 1 copy copy",
+           "fieldType": "text"
+          },
+          {
+           "key": "IGK357",
+           "name": "Image 4 copy",
+           "fieldType": "image"
+          }
+         ]
+        }
+       ],
+       "currentPanelKey": "K345"
+      }
+     ]
+    }
+   ],
+   "filters": [
+    {
+     "key": "W396503",
+     "name": "Date",
+     "summary": "((Date@ID Between '12/31/2022' And '9/30/2023'))",
+     "source": {
+      "id": "1171307D3A4ADB7E1ADEB28FD1B23357",
+      "name": "Date",
+      "type": 12
+     },
+     "synchronizedAcrossChapter": false,
+     "selectorType": "attribute_qualification",
+     "displayStyle": "attribute_qualification",
+     "hasAllOption": true,
+     "targets": [],
+     "multiSelectionAllowed": true,
+     "currentSelection": {
+      "selectionStatus": "included",
+      "expression": {
+       "operator": "Between",
+       "operands": [
+        {
+         "type": "form",
+         "attribute": {
+          "id": "1171307D3A4ADB7E1ADEB28FD1B23357",
+          "name": "Date"
+         },
+         "form": {
+          "id": "45C11FA478E745FEA08D781CEA190FE5",
+          "name": "ID"
+         }
+        },
+        {
+         "type": "constant",
+         "dataType": "Date",
+         "value": "12/31/2022"
+        },
+        {
+         "type": "constant",
+         "dataType": "Date",
+         "value": "9/30/2023"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "key": "W396532",
+     "name": "Product Name",
+     "summary": "Product Name In List (All)",
+     "source": {
+      "id": "DDCC58443A4BBE5174B660A2634862B9",
+      "name": "Product Name",
+      "type": 12
+     },
+     "synchronizedAcrossChapter": false,
+     "selectorType": "attribute_element_list",
+     "displayStyle": "check_boxes",
+     "hasAllOption": true,
+     "targets": [],
+     "multiSelectionAllowed": true,
+     "currentSelection": {
+      "selectionStatus": "included",
+      "allSelected": true,
+      "hideSelectedElements": true
+     }
+    }
+   ]
+  }
+ ]
+}

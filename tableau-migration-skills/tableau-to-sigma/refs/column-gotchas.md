@@ -98,7 +98,7 @@ string and passing it to `Date()`:
 Key points:
 - `Text()` is the correct string conversion function — `ToText()` does not exist in Sigma
 - `Date()` takes a single ISO date string (`"YYYY-MM-DD"`) — it does not accept 3 separate arguments
-- `DateParse()` does not exist in Sigma — do not use it
+- `DateParse(text, format)` DOES exist in Sigma and returns a datetime (verified 2026-06-15) — but it parses a **text** input with an **strftime** format (e.g. `DateParse(Text([YYYYMMDD]), "%Y%m%d")`), not a Java/Tableau format string. The Tableau converter emits it for `DATEPARSE` (with the format auto-rewritten to strftime). `Date("YYYY-MM-DD")` is still the simplest path for an ISO-string column.
 - `Mid()` is 1-indexed (position 5 gives the month digits of a YYYYMMDD integer)
 
 Do this in the workbook master table column, not in the data model — keep the integer column
@@ -224,7 +224,7 @@ as compiling to a valid `number` type during PUT readback. Only Phase 6f's
 `POST /v2/workbooks/{wb}/export` + PNG inspection catches the render-time
 failure (the chart exports as an empty plot area). Always run Phase 6f when an
 `If()` predicate is an integer column. Verified 2026-05-24 against OCT's
-`Is Returned` column on `MYDB.MYSCHEMA.ORDERS`.
+`Is Returned` column on `TJ.PUBLIC.SUPERSTORE_ORDERS`.
 
 ## YAML response from spec endpoints
 

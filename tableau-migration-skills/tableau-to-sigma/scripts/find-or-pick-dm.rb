@@ -22,7 +22,7 @@
 # Input signature shape (produced by Phase 1 + 2.5 — adjust paths as needed):
 #   {
 #     "tableau_workbook":   "Monthly Revenue",
-#     "warehouse_tables":   ["MY_CONNECTION.ORDER_FACT"],          # FQN list
+#     "warehouse_tables":   ["CSA.ORDER_FACT"],          # FQN list
 #     "referenced_columns": ["ORDER_DATE","GROSS_REVENUE","REGION","STATE"],
 #     "measures":           [{"col":"GROSS_REVENUE","derivation":"Sum"}, ...]
 #   }
@@ -122,20 +122,14 @@ loop do
   break if page.nil? || page.empty?
 end
 
-# Drop archived (trashed) DMs. Sigma keeps trashed items in the database
-# indefinitely with isArchived=true, so the list endpoint returns them.
-# Reusing a trashed DM is a surprising outcome — the user thought it was
-# deleted, so scoring it as a reuse candidate produces a workbook bound to
-# an apparently-gone DM. Filter them out up front.
-before = all_dms.size
-all_dms = all_dms.reject { |dm| dm['isArchived'] == true }
-warn "dropped #{before - all_dms.size} archived DMs from the candidate list" if before != all_dms.size
-
 # Deterministic ranking: updatedAt desc, then name asc.
+# NOTE: require 'time' MUST come before the sort — without it Time.parse raises,
+# every timestamp rescues to 0, and the sort silently degrades to name-ascending
+# (recently-updated DMs past the --limit window are never scanned).
+require 'time'
 all_dms = all_dms.sort_by do |dm|
   [-(Time.parse(dm['updatedAt'].to_s).to_i rescue 0), dm['name'].to_s]
 end
-require 'time'   # ensure Time.parse loaded (rescue covers if not)
 
 warn "found #{all_dms.size} total DMs; scoring top #{[all_dms.size, opts[:limit]].min} by updatedAt"
 
@@ -168,7 +162,8 @@ threads = 5.times.map do
       next unless dm_id
       r = nil
       # Retry on 429 (Cloudflare burst limit) with exponential backoff. The
-      # /v2/dataModels endpoint commonly 429s at >5 concurrent requests.
+      # /v2/dataModels endpoint commonly 429s at >5 concurrent across
+      # tj-wells-1989 — see beads-sigma-cn5.
       4.times do |attempt|
         r = http_get("/v2/dataModels/#{dm_id}/spec")
         code = r.code.to_i
@@ -211,8 +206,11 @@ all_dms.take(opts[:limit]).each do |dm|
     src = el['source'] || {}
     case src['kind']
     when 'warehouse-table', 'table'
-      # source like { kind: warehouse-table, connectionId, path: "DB.SCHEMA.TABLE" }
-      fqn = src['path'] || [src['database'], src['schema'], src['name']].compact.join('.')
+      # source like { kind: warehouse-table, connectionId, path: "DB.SCHEMA.TABLE" }.
+      # Live API specs return path as an ARRAY (["DB","SCHEMA","TABLE"]) — join it,
+      # else normalize_fqn sees the array's to_s and table-match never fires.
+      raw = src['path']
+      fqn = raw.is_a?(Array) ? raw.join('.') : (raw || [src['database'], src['schema'], src['name']].compact.join('.'))
       tables << normalize_fqn(fqn) if fqn && !fqn.empty?
     when 'sql'
       # Custom SQL — surface a sentinel so the agent knows; not directly comparable
@@ -299,21 +297,45 @@ candidates = dm_signatures.map do |dm|
     'extra_columns_sample' => extra_cols_norm.first(5).map(&caption_of),
     'raw_element_count' => dm[:raw_element_count]
   }
-end.sort_by { |c| -c['score'] }
+end
+
+# Tie-break: identical scores are common (duplicate / derived DMs sourcing the
+# same tables and column set). Prefer a DM whose name matches the source
+# workbook, then the one with the fewest extra columns — otherwise ordering is
+# arbitrary and the recommendation can land on a sprawling lookalike instead
+# of the purpose-built twin.
+sig_name_norm = normalize_col(sig['tableau_workbook'] || sig['workbook'] || '')
+candidates = candidates.sort_by do |c|
+  name_mismatch = (!sig_name_norm.empty? && normalize_col(c['dm_name']) == sig_name_norm) ? 0 : 1
+  [-c['score'], name_mismatch, c['extra_columns'] || 0]
+end
 
 best = candidates.first
 second = candidates[1]
 
-# Auto-pick gate: only fires when (a) --auto-pick flag is set, (b) top score
-# clears the auto-pick threshold, and (c) the next candidate is at least
-# auto_pick_tie_window below the top. The tie check protects against silently
-# picking the wrong one of two very-close candidates (e.g., a duplicate DM).
+# Auto-pick gate (reuse-first). Fires when --auto-pick is set and the top
+# candidate (a) clears the auto-pick threshold AND (b) COVERS ALL of the
+# workbook's source tables (table_match 1.0). Table coverage is the safety
+# invariant: a DM that sources every table the workbook needs can satisfy every
+# column ref through its element set, so reusing it is safe; a DM missing a table
+# is never auto-picked (its denorm view can't resolve the missing columns).
+#
+# We deliberately DO NOT block on a score tie here. A tie among table-covering
+# candidates is duplicate-DM SPRAWL (the same star modeled two or three times) —
+# exactly what reuse-first exists to collapse — so we take the top (the
+# deterministic tie-break already prefers a name match, then the fewest extra
+# columns, over the most-recently-updated set). A column-SUPERSET (every
+# referenced column present, column_match 1.0) is the safest case and always
+# qualifies. Callers should reuse `recommended_dm_id` only when `auto_picked`.
 auto_pick_threshold  = opts[:auto_pick_threshold]  || 0.55
 auto_pick_tie_window = opts[:auto_pick_tie_window] || 0.05
 tie_with_second      = best && second && (best['score'] - second['score']) < auto_pick_tie_window
-auto_picked          = opts[:auto_pick] && best && best['score'] >= auto_pick_threshold && !tie_with_second
+best_name_matches    = best && !sig_name_norm.empty? && normalize_col(best['dm_name']) == sig_name_norm
+best_covers_tables   = best && best['table_match'].to_f >= 1.0
+best_is_superset     = best_covers_tables && best['column_match'].to_f >= 1.0
+auto_picked          = !!(opts[:auto_pick] && best && best['score'] >= auto_pick_threshold && best_covers_tables)
 
-# Standard recommend path keeps the old semantics.
+# Standard recommend path keeps the old semantics (printed for human opt-in).
 recommended_via_std  = best && best['score'] >= opts[:min_score]
 recommended_dm_id    = (auto_picked || recommended_via_std) ? best['dm_id'] : nil
 
@@ -321,11 +343,11 @@ rationale =
   if best.nil?
     'no DMs in org'
   elsif auto_picked
-    "AUTO-PICKED at score #{best['score']} (>= #{auto_pick_threshold}, no tie within #{auto_pick_tie_window}). #{best['shared_columns'].size}/#{tableau_columns.size} cols matched. Caller must WARN about #{best['extra_columns']} inherited columns."
-  elsif best['score'] >= 0.85
-    "auto-reuse candidate (#{best['shared_columns'].size}/#{tableau_columns.size} cols, #{best['shared_tables'].size}/#{tableau_tables.size} tables)"
-  elsif opts[:auto_pick] && best['score'] >= auto_pick_threshold && tie_with_second
-    "would auto-pick but second candidate at #{second['score']} is within #{auto_pick_tie_window} — TIE — falling back to ASK USER"
+    kind = best_is_superset ? 'column-superset' : 'covers all source tables'
+    tie  = tie_with_second ? " (collapsing a #{best['score']}-score tie — duplicate-DM sprawl)" : ''
+    "AUTO-PICKED at score #{best['score']} — #{kind}#{tie}. #{best['shared_columns'].size}/#{tableau_columns.size} cols, #{best['shared_tables'].size}/#{tableau_tables.size} tables matched. Caller must WARN about #{best['extra_columns']} inherited columns."
+  elsif opts[:auto_pick] && best['score'] >= auto_pick_threshold && !best_covers_tables
+    "score #{best['score']} clears the bar but the candidate is MISSING source table(s) #{best['missing_tables'].join(', ')} — not a safe reuse — build a new DM"
   elsif best['score'] >= opts[:min_score]
     'ambiguous match — ASK USER before reusing'
   else

@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 # Compose a migration-plan.json that the assessment hands to downstream
-# migration skills (tableau-to-sigma, tableau-vds-to-snowflake) for direct
+# migration skills (tableau-to-sigma, tableau-vds-to-cdw) for direct
 # invocation.
 #
 # Inputs (all from /tmp/assessment-<site>/):
@@ -43,7 +43,7 @@ require 'optparse'
 require 'set'
 require 'rexml/document'
 
-opts = { similarity: 0.5, target_schema: 'MYDB.MYSCHEMA', warehouse_cli: 'snow' }
+opts = { similarity: 0.5, target_schema: 'TJ.PUBLIC', warehouse_cli: 'snow' }
 OptionParser.new do |p|
   p.on('--out DIR')                 { |v| opts[:out] = v }
   p.on('--similarity F', Float,
@@ -57,7 +57,7 @@ OptionParser.new do |p|
   p.on('--target-schema SCHEMA',
        'CATALOG.SCHEMA (Snowflake) / project.dataset (BigQuery) / ' \
        'catalog.schema (Databricks) / database.schema (Postgres) to check ' \
-       'for already-landed tables (default MYDB.MYSCHEMA). Used together with ' \
+       'for already-landed tables (default TJ.PUBLIC). Used together with ' \
        '--snowflake-conn or --warehouse-cli.') { |v| opts[:target_schema] = v }
   p.on('--warehouse-cli MODE',
        %w[snow bq databricks psql],

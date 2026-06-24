@@ -48,8 +48,19 @@ end
 
 errors = []
 all_element_names = []
+# Control-id tokens are legitimate bare refs inside Sigma formulas (a
+# parameter-driven Switch references its control by controlId, not a column).
+# Collect them so the sibling-ref check below doesn't false-flag them as
+# "not a sibling column".
+control_ids = Set.new rescue nil
+control_ids ||= []
 spec.fetch('pages', []).each do |page|
-  page.fetch('elements', []).each { |el| all_element_names << el['name'] if el['name'] }
+  page.fetch('elements', []).each do |el|
+    all_element_names << el['name'] if el['name']
+    if el['kind'] == 'control' && el['controlId']
+      control_ids.respond_to?(:add) ? control_ids.add(el['controlId']) : (control_ids << el['controlId'])
+    end
+  end
 end
 all_known_prefixes = (all_element_names + external_names).to_set rescue (all_element_names + external_names)
 require 'set' rescue nil
@@ -70,6 +81,17 @@ spec.fetch('pages', []).each do |page|
       own_prefixes << src['path'].last
     end
     own_prefixes << 'Custom SQL' if src['kind'] == 'sql'
+    # bead 1t6c: a master sourcing a DM element (kind: data-model) carries
+    # pass-through column formulas like [EMPLOYEES/Department] whose prefix is the
+    # DM element's source-table name — that lives INSIDE the data model, not this
+    # spec, so it can't be cross-checked here and was false-flagged "unknown
+    # prefix". The DM post already validated these columns; trust the prefixes the
+    # element's own formulas use.
+    if src['kind'] == 'data-model'
+      cols.each do |c|
+        (c['formula'] || '').to_s.scan(/\[([^\]\/]+)\//).flatten.each { |p| own_prefixes << p }
+      end
+    end
 
     cols.each do |col|
       f = (col['formula'] || '').to_s
@@ -105,7 +127,8 @@ spec.fetch('pages', []).each do |page|
                       "(known: #{(own_prefixes + all_known_set).to_a.sort.join(', ')})"
           end
         else
-          unless sibling_names.include?(ref)
+          is_control = control_ids.include?(ref) || ref.start_with?('ctl-')
+          unless sibling_names.include?(ref) || is_control
             errors << "#{name}.#{col['name']}: bare ref [#{ref}] not a sibling column"
           end
         end
@@ -122,6 +145,12 @@ spec.fetch('pages', []).each do |page|
     errors << "#{name}: invalid kind \"pie\" — must be \"pie-chart\"" if kind == 'pie'
     errors << "#{name}: invalid kind \"donut\" — must be \"donut-chart\"" if kind == 'donut'
     errors << "#{name}: kpi-chart missing value" if kind == 'kpi-chart' && !el['value']
+    # Breaking-change-2026-06-11: kpi-chart value binding moved id -> columnId
+    # (matching the 2026-05-21 chart axis change).
+    # OLD (now rejected): value: {id: ...}   NEW (required): value: {columnId: ...}
+    if kind == 'kpi-chart' && (v = el['value']).is_a?(Hash) && v['id'] && !v['columnId']
+      errors << "#{name}: kpi-chart value uses old shape {id: ...} — must be {columnId: ...} (breaking change 2026-06-11)"
+    end
 
     if %w[pie-chart donut-chart].include?(kind)
       errors << "#{name}: #{kind} missing color" unless el['color']
@@ -226,7 +255,15 @@ if opts[:type] == 'workbook'
     end
     next if masters.empty?
 
-    others = els.reject { |e| masters.include?(e) }
+    # HIDDEN helper tables that source a master (visibleAsSource:false, e.g.
+    # the scatter grouped-source tables — bead z1d0/ry0n) are data-page
+    # citizens, not content: exempt them from the mixing rule.
+    master_ids = masters.map { |m| m['id'] }
+    helpers = els.select do |e|
+      e['kind'] == 'table' && e['visibleAsSource'] == false &&
+        e.dig('source', 'kind') == 'table' && master_ids.include?(e.dig('source', 'elementId'))
+    end
+    others = els.reject { |e| masters.include?(e) || helpers.include?(e) }
     unless others.empty?
       master_names = masters.map { |m| m['name'] || m['id'] }.join(', ')
       kind_counts = Hash.new(0)

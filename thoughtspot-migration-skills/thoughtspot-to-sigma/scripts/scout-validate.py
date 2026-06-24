@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""scout-validate — gap-scout validation primitive (Qlik & Power BI).
+"""scout-validate — gap-scout validation primitive (ThoughtSpot → Sigma).
 
 Validates a candidate Sigma formula against a real data-model element by building a
 throwaway test workbook, checking the column resolves (type != "error"), and — on
@@ -7,16 +7,25 @@ success — persisting the rule to the customer-local learned-rules.yaml. Generi
 skills via --home.
 
     python3 scout-validate.py \
-      --formula 'Avg([Master/Days To Ship])' \
+      --formula 'DateAdd("day", 7, [Order Fact/Order Date])' \
       --data-model-id <dm> --element-id <denorm-elem-id> --folder-id <folder> \
-      --feature 'RangeAvg' --pattern '\\bRangeAvg\\s*\\(\\s*(.+?)\\s*\\)' \
-      --template 'Avg([Master/\\1])' --hint 'aggregate context only' \
-      --description 'Qlik RangeAvg -> Sigma Avg' --home ~/.qlik-to-sigma
+      --feature 'add_days' --pattern '\\badd_days\\s*\\(\\s*(.+?)\\s*,\\s*(.+?)\\s*\\)' \
+      --template 'DateAdd("day", \\2, [\\1])' --hint 'date arithmetic' \
+      --description 'TML add_days -> Sigma DateAdd' --home ~/.thoughtspot-to-sigma
+
+To feed the run-each-time gap-scout gate (bead beads-sigma-5l5e), also pass the
+error column's gate id and the conversion working dir — the result is appended to
+<workdir>/scout-ledger.jsonl so migrate.py's type=error readback gate sees the gap
+as scouted (validated → ok; error → escalated):
+
+      --gap-id 'errcol:<elementId>/<label>' --workdir <wd>
 
 Env: SIGMA_BASE_URL, SIGMA_API_TOKEN (eval get-token.sh first).
 Prints JSON: {status: validated|error, workbook_id, error, ...}. Cleans up the test workbook.
 """
 import json, os, sys, ssl, urllib.request, argparse, datetime, re
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+import scout_gate
 _SSL = ssl._create_unverified_context()
 
 BASE = os.environ["SIGMA_BASE_URL"]; TOK = os.environ["SIGMA_API_TOKEN"]
@@ -88,8 +97,10 @@ def main():
     ap.add_argument("--hint", default=""); ap.add_argument("--description", default="")
     ap.add_argument("--example-from", default="")
     ap.add_argument("--kind", default="kpi-chart", choices=["kpi-chart","table"])
-    ap.add_argument("--home", default=os.path.expanduser("~/.qlik-to-sigma"))
+    ap.add_argument("--home", default=os.path.expanduser("~/.thoughtspot-to-sigma"))
     ap.add_argument("--skill", default="", help="skill name for issue routing (default: derived from --home)")
+    ap.add_argument("--gap-id", default="", help="gap-report row this scout addressed (gate ledger; e.g. errcol:<elementId>/<label>)")
+    ap.add_argument("--workdir", default="", help="conversion working dir; ledger written here")
     a = ap.parse_args()
 
     elem_name, cols = dm_element_master_columns(a.data_model_id, a.element_id)
@@ -147,6 +158,9 @@ def main():
         result["escalation"] = build_escalation(a, err)
     # cleanup test workbook
     api("DELETE", f"/v2/files/{wb}")
+    # record to the run-each-time gap-scout ledger (bead beads-sigma-5l5e) so the
+    # migrate.py type=error readback gate sees this gap as scouted.
+    scout_gate.record(a.workdir, a.gap_id, a.feature, "validated" if status == "validated" else "escalated")
     print(json.dumps({**result,"status":status}, indent=2))
 
 if __name__ == "__main__":

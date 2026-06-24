@@ -44,6 +44,7 @@ INPUTS
 - TML function/pattern: <e.g. "add_days">
 - Sample expressions: <2-5 real examples from the model's formulas>
 - Sigma data-model id: <dm-id> ; denormalized element id: <denorm-elem-id> ; folder: <id>
+- Gate id + workdir: <errcol:... and --workdir from migrate.py's GAP-SCOUT REQUIRED block>
 
 DO
 1. Propose a Sigma formula (see the candidate table in gap-scout.md).
@@ -51,13 +52,30 @@ DO
    python3 scripts/scout-validate.py --formula '<sigma>' \
      --data-model-id <dm> --element-id <denorm> --folder-id <folder> \
      --feature '<fn>' --pattern '<regex>' --template '<sigma template>' \
-     --description '<fn> -> Sigma' --home ~/.thoughtspot-to-sigma
+     --description '<fn> -> Sigma' --home ~/.thoughtspot-to-sigma \
+     --gap-id '<errcol:... from the GAP-SCOUT REQUIRED list>' --workdir <migration workdir>
 3. If status=validated it's persisted; report the rule. If error, try another form
    (≤4 attempts). After the last failed attempt the result carries an
    `escalation.dry_run_cmd` / `escalation.file_cmd`; report it as genuine-(c)
    needing redesign. Do NOT file anything yourself — see "Opt-in issue filing".
 ```
 Validated rules auto-apply on the next migrate via `learned-rules.py`.
+
+## Run-each-time gate (bead beads-sigma-5l5e) — why `--gap-id` + `--workdir` matter
+
+The TML converter passes calc expressions through optimistically — a function with no
+Sigma equivalent does NOT surface as a convert-time warning; it surfaces as a
+**type=error column** when `migrate.py` reads the freshly-POSTed workbook back. At that
+point `migrate.py` **STOPS** (exit 11) with a `GAP-SCOUT REQUIRED` block listing each
+unscouted error column's `--gap-id` (`errcol:<elementId>/<label>`) and the `--workdir`.
+
+`scout-validate.py` appends its result (`validated` or `escalated`) to
+`<workdir>/scout-ledger.jsonl` keyed by that exact `--gap-id`. So you MUST pass the
+`--gap-id` and `--workdir` the STOP block printed — otherwise the ledger entry won't
+match the error column and the re-run will STOP again. The gate cannot be skipped with
+`--yes`/`--force`: an unscouted error column always stops; once every error column is
+scouted (validated → translated and persisted, or escalated → genuinely-hard and
+flagged) the re-run proceeds. Flow: build → STOP → scout each gap → re-run → proceed.
 
 ## Opt-in issue filing (escalations)
 

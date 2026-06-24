@@ -55,6 +55,9 @@ opts = {}
 OptionParser.new do |p|
   p.on('--signals PATH')     { |v| opts[:sig] = v }
   p.on('--master-map PATH')  { |v| opts[:mmap] = v }
+  p.on('--bim PATH', 'model.bim — geo dataCategory lookup so PBI map visuals emit real Sigma region/point maps') { |v| opts[:bim] = v }
+  p.on('--image-map PATH', 'JSON {registeredResourceName: hostedUrl} — PBI image visuals become Sigma image elements (no map: skipped with a note)') { |v| opts[:imap] = v }
+  p.on('--layout MODE', 'clean (default: opinionated Sigma-native grid — dark header, KPI row, uniform 2-up chart grid) | pbi (flat canvas-proportional, matches the PBI page 1:1) | banded (legacy row-band containers)') { |v| opts[:layout_mode] = v }
   p.on('--data-model ID')    { |v| opts[:dm] = v }
   p.on('--out PATH')         { |v| opts[:out] = v }
   p.on('--layout-out PATH')  { |v| opts[:layout_out] = v }
@@ -77,6 +80,23 @@ end.parse!
 %i[sig mmap out].each { |k| abort("missing --#{k.to_s.tr('_','-')}") unless opts[k] }
 
 signals = JSON.parse(File.read(opts[:sig]))
+$image_map = (opts[:imap] && File.exist?(opts[:imap])) ? JSON.parse(File.read(opts[:imap])) : {}
+if opts[:bim] && File.exist?(opts[:bim])
+  $geo_categories ||= {}
+  $sort_by_column ||= {}
+  _bim = JSON.parse(File.read(opts[:bim]))
+  _model = _bim['model'] || _bim
+  (_model['tables'] || []).each do |t|
+    (t['columns'] || []).each do |c|
+      $geo_categories["#{t['name']}.#{c['name']}".downcase] = c['dataCategory'] if c['dataCategory']
+      # PBI sort-by-column ("FiscalMonth" sorts by "Period") — without it Sigma
+      # sorts month names ALPHABETICALLY (Apr, Aug, Feb…), a top complaint on
+      # converted dashboards. Recorded as 'table.field' -> 'table.sortfield'.
+      $sort_by_column["#{t['name']}.#{c['name']}".downcase] = "#{t['name']}.#{c['sortByColumn']}" if c['sortByColumn']
+    end
+  end
+  warn "[build-workbook] geo metadata: #{$geo_categories.length} dataCategory, #{$sort_by_column.length} sortByColumn column(s) from #{opts[:bim]}"
+end
 mmap    = JSON.parse(File.read(opts[:mmap]))
 fields  = mmap['fields'] || {}
 masters = mmap['masters'] || {}
@@ -178,7 +198,7 @@ SIGMA_KIND = {
   'area' => 'area-chart', 'combo' => 'combo-chart', 'scatter' => 'scatter-chart',
   'pie' => 'pie-chart', 'donut' => 'donut-chart',
   'table' => 'table', 'pivot-table' => 'pivot-table', 'text' => 'text',
-  'control' => 'control'
+  'control' => 'control', 'map' => 'map', 'image' => 'image'
 }.freeze
 
 # PBI role -> (dim_role?, value_role?) per visual kind handled below.
@@ -365,6 +385,70 @@ def measure_formula(fs)
   end
 end
 
+# bead (A) reference lines: PBI analytics-pane constant lines (rec['ref_lines'],
+# captured by extract-pbir._reference_lines) -> Sigma `refMarks`. VERIFIED shape
+# (ported from build-charts-from-signals.rb + qlik-to-sigma qlik_refmarks,
+# 2026-06-15): `value` MUST be the wrapped object form ({type:formula,formula} —
+# a bare number 400s; value.type:column is rejected too, so a column threshold
+# goes through `formula`), and `label.visibility` MUST be 'shown' (the docs'
+# bare-number/string forms are rejected by the live API). axis is carried from
+# the PBI axis ('series' for y-axis lines, 'axis' for x). Only emitted for the
+# cartesian kinds Sigma supports refMarks on.
+def build_ref_marks(rec)
+  Array(rec['ref_lines']).map do |rl|
+    val = rl['value']
+    # constant numbers go through verbatim; anything else is treated as a Sigma
+    # formula (a measure-bound threshold the agent can refine).
+    formula = val.to_s
+    next nil if formula.strip.empty?
+    rm = { 'type' => 'line', 'axis' => (rl['axis'] || 'series'),
+           'value' => { 'type' => 'formula', 'formula' => formula } }
+    line = {}
+    line['color'] = rl['color'] if rl['color']
+    rm['line'] = line.merge('width' => 2) unless line.empty?
+    label = { 'visibility' => 'shown' }
+    label['text'] = rl['label'] if rl['label'] && !rl['label'].to_s.empty?
+    rm['label'] = label
+    rm
+  end.compact
+end
+
+# bead (A) trend line: PBI 'Trend line' analytics toggle -> Sigma trendlines[].
+# The verified shape (build-charts-from-signals.rb) keys the trendline to a
+# value column id with model + shown label/value. PBI offers only a linear trend.
+def build_trendlines(rec, ycids)
+  return [] unless rec['trend_line'] && ycids && !ycids.empty?
+  model = (rec['trend_line']['model'] || 'linear').to_s
+  ycids.map do |cid|
+    real = cid.is_a?(Hash) ? cid['columnId'] : cid   # combo: {columnId,type} form
+    { 'columnId' => real, 'model' => model,
+      'label' => { 'visibility' => 'shown' }, 'value' => { 'visibility' => 'shown' } }
+  end
+end
+
+# bead (B) by-measure color: PBI 'Color saturation' / FX fill-by-value
+# (rec['measure_color'] = {queryRef, scheme[], reverse}) -> Sigma
+# color:{by:scale, column:<dup measure>, scheme}. Ported from qlik-to-sigma's
+# qlik_color: a Sigma column can't be on BOTH yAxis and color, so the driving
+# measure is DUPLICATED into a new (hidden) column referenced by the scale.
+# Mutates `cols` (appends the dup column) and returns the color hash, or nil.
+def measure_color_channel(rec, fields, master, vfmts, eid, cols, ycids)
+  mc = rec['measure_color']
+  return nil unless mc && mc['queryRef'] && ycids && !ycids.empty?
+  fs = field_spec(mc['queryRef'], fields, master)
+  scheme = Array(mc['scheme']).dup
+  scheme = ['#ffffcc', '#fd8d3c', '#bd0026'] if scheme.empty?
+  scheme.reverse! if mc['reverse']
+  base_cid = ycids.first.is_a?(Hash) ? ycids.first['columnId'] : ycids.first
+  base = cols.find { |c| c['id'] == base_cid }
+  cid = "#{eid}-clr"
+  dup = { 'id' => cid, 'name' => "#{qr_leaf(mc['queryRef'], 'Value')} (color)",
+          'formula' => (base ? base['formula'] : measure_formula(fs)), 'hidden' => true }
+  apply_fmt(dup, mc['queryRef'], fields, vfmts)
+  cols << dup
+  { 'by' => 'scale', 'column' => cid, 'scheme' => scheme }
+end
+
 # Deterministic, collision-free short id from a PBIR visual id. PBIR visual ids
 # often share a long common prefix (e.g. a1b2c3d4e5f60001 / ...0002), so a naive
 # prefix-truncate collides. Take a stable suffix of the sanitized id plus a short
@@ -425,6 +509,10 @@ def apply_sort(el, kind, rec, qr_cids, name)
   case kind
   when 'bar-chart', 'line-chart', 'area-chart', 'combo-chart'
     return warn_sort_miss(name, srt) unless cid
+    # A visual-level sort BY THE DIM ITSELF must not clobber the model's
+    # sortByColumn axis order (PBI sorts FiscalMonth via Period; re-sorting by
+    # the month NAME would go alphabetical).
+    return if cid == el.dig('xAxis', 'columnId') && el.dig('xAxis', 'sort', 'by').to_s.end_with?('-sortcol')
     (el['xAxis'] ||= {})['sort'] = { 'by' => cid, 'direction' => dir }
   when 'pie-chart', 'donut-chart'
     return warn_sort_miss(name, srt) unless cid
@@ -450,8 +538,47 @@ end
 # accumulator array: branches that need a HIDDEN helper element on the Data page
 # (bead ry0n: the scatter grouped-source table) push it there; the page assembly
 # appends extra_data to the Data page's elements.
+# PBI dataCategory -> Sigma region-map regionType. Loaded from --bim into
+# $geo_categories ('table.field' downcased -> dataCategory). PBI geocodes
+# arbitrary place text via Bing at render time; Sigma matches region NAMES to
+# built-in shapes — so only category-tagged columns can become real maps.
+GEO_REGION_TYPE = {
+  'postalcode' => 'us-zipcode', 'city' => 'us-postal-place', 'place' => 'us-postal-place',
+  'stateorprovince' => 'us-state', 'county' => 'us-county',
+  'country' => 'country', 'countryregion' => 'country'
+}.freeze
+$geo_categories ||= {}
+$sort_by_column ||= {}
+
+# Resolve a 'map' visual to region-map / point-map / bar-chart fallback.
+# Mutates rec['bindings'] for the fallback (legend becomes the bar category,
+# matching the old downgrade behavior).
+def resolve_map_kind(rec, name)
+  b = rec['bindings'] || {}
+  lat = (b['Latitude'] || []).first
+  lng = (b['Longitude'] || []).first
+  return 'point-map' if lat && lng
+  loc = (b['Category'] || b['Location'] || []).first
+  cat = loc && $geo_categories[loc.to_s.downcase]
+  rt  = cat && GEO_REGION_TYPE[cat.to_s.downcase]
+  if rt
+    rec['_region_type'] = rt
+    warn "[build-workbook] visual '#{name}': PBI map -> Sigma region-map (#{rt}) on '#{loc}'"          "#{rt.start_with?('us-') ? ' — US region layer assumed (PBI dataCategory carries no country)' : ''}."
+    return 'region-map'
+  end
+  why = loc.nil? ? 'no location binding' : ($geo_categories.empty? ? 'no --bim geo metadata supplied' : "'#{loc}' has no geocodable dataCategory")
+  warn "[build-workbook] WARN visual '#{name}': PBI map downgraded to bar chart — #{why}. "        'Sigma maps need a region-typed column (country/state/county/zip/place) or lat+long; '        'PBI relied on Bing geocoding which Sigma does not do.'
+  series = (b['Series'] || b['Legend'] || []).first
+  b['Category'] = [series] if series  # old downgrade kept the legend as the bar category
+  'bar-chart'
+end
+
 def build_element(rec, fields, masters, extra_data = [])
   kind = SIGMA_KIND[rec['sigma_kind']] || 'bar-chart'
+  if kind == 'map'
+    t0 = rec['title'].to_s.strip
+    kind = resolve_map_kind(rec, t0.empty? ? rec['visual_id'] : t0)
+  end
   vid  = rec['visual_id']
   eid  = "el-#{short(vid)}"
   vfmts = rec['formats'] || {}
@@ -463,11 +590,44 @@ def build_element(rec, fields, masters, extra_data = [])
   name  = title.empty? ? (derived_title(rec, kind) || KIND_LABEL[kind] || 'Chart') : title
 
   if kind == 'text'
-    body = rec['text'] ? "## #{rec['text']}" : '## '
-    return { 'id' => eid, 'kind' => 'text', 'body' => body }
+    # Size-aware: PBI textboxes are titles OR small decorative labels
+    # (copyright lines, urls). Rendering every one as an H2 made tiny footer
+    # text huge and overlapping (customer QS feedback). Boxes under ~60px tall
+    # render as plain body text.
+    txt = rec['text'].to_s
+    body = (rec['h'].to_f >= 60 ? "## #{txt}" : txt)
+    return { 'id' => eid, 'kind' => 'text', 'body' => body.empty? ? ' ' : body }
+  end
+
+  if kind == 'image'
+    url = ($image_map || {})[rec['resource']]
+    unless url
+      warn "[build-workbook] visual '#{rec['visual_id']}': image asset '#{rec['resource']}' " \
+           'skipped — supply --image-map {resource: hostedUrl} to embed it (Sigma images are URL-only).'
+      return nil
+    end
+    return { 'id' => eid, 'kind' => 'image', 'url' => url }
   end
 
   master = visual_master(rec, fields)
+  # E-06: a value-driven visual with NO resolvable field binding would emit a
+  # source-less element with a "[]" formula column (an empty PBI `kpi {}` or a
+  # cardVisual->bar approximation), which the API rejects with
+  # `source: Invalid value: undefined`. Skip it loudly rather than ship a broken
+  # element. (control/text/image are handled elsewhere and legitimately carry no
+  # value binding, so they are NOT in this set.)
+  value_driven = %w[kpi-chart bar-chart line-chart area-chart combo-chart
+                    scatter-chart pie-chart donut-chart region-map point-map
+                    table pivot-table].include?(kind)
+  if value_driven
+    all_qrs = (rec['bindings'] || {}).values.flatten.compact
+    if all_qrs.empty? || master.nil?
+      why = all_qrs.empty? ? 'no field bindings' : 'no resolvable master element'
+      warn "[build-workbook] WARN visual '#{rec['title'] || rec['visual_id']}' (#{kind}) has " \
+           "#{why} — element SKIPPED (would emit a source-less \"[]\" column the API rejects)."
+      return nil
+    end
+  end
   # bead 8vzj: a Sigma element sources exactly ONE master. visual_master picks the
   # one covering the MOST fields, but any bound field that cannot resolve on it
   # (not its master and not among its `alts`) is silently DROPPED. Warn loudly so
@@ -616,6 +776,43 @@ def build_element(rec, fields, masters, extra_data = [])
     # Invalid string"; live readback also normalizes to columnId). NB: pie/donut
     # `value` uses `{id}` — do not change that one.
     el['value'] = { 'columnId' => cid }
+  when 'region-map'
+    loc = (b['Category'] || b['Location'] || []).first
+    meas = (b['Y'] || b['Values'] || []).first
+    dfs = field_spec(loc, fields, master)
+    dcid = "#{eid}-r"
+    cols << { 'id' => dcid, 'formula' => dfs['ref'], 'name' => qr_leaf(loc, 'Region') }
+    qr_cids[loc] = dcid
+    el['region'] = { 'id' => dcid, 'regionType' => rec['_region_type'] }
+    if meas
+      fs = field_spec(meas, fields, master)
+      vcid = "#{eid}-v"
+      col = { 'id' => vcid, 'formula' => measure_formula(fs), 'name' => qr_leaf(meas) }
+      apply_fmt(col, meas, fields, vfmts)
+      cols << col
+      qr_cids[meas] = vcid
+      el['color'] = { 'by' => 'scale', 'column' => vcid }
+    end
+    if (srs = (b['Series'] || b['Legend'] || []).first)
+      warn "[build-workbook] WARN visual '#{name}': region-map colors by the measure scale — "            "PBI legend '#{srs}' dropped (no categorical legend on a Sigma region map)."
+    end
+  when 'point-map'
+    latq = (b['Latitude'] || []).first
+    lngq = (b['Longitude'] || []).first
+    lfs = field_spec(latq, fields, master); gfs = field_spec(lngq, fields, master)
+    lcid = "#{eid}-lat"; gcid = "#{eid}-lng"
+    cols << { 'id' => lcid, 'formula' => lfs['ref'], 'name' => qr_leaf(latq, 'Latitude') }
+    cols << { 'id' => gcid, 'formula' => gfs['ref'], 'name' => qr_leaf(lngq, 'Longitude') }
+    el['latitude'] = { 'id' => lcid }
+    el['longitude'] = { 'id' => gcid }
+    if (szq = (b['Size'] || b['Y'] || b['Values'] || []).first)
+      fs = field_spec(szq, fields, master)
+      scid = "#{eid}-sz"
+      col = { 'id' => scid, 'formula' => measure_formula(fs), 'name' => qr_leaf(szq, 'Size') }
+      apply_fmt(col, szq, fields, vfmts)
+      cols << col
+      el['size'] = { 'id' => scid }
+    end
   when 'bar-chart', 'line-chart', 'area-chart'
     # b['Group'] is the treemap/funnel category role (1zh9) — alias it to the dim
     # so a treemap-as-bar fallback keeps its category instead of emitting '[]'.
@@ -649,6 +846,18 @@ def build_element(rec, fields, masters, extra_data = [])
     end
     el['xAxis'] = { 'columnId' => dcid }
     el['yAxis'] = { 'columnIds' => ycids }
+    # PBI sort-by-column: bind the hidden sort field and order the axis by it
+    # (model FiscalMonth sorts by Period; alphabetical months otherwise).
+    if dim && (sort_qr = ($sort_by_column || {})[dim.to_s.downcase])
+      sfs = fields[sort_qr] || fields.find { |k, _| k.to_s.downcase == sort_qr.downcase }&.last
+      if sfs && (sfs['master'] == master || Array(sfs['alts']).any? { |a| a['master'] == master })
+        scol_id = "#{eid}-sortcol"
+        cols << { 'id' => scol_id, 'formula' => (sfs['master'] == master ? sfs['ref'] : Array(sfs['alts']).find { |a| a['master'] == master }['ref']), 'name' => qr_leaf(sort_qr, 'Sort'), 'hidden' => true }
+        el['xAxis']['sort'] = { 'by' => scol_id, 'direction' => 'ascending' }
+      else
+        warn "[build-workbook] WARN visual '#{name}': model sorts '#{dim}' by '#{sort_qr}' but that field is not in the master-map — axis will sort alphabetically; add it to fields to fix."
+      end
+    end
     # PBI *Bar* visuals are horizontal; *Column* visuals vertical. Sigma keeps the
     # same xAxis(category)/yAxis(value) binding and flips rendering via this flag.
     # Only "horizontal" is a valid value — vertical = omit (Sigma default).
@@ -659,7 +868,7 @@ def build_element(rec, fields, masters, extra_data = [])
     # Stacking enum is none|stacked|normalized (OpenAPI BarChart.stacking;
     # "normalized" = scaled to 100%). extract-pbir already maps PBI 100%-stacked
     # -> "normalized", so pass it through verbatim (bead pi8v).
-    el['stacking'] = rec['stacking'] if kind == 'bar-chart' && rec['stacking']
+    el['stacking'] = rec['stacking'] if %w[bar-chart area-chart].include?(kind) && rec['stacking']
     # bead n9u9: honor the PBI per-visual data-label signal (objects.labels show)
     # when the extractor provided one: true -> shown, false -> omit (Sigma default
     # is off). Verified `dataLabel:{labels:"shown"}` persists + renders for bar AND
@@ -675,7 +884,17 @@ def build_element(rec, fields, masters, extra_data = [])
       cols << { 'id' => scid, 'formula' => sfs['ref'], 'name' => qr_leaf(series, 'Series') }
       qr_cids[series] = scid
       el['color'] = { 'by' => 'category', 'column' => scid }
+    else
+      # bead (B) by-measure color: only when PBI did NOT bind a categorical
+      # Series/Legend (that wins — a column can't be on color twice).
+      cc = measure_color_channel(rec, fields, master, vfmts, eid, cols, ycids)
+      el['color'] = cc if cc
     end
+    # bead (A) reference lines / trend line -> Sigma refMarks / trendlines.
+    rms = build_ref_marks(rec)
+    el['refMarks'] = rms unless rms.empty?
+    tls = build_trendlines(rec, ycids)
+    el['trendlines'] = tls unless tls.empty?
   when 'combo-chart'
     # bead 6v5u: PBI lineClustered/StackedColumnComboChart -> Sigma combo. Roles:
     # Category (x), Y (columns -> primary/left axis), Y2 (lines -> secondary/right
@@ -710,6 +929,14 @@ def build_element(rec, fields, masters, extra_data = [])
     end
     el['xAxis'] = { 'columnId' => dcid }
     el['yAxis'] = { 'columnIds' => ycids }
+    # bead (B) by-measure color on the combo's primary bars.
+    cc = measure_color_channel(rec, fields, master, vfmts, eid, cols, ycids)
+    el['color'] = cc if cc
+    # bead (A) reference lines / trend line.
+    rms = build_ref_marks(rec)
+    el['refMarks'] = rms unless rms.empty?
+    tls = build_trendlines(rec, ycids)
+    el['trendlines'] = tls unless tls.empty?
   when 'scatter-chart'
     # bead 14w(b): scatter -> xAxis (measure), yAxis (measure), point category for
     # color/detail. PBI scatter binds X + Y (both measures) and a Category/Details.
@@ -792,6 +1019,9 @@ def build_element(rec, fields, masters, extra_data = [])
     # PBI legend.show=false -> hide the Sigma legend (the detail-on-color split
     # otherwise surfaces a legend PBI did not show).
     el['legend'] = { 'visibility' => 'hidden' } if rec['legend'] == false
+    # bead (A) reference lines on a scatter (e.g. a margin-target line at x=0.45).
+    rms = build_ref_marks(rec)
+    el['refMarks'] = rms unless rms.empty?
   when 'pie-chart', 'donut-chart'
     dim = (b['Category'] || b['Legend'] || []).first
     val = (b['Values'] || b['Y'] || []).first
@@ -833,6 +1063,26 @@ def build_element(rec, fields, masters, extra_data = [])
       end
     end
     if !group_ids.empty? && !calc_ids.empty?
+      # E-08: a time-intelligence calc (DateLookback / CumulativeSum) needs a DATE
+      # column in the grouping or it compiles to type:error at runtime. Warn when
+      # one is inlined into a purely categorical grouping (e.g. "Revenue vs PY %"
+      # in a customer/segment table) — the measure should instead be routed
+      # through a date-grouped prior-period element (see dax-restructure-patterns.rb).
+      time_intel = /\b(DateLookback|CumulativeSum)\s*\(/i
+      grouped_on_date = group_ids.any? do |gid|
+        f = (cols.find { |c| c['id'] == gid } || {})['formula'].to_s
+        f =~ /\b(date|month|year|quarter|week|day)\b/i || f =~ /DateTrunc\s*\(/i
+      end
+      unless grouped_on_date
+        cols.each do |c|
+          next unless calc_ids.include?(c['id']) && c['formula'].to_s =~ time_intel
+          dim_names = group_ids.map { |g| (cols.find { |x| x['id'] == g } || {})['name'] }.compact.join(', ')
+          warn "[build-workbook] WARN visual '#{name}': time-intel column '#{c['name']}' is inlined " \
+               "into a table grouped only by categorical column(s) (#{dim_names}) — Sigma " \
+               "DateLookback/CumulativeSum needs a date-grouped context and will compile to " \
+               "type:error. Route this measure through a date-grouped prior-period element."
+        end
+      end
       el['groupings'] = [{ 'id' => "#{eid}-g", 'groupBy' => group_ids, 'calculations' => calc_ids }]
     end
   when 'pivot-table'
@@ -1012,7 +1262,7 @@ col_for = ->(x, w, pw) {
   ce = cs + 1 if ce <= cs
   [[cs, 1].max, [ce, 25].min]
 }
-ROW_UNIT = 30.0
+ROW_UNIT = 20.0
 # Container-banded pages (layout-playbook.md): the PBI canvas regions cluster
 # into horizontal row bands, each band a full-width <GridContainer> whose
 # children keep the canvas-derived geometry (container-relative rows). Every
@@ -1065,6 +1315,176 @@ pages_xml = signals['pages'].map do |pg|
     items = items.select { |i| built_ids.include?(i[0]) }
   end
   next nil if items.empty?
+
+  # ---- CLEAN opinionated layout (default) ----------------------------------
+  # Customer-tuned (2026-06-12): keep every element in the SAME SPOT as the
+  # PBI canvas (same row band, same left-to-right position, same vertical
+  # stacking), but make overriding decisions about sizing: bands become
+  # uniform full-width rows, column widths are normalized to fill the 24-col
+  # grid edge-to-edge, items stacked in a sub-column split the band height
+  # evenly, and per-kind minimum heights apply. Tiny decorative textboxes
+  # (copyright lines, urls) are DROPPED; the page title moves into the dark
+  # header band.
+  if (opts[:layout_mode] || 'clean') == 'clean'
+    kind_of = {}
+    (page_spec ? page_spec['elements'] : []).each { |e| kind_of[e['id']] = e['kind'] }
+    src_rec = ->(id) { pg['visuals'].find { |v| "el-#{short(v['visual_id'])}" == id } }
+
+    # 1) header promotion + decorative-text drop
+    hdr_text_id = nil
+    drop = []
+    items.each do |it|
+      next unless kind_of[it[0]] == 'text'
+      r = src_rec.call(it[0])
+      txt = r && r['text'].to_s.strip
+      if hdr_text_id.nil? && txt && txt != '' && r['h'].to_f >= 40 && r['y'].to_f < 120
+        hdr_text_id = it[0]
+        drop << it[0]
+      elsif r.nil? || r['h'].to_f < 60 || txt == ''
+        warn "[build-workbook] clean layout: decorative textbox '#{it[0]}' dropped (#{txt.to_s[0, 30].inspect})."
+        page_spec['elements'] = page_spec['elements'].reject { |e| e['id'] == it[0] } if page_spec
+        drop << it[0]
+      end
+    end
+    items = items.reject { |i| drop.include?(i[0]) }
+
+    children = []
+    extra = []
+    hdr_id = "band-#{page_id}-hdr"
+    extra << SigmaLayout.container_el(hdr_id, SigmaLayout::HEADER_STYLE.dup)
+    if hdr_text_id
+      hdr_el = page_spec && page_spec['elements'].find { |e| e['id'] == hdr_text_id }
+      ttl = src_rec.call(hdr_text_id)['text'].to_s.strip
+      hdr_el['body'] = %(# <span style="color: #FFFFFF">#{ttl}</span>) if hdr_el
+      children << SigmaLayout.header_band_xml(hdr_id, hdr_text_id)
+    else
+      ttl = SigmaLayout.resolve_header_title(pg['page_title'], opts[:source_title], opts[:name]) || 'Dashboard'
+      txt_id = "band-#{page_id}-hdrtext"
+      extra << SigmaLayout.header_text_el(txt_id, ttl)
+      children << SigmaLayout.header_band_xml(hdr_id, txt_id)
+    end
+
+    # 2) bands from the SOURCE rows, columns from the SOURCE x-positions
+    min_rows = { 'kpi-chart' => 4, 'control' => 2, 'text' => 2, 'image' => 20,
+                 'scatter-chart' => 9, 'region-map' => 9, 'point-map' => 9 }
+    bands = SigmaLayout.cluster_bands(items)
+    cursor = 1 + SigmaLayout::HEADER_ROWS
+    les = []
+    bands.each do |band|
+      # columns: cluster band items by x-overlap, preserving left-to-right order
+      cols = []
+      band.sort_by { |i| i[1] }.each do |it|
+        hit = cols.find { |c| it[1] < c[:c1] && c[:c0] < it[2] }
+        if hit
+          hit[:items] << it
+          hit[:c0] = [hit[:c0], it[1]].min
+          hit[:c1] = [hit[:c1], it[2]].max
+        else
+          cols << { c0: it[1], c1: it[2], items: [it] }
+        end
+      end
+      # normalized widths proportional to source widths, filling 1..25 exactly
+      total = cols.sum { |c| c[:c1] - c[:c0] }.to_f
+      alloc = cols.map { |c| [(24 * (c[:c1] - c[:c0]) / total).round, 3].max }
+      diff = 24 - alloc.sum
+      alloc[alloc.index(alloc.max)] += diff
+      # band height: tallest member's source height, clamped by kind minimums
+      band_h = band.map do |it|
+        h = it[4] - it[3]
+        [h, min_rows[kind_of[it[0]]] || 6].max
+      end.max
+      edge = 1
+      cols.each_with_index do |c, ci|
+        c0 = edge
+        c1 = edge + alloc[ci]
+        edge = c1
+        stack = c[:items].sort_by { |i| i[3] }
+        each_h = [band_h / stack.length, 2].max
+        stack.each_with_index do |it, si|
+          r0 = cursor + si * each_h
+          r1 = (si == stack.length - 1) ? cursor + band_h : r0 + each_h
+          les << [it[0], c0, c1, r0, r1]
+        end
+      end
+      cursor += band_h
+    end
+    page_spec['elements'] = page_spec['elements'] + extra if page_spec
+    inner = les.map { |i| SigmaLayout.le(i[0], i[1], i[2], i[3], i[4]) }.join("\n")
+    next SigmaLayout.page_xml(page_id, children.join("\n"), inner)
+  end
+
+  # ---- PBI-fidelity FLAT layout (--layout pbi) ------------------------------
+  # The page mirrors the PBI canvas 1:1: flat LayoutElements at the canvas-
+  # proportional grid coords (exactly the shape Sigma's own UI writes), no
+  # header band, no row containers. Band containers with auto rows COLLAPSE
+  # around short content (KPIs lost their titles; map/scatter bands rendered
+  # blank in page exports) — verified against the PBI page renders.
+  if opts[:layout_mode] == 'pbi'
+    kind_of = {}
+    (page_spec ? page_spec['elements'] : []).each { |e| kind_of[e['id']] = e['kind'] }
+    # Sigma needs more vertical room than PBI's compact widgets: clamp minimum
+    # row spans per kind (KPI value+title needs ~5 rows; charts breathe at 6+).
+    min_rows = { 'kpi-chart' => 4, 'scatter-chart' => 8, 'region-map' => 8, 'point-map' => 8,
+                 'pie-chart' => 6, 'bar-chart' => 6, 'line-chart' => 6, 'area-chart' => 6,
+                 'combo-chart' => 6 }
+    items = items.map do |id, c0, c1, r0, r1|
+      need = min_rows[kind_of[id]]
+      r1 = r0 + need if need && (r1 - r0) < need
+      c1 = c0 + 2 if c1 - c0 < 2
+      [id, c0, c1, r0, r1]
+    end
+    # Sigma rejects overlapping LayoutElements ("Element collisions") while a
+    # PBI canvas freely z-stacks (decorative text over chart corners). Resolve
+    # deterministically: later/lower items push DOWN past whatever they hit.
+    items = items.sort_by { |i| [i[3], i[1]] }
+    10.times do
+      moved = false
+      items.each_with_index do |a, ai|
+        items.each_with_index do |b, bi|
+          next if bi <= ai
+          cols = a[1] < b[2] && b[1] < a[2]
+          rows = a[3] < b[4] && b[3] < a[4]
+          next unless cols && rows
+          delta = a[4] - b[3]
+          b[3] += delta; b[4] += delta
+          moved = true
+        end
+      end
+      items = items.sort_by { |i| [i[3], i[1]] }
+      break unless moved
+    end
+    # FILL THE CANVAS (customer feedback: "no white space, things big enough
+    # to show the data"): PBI's compact widgets leave the converted page
+    # sparse. Snap every element to its neighbors / page edges — stretch right
+    # and down until the next element or the grid border (gaps <= 3 cols/rows
+    # are dead gutters, not intentional spacing).
+    overlap = ->(a0, a1, b0, b1) { a0 < b1 && b0 < a1 }
+    items.each do |it|
+      it[1] = 1 if it[1] <= 3 &&
+                   items.none? { |o| !o.equal?(it) && o[2] <= it[1] + 1 && overlap.call(it[3], it[4], o[3], o[4]) }
+      it[3] = 1 if it[3] <= 3 &&
+                   items.none? { |o| !o.equal?(it) && o[4] <= it[3] + 1 && overlap.call(it[1], it[2], o[1], o[2]) }
+    end
+    items.each do |it|
+      right = items.reject { |o| o.equal?(it) }
+                   .select { |o| o[1] >= it[2] && overlap.call(it[3], it[4], o[3], o[4]) }
+                   .map { |o| o[1] }.min || 25
+      it[2] = right if right > it[2] && right - it[2] <= 3
+      below = items.reject { |o| o.equal?(it) }
+                   .select { |o| o[3] >= it[4] && overlap.call(it[1], it[2], o[1], o[2]) }
+                   .map { |o| o[3] }.min
+      it[4] = below if below && below > it[4] && below - it[4] <= 3
+    end
+    # bottom band: level everything to the page's max row
+    maxr = items.map { |i| i[4] }.max
+    items.each do |it|
+      nothing_below = items.none? { |o| !o.equal?(it) && o[3] >= it[4] && overlap.call(it[1], it[2], o[1], o[2]) }
+      it[4] = maxr if nothing_below && maxr - it[4] <= 4
+    end
+    inner = items.map { |i| SigmaLayout.le(i[0], i[1], i[2], i[3], i[4]) }.join("\n")
+    next SigmaLayout.page_xml(page_id, inner)
+  end
+  # ---- legacy banded layout (--layout banded) ------------------------------
   # phase-e layout-quality fix: a short title TEXTBOX at the top of the source
   # canvas becomes the header band's text (white-on-dark), MOVED out of band 1
   # (never left behind as a dead zone). The candidate may start up to one grid

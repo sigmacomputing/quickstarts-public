@@ -12,6 +12,23 @@ user-invocable: true
 
 # Qlik → Sigma Conversion
 
+## Preflight the workbook spec before POST (mandatory)
+
+Before POSTing any workbook spec, run `ruby scripts/lib/preflight_lint.rb <spec.json>` — it exits 1 with a precise message on the two migration-killer bugs: a `table` with aggregate columns + dimensions but **no `groupings`** (renders raw detail rows), and a malformed `control` (missing `id`/`controlId`/`controlType` or nesting value fields under a `value` object instead of flat, a non-double-nested `source`, or a list control wired to neither `source` nor `filters` — a filters-only list control is valid). Fix every violation first — never POST past it, and **never conclude a feature is "unsupported" from an `Invalid kind` error** (it means the inner fields are wrong). Verified shapes: `sigma-workbooks` `controls.md` / `tables.md`.
+
+## Phase 0 — Choose where to build (ask first when no destination given)
+
+Don't silently land the migrated data model + workbook in an auto-picked folder.
+If the user didn't supply a destination (no `--folder <id>`), ASK before building:
+
+1. `ruby scripts/pick-destination.rb list` → `{ workspaces, folders (editable, with parentName), myDocuments }`
+2. Let the user pick ONE: a **workspace** (its `id` lands content in the workspace root),
+   an existing **folder**, **My Documents** (when non-null — null for service tokens), or
+   **create a new folder**: `ruby scripts/pick-destination.rb create --name "<name>" [--parent <workspace-or-folder-id>]`
+3. Pass the chosen id as `--folder <id>`. `folderId` accepts a workspace id or a folder id.
+
+If a destination is already supplied, honor it silently — don't ask.
+
 > **STATUS: VALIDATED end-to-end (2026-06-02; generalized + re-validated 2026-06-10).**
 > The full flow below was proven on a real migration ("Retail Orders (Qlik)" → Sigma)
 > with **exact parity** to the Snowflake source at the data-model, denormalized-element,
@@ -242,14 +259,19 @@ side-by-side):
    dim-value-without-facts surfaces **even when every shared cell matches**.
    (Known shape: Qlik shows dimension values with zero fact rows — e.g. a store with
    no orders — that a fact-grain LEFT JOIN can never emit; that's data shape, not a bug.)
-4. **Control lint (gate 7)** — `scripts/lib/control_lint.rb` (shared, vendored
+4. **Layout lint (gate 6)** — `scripts/lib/layout_lint.rb` (shared, vendored
+   byte-identical) runs against the LIVE spec readback: no raw-id element display
+   names, no controls orphaned outside containers on a banded page, no generic
+   Sigma auto-page title in the header band. RED here blocks GREEN. Bypass with
+   `--skip-layout-lint`. (Verified clean against shipped Qlik migrations.)
+5. **Control lint (gate 7)** — `scripts/lib/control_lint.rb` (shared, vendored
    byte-identical) runs against the LIVE spec readback + the builder's
    `control-scope.json` sidecar: no dead controls, no ghost targets, full reach
    (incl. the Qlik `mustReach` global-scope assertions), and source-signal
    coverage (filterpanes/listboxes in the app but zero controls = RED).
    Optional runtime proof: `ruby scripts/probe-controls.rb --workbook-id <wb>`
    (flip test via export `parameters`; MCP can NOT set a control value).
-GREEN = all columns resolve + no DIVERGENT KPI + control lint clean. Bucket
+GREEN = all columns resolve + no DIVERGENT KPI + layout lint clean + control lint clean. Bucket
 mismatches WARN loudly with the likely cause. (First run matched to the cent;
 staleness-explained deltas don't block.)
 
@@ -261,7 +283,7 @@ staleness-explained deltas don't block.)
 ## Phase 5.5 — Visual QA (mandatory gate — never skip)
 A workbook that POSTs 200 and passes numeric/bucket parity can still be visually broken — **overlapping tiles, clipped KPI titles, dead zones, filters floating over charts.** Qlik's associative model floats listboxes/filterpanes on top of charts and Sigma's grid has no z-order; the build script now lifts controls to a top band and de-overlaps (`_decollide_bands`), but novel sheets can still slip through.
 
-1. Render every page to PNG (token first: `eval "$(scripts/vendor/get-token.sh)"`):
+1. `migrate-qlik.rb` now **auto-renders** every content page to a full-page PNG (Phase 5b → `<workdir>/visual-qa/<pageId>.png`) so the gate runs by default. To re-render a page manually (token first: `eval "$(scripts/vendor/get-token.sh)"`):
    `python3 scripts/sigma-export-png.py --workbook <id> --page <pageId> --out /tmp/<page>.png --w 1600`
 2. **Read each PNG** and check it against `refs/layout-visual-qa.md` (no overlaps/stacking, no dead zones, controls in their own band, no clipped titles, even heights, right chart kind/format).
 3. Fix any failure in the spec — for multi-page workbooks use `sigma-skills/sigma-workbooks/scripts/wb-rep.rb` (pull → edit element files → push) — then **re-render and re-read**.
@@ -286,6 +308,7 @@ A workbook that POSTs 200 and passes numeric/bucket parity can still be visually
 | `scripts/sigma-export-png.py` | 5.5 | Render a workbook page/element to PNG via the export API for visual inspection against `refs/layout-visual-qa.md` (the Visual QA gate). |
 | `scripts/build-sigma-dm.py` | 3 | Author + POST the Sigma data model FROM THE PIPELINE ARTIFACTS (converter-out + reconcile + denorm): repointed star + relationships + denorm SQL element + metrics. `--dry-run` for offline. **Proven (generalized 2026-06-10).** |
 | `scripts/build-sigma-workbook.py` | 4 | Author + POST the workbook FROM DISCOVERY (charts.json + layout.json): one page per Qlik sheet, cell-grid layout, sorts, formats, null-suppression filters. `--dry-run` for offline. **Proven (generalized 2026-06-10).** |
+| `scripts/lib/layout_lint.rb` | 5 | **Shared layout-quality lint (gate 6)** — raw-id display names / orphan controls outside containers / generic header-band title; vendored byte-identical across plugins; run automatically by `migrate-qlik.rb` Phase 6 (`--skip-layout-lint` to bypass). |
 | `scripts/lib/control_lint.rb` | 5 | **Shared control-wiring lint (gate 7)** — dead controls / ghost targets / reach / `control-scope.json` coverage; vendored byte-identical across plugins; run automatically by `migrate-qlik.rb` Phase 6e. |
 | `scripts/probe-controls.rb` | 5 | **Shared flip test** — runtime proof a control filters: export an in-closure element with/without `parameters:{controlId: value}`; cross-page exports prove Qlik's global scope. |
 | `refs/control-parity.md` | 5 | The control-parity contract: lint + sidecar schema + the MCP/export-API answer (export `parameters` is the only way to set a control value). |

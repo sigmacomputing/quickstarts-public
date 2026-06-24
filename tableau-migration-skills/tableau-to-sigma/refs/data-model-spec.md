@@ -35,7 +35,7 @@ POST /v2/dataModels/spec
   "source": {
     "connectionId": "<connection-id>",
     "kind": "warehouse-table",
-    "path": ["SCHEMA", "CATALOG", "TABLE_NAME"]
+    "path": ["DATABASE", "SCHEMA", "TABLE_NAME"]
   },
   "columns": [
     {"id": "col-sales", "name": "Sales", "formula": "[TABLE_NAME/SALES]"}
@@ -52,7 +52,7 @@ POST /v2/dataModels/spec
 ### Column formula prefix rule
 
 The prefix in a column formula is the **last segment of the `path` array**, exactly as written:
-- `path: ["MY_CONNECTION", "MYDB", "ORDERS"]` → prefix is `ORDERS`
+- `path: ["CSA", "Tableau Test", "ORDERS"]` → prefix is `ORDERS`
 - Formula: `"[ORDERS/SALES]"`
 
 ## Element shape (Custom SQL)

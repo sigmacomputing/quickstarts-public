@@ -1,6 +1,6 @@
 # Workbook Layout Reference
 
-> **Spec shape lives in `sigma-workbooks`.** This file is Tableau-conversion-specific: Ruby layout generation, multi-series chart patterns, dashboard-translation idioms. For the canonical workbook spec shape (element kinds, sources, controls, formulas, formatting), read `~/sigma-skills/sigma-workbooks/reference/specification/`. Treat that as the source of truth — when this file disagrees, the sigma-workbooks reference wins.
+> **Spec shape lives in `sigma-workbooks`.** This file is Tableau-conversion-specific: Ruby layout generation, multi-series chart patterns, dashboard-translation idioms. For the canonical workbook spec shape (element kinds, sources, controls, formulas, formatting), read the `sigma-workbooks` skill's `reference/specification/`. Treat that as the source of truth — when this file disagrees, the sigma-workbooks reference wins.
 
 Layout is always generated with Ruby. Never hand-write layout XML.
 
@@ -413,7 +413,7 @@ If you need an explicit one-series-per-category breakdown instead (e.g., for sta
 }
 ```
 
-`stacking` values: `"none"` (default, grouped), `"stacked"` (absolute), `"100"` (100% stacked).
+`stacking` values: `"none"` (default, grouped), `"stacked"` (absolute), `"normalized"` (100% stacked). Live-verified 2026-06-15 — `"100"` / `"percent"` are **rejected** (`Invalid value: string`); the 100%-stacked value is `"normalized"`.
 
 ### Area chart
 
@@ -656,7 +656,7 @@ Sigma supports two map kinds via spec: **`region-map`** (choropleth — fills na
 | `region` | yes | `{id, regionType}` | `id` is the column ID holding the region key |
 | `label` | optional | array `[{id}, ...]` | Values rendered on each region; usually the measure |
 | `tooltip` | optional | array `[{id}, ...]` | Extra columns shown on hover (e.g., active count, avg salary) |
-| `color` | optional | `{by: "category", column: <colId>}` | Categorical fill (one color per category, NOT a gradient) — column must be a **different** column from `region.id` (the API rejects reuse with "Column X is referenced from both 'region' and 'color'"). `by: "value"` is **rejected** with HTTP 400. With `color` omitted the map renders a uniform fill (NOT auto value-based heat). To get a Tableau-style red→blue divergent gradient heat scale, the user must configure it in the Sigma editor after publish — it is UI-only today. |
+| `color` | optional | `{by: "category", column: <colId>}` | Categorical fill (one color per category, NOT a gradient) — column must be a **different** column from `region.id` (the API rejects reuse with "Column X is referenced from both 'region' and 'color'"). `by: "value"` is **rejected** with HTTP 400. With `color` omitted the map renders a uniform fill (NOT auto value-based heat). To get a Tableau-style red→blue divergent gradient heat scale, the customer must configure it in the Sigma editor after publish — it is UI-only today. Verified 2026-05-24 against `tj-wells-1989`. |
 | `size` | — | silently dropped | Choropleths don't size; the API accepts and drops it |
 
 **Valid `regionType` values (verified May 2026 — POST round-trips them):**
@@ -745,15 +745,15 @@ the chart editor after publish.
 
 | Property | Set via spec? | How to apply post-publish |
 |---|---|---|
-| Bar chart orientation (horizontal vs vertical) | No | Chart editor → Properties → Chart type → Horizontal icon |
+| Bar chart orientation (horizontal vs vertical) | **Yes** — `"orientation": "horizontal"` on the `bar-chart` (omit for the default vertical) | n/a — set in spec |
 | Trellis (small multiples / panel charts) on any chart kind | No | Chart editor → Trellis panel → drag dimension to Trellis row / column / by-series |
 | Axis label rotation (0°, 45°, 90°) | No | Chart editor → Format → X-axis → Label rotation |
 | Series color | No (not yet) | Chart editor → Properties → Color |
 | Chart color palette | No | Chart editor → Properties → Color |
 | Font size / axis title | No | Chart editor → Format tab |
-| Text element alignment (center / right) | No | Element editor → Format → Alignment. Confirmed UI-only: spec GET returns only `id`/`kind`/`body` even after centering in the UI. Markdown `# Heading` in `body` always renders left-aligned. |
+| Text element alignment (center / right) | **Yes (since 2026-06-11)** | Inline HTML in `body`: `<p style="text-align: center">…</p>` (also `right`/`left`). Round-trips through GET/PUT — live-verified 2026-06-11. Combines with `<span>` color/font-size styling. Pre-fix UI-set alignment did not serialize; re-apply once via spec or UI and it sticks. |
 
-**`"orientation": "horizontal"` is silently accepted but ignored.** Do not include it — it does nothing.
+**`"orientation": "horizontal"` makes a horizontal bar chart and round-trips through GET** (live-verified 2026-06-15). The enum accepts `"horizontal"` only — omit the field entirely for the default vertical orientation (`"orientation": "vertical"` is rejected).
 
 **Series `color` on `yAxis` entries is silently accepted but not persisted.** PUT succeeds without error but GET strips the field. Expected shape for when this is wired up:
 ```json
@@ -801,7 +801,7 @@ KPI elements require a `value` field referencing one column ID:
 {
   "kind": "kpi-chart",
   "columns": [{"id": "k-sales", "formula": "Sum([Master/Sales])", "name": "Total Sales", "format": {"kind": "number", "formatString": "$,.0f"}}],
-  "value": {"id": "k-sales"}
+  "value": {"columnId": "k-sales"}
 }
 ```
 
@@ -861,7 +861,7 @@ Use `rowsBy`, `columnsBy`, and `values`. **Do NOT use `rows` or `columnGroups`**
 
 **`conditionalFormats`** — Conditional formatting on pivot-table / table columns. Two supported types.
 
-> The
+> **Verified 2026-05-24 against `tj-wells-1989` org during audit-run-2.** The
 > field that holds the column IDs is **`columnIds`**, NOT `columns`. The first
 > POST in audit-run-1 (NASA agent) failed with HTTP 400 `Invalid request` when
 > using `columns`; the second succeeded with `columnIds` and round-trips
@@ -1006,9 +1006,10 @@ page (`page['name']`) only changes the tab label; it does not put a heading on t
 If the Tableau dashboard image shows a title at the top, add `{ "kind": "text", "body": "# Title" }`
 and reserve the top ~2 grid rows for it in the layout XML.
 
-**Alignment is UI-only.** Markdown `# Heading` in `body` always renders left-aligned. Centering
-or right-aligning has to be applied post-publish via the element editor's Format tab — the spec
-GET round-trip confirms only `id`/`kind`/`body` survive on text elements.
+**Alignment is spec-able as of 2026-06-11** (previously UI-only). Wrap the content in inline
+HTML: `<p style="text-align: center">…</p>` (also `right`/`left`). Live-verified: POSTs cleanly,
+survives GET→PUT cycles, and combines with `<span style="color/font-size">` styling. Bare
+markdown (`# Heading`) still renders left-aligned — alignment must be expressed in the HTML form.
 
 ### Image element
 
@@ -1206,13 +1207,25 @@ Sum(If([p_date_dimension] = "Month", [Sales], Null))
 }
 ```
 
-### slider — DO NOT use this `controlType` value
+### slider — single-handle numeric control
 
-> **Verified 2026-05-24 against `sigma-workbook-spec-findings/verify/controls-invalid-kinds.rb`.** POST with `controlType: slider` is rejected with HTTP 400 `Invalid kind: "control"`. **This type does not exist.** Build a single-value slider as a `number-range` control with `mode: <=` or `mode: >=` and a single-element `values` array. See `~/sigma-skills/sigma-workbooks/reference/specification/controls.md` (Slider section) for the canonical pattern, and note that `values` on `number-range` does not reliably round-trip — it reads back as null on GET even though the published workbook respects it.
+> **Corrected 2026-06-15.** The earlier note that `controlType: slider` "does not exist" was **wrong** — it came from a probe that omitted the required `mode` field, so the `Invalid kind: "control"` rejection was misread as "unsupported type." `slider` is a valid `controlType` (it is in the OpenAPI enum, builds in the UI, and POSTs cleanly). A single-handle slider carries **flat top-level** `low`/`high` (track bounds), a `mode` comparator (`<=` / `>=` / `=` / `<` / `>` — which rows the handle keeps), and a **scalar** `value` (handle position). Live-verified by reading back a UI-built slider **and** a successful POST.
+
+```json
+{
+  "kind": "control", "controlId": "slider-sales", "name": "Sales",
+  "controlType": "slider",
+  "low": 0, "high": 100000, "mode": "<=", "value": 33755,
+  "includeNulls": "when-no-value-is-selected",
+  "filters": [{"source": {"kind": "warehouse-table", "connectionId": "<id>", "path": [...]}, "columnId": "SALES"}]
+}
+```
+
+> A nested `value: {low, high}` object is rejected with `Invalid kind: control`; the fields are flat. The most common mistake is omitting `mode` — the element is rejected without it even when `low`/`high`/`value` are present.
 
 ### range-slider — range with two handles
 
-> **Behavior flipped between 2026-05-22 (rejected) and 2026-05-24 (accepted).** Pinned by `sigma-workbook-spec-findings/verify/controls-invalid-kinds.rb` — that script will surface any future regression. Treat as supported-but-fragile; the canonical `number-range` form is still the safer choice.
+> **Live-verified 2026-06-15.** A two-handle `range-slider` carries flat `low`/`high` (the band) and an optional `max`; all round-trip through GET (`max` auto-derives from `high` if omitted). A valid, first-class alternative to `number-range` for a bounded numeric band.
 
 ```json
 {
@@ -1301,7 +1314,7 @@ curl -s -X PUT \
 | Setting `layout` on each page object instead of top-level | PUT returns success but UI shows no layout change | Set `spec['layout']` once at the top level; strip `layout` from all page objects |
 | Bare `<Page>` tag without `type`/`id` attributes | Layout ignored silently | Use `<Page type="grid" gridTemplateColumns="repeat(24, 1fr)" gridTemplateRows="auto" id="<pageId>">` |
 | Using `measures` instead of `yAxis` on bar/line charts | `"Invalid array: ...yAxis, got undefined"` | Replace `measures` with `yAxis` |
-| KPI missing `value` field | `"Invalid object: ...value, got undefined"` | Add `"value": {"id": "<col-id>"}` to every `kpi-chart` element |
+| KPI missing `value` field | `"Invalid object: ...value, got undefined"` | Add `"value": {"columnId": "<col-id>"}` to every `kpi-chart` element |
 | Using `rows`/`columnGroups` on a pivot table | API accepts silently but pivot does not render | Use `rowsBy`/`columnsBy` (object arrays) and `values` (string array) |
 | Using IDs from POST body instead of GET response | Layout elements don't appear | Always GET spec after POST to get real IDs |
 | `<LayoutElement>` for a container | Empty container visible | Use `<GridContainer>` for elements that have children |

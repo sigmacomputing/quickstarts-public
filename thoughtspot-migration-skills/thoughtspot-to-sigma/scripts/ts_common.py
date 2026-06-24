@@ -57,7 +57,15 @@ def ts_format_to_sigma(pattern, currency_iso=None):
         return None
     pct = "%" in (pattern or "")
     core = (pattern or "").replace("%", "")
-    decimals = len(core.split(".")[1]) if "." in core else (2 if currency_iso else 0)
+    # Honor the pattern's decimal count when a pattern is given — `#,##0` → 0 dp
+    # (whole-dollar currency `$26,308,613`), `#,##0.00` → 2 dp. Only default to 2 dp
+    # when currency is set with NO pattern at all.
+    if "." in core:
+        decimals = len(core.split(".")[1])
+    elif pattern:
+        decimals = 0
+    else:
+        decimals = 2 if currency_iso else 0
     grp = "," if (not pattern or "," in core or currency_iso) else ""
     if currency_iso and not pct:
         sym = _CUR.get(currency_iso.upper(), currency_iso.upper() + " ")
@@ -178,6 +186,18 @@ def parse_ts_viz(v, resolver=None):
                 break
         if hit:
             continue
+        mts = _TIMESHIFT_RE.match(c)                   # e.g. "sales(this year)" / "sales(last year)"
+        if mts:
+            base = re.sub(r'^(Total|Average|Min|Max)\s+', '', mts.group(1).strip(), flags=re.I)
+            measures.append(c)
+            mtypes[c] = {"kind": "timeshift", "base": base, "period": _timeshift_period(mts.group(2))}
+            continue
+        mg = _GROWTH_RE.match(c)                        # e.g. "Growth of Total sales" — ordered window
+        if mg:
+            measures.append(c)
+            mtypes[c] = {"kind": "growth", "base": re.sub(r'^Total\s+', '', mg.group(1).strip(), flags=re.I)}
+            flagged.append({"name": a.get("name", ""), "fn": "period-over-period growth"})
+            continue
         ent = (resolver or {}).get(c)
         if ent and ent.get("is_formula"):             # bare model formula (e.g. Order Count)
             add_formula_col(c, mf.get(c, ""))
@@ -200,15 +220,45 @@ def parse_ts_viz(v, resolver=None):
     color = next((d for d in (ax.get("color") or []) if d in dims), None)
     if color:
         dims = [d for d in dims if d != color] + [color]    # color dim LAST
-    if has_cf_rule(a):
+    cond_formats = parse_conditional_formats(a)
+    if cond_formats and ctype not in ("TABLE", "ADVANCED_COLUMN"):
+        # mappable CF but the host isn't a table — Sigma conditionalFormats only ride
+        # pivot/input tables, so we can't attach it to a chart → flag instead.
         flagged.append({"name": a.get("name", ""), "fn": "conditional formatting"})
-    m = re.search(r"\btop\s+(\d+)\b", a.get("search_query", "") or "", re.I)
+        cond_formats = []
+    elif not cond_formats and has_cf_rule(a):
+        # CF present but it's a gradient/data-bar variant we don't map → flag.
+        flagged.append({"name": a.get("name", ""), "fn": "conditional formatting"})
+    # A ThoughtSpot title with a `{{token}}` (a filter/parameter reference) is a
+    # DYNAMIC title. A Sigma element `name` is a plain string in the spec — there's
+    # no title-templating — so it would render the literal `{{token}}`. Flag it
+    # (flag-not-drop) so the migration surfaces that the title won't update live,
+    # rather than shipping a confusing literal.
+    if re.search(r"\{\{.*?\}\}", a.get("name", "") or ""):
+        flagged.append({"name": a.get("name", ""), "fn": "dynamic title"})
+    # `top N` / `bottom N` → that count; a BARE `top`/`bottom` (no number) defaults
+    # to 10 in ThoughtSpot (verified live: `[sales] by [product] top` → 10 rows).
+    sq = a.get("search_query", "") or ""
+    mtop = re.search(r"\btop\s+(\d+)\b", sq, re.I)
+    topn = int(mtop.group(1)) if mtop else (10 if re.search(r"\btop\b", sq, re.I) else None)
+    # The viz's date column = the one carrying a date-scope dot token (`[date].'this
+    # year'`, `[date].2021`, `[date].monthly`…). Used to build SumIf conditions for
+    # period-shifted measures.
+    dcm = re.search(r"\[([^\]]+)\]\s*\.\s*('|\d{4}\b|month|week|day|year|quarter|hour|daily|monthly|weekly|yearly|quarterly|this|last|next)", sq, re.I)
+    date_col = dcm.group(1) if dcm else None
+    # When the viz has period-shifted MEASURES (sales(this year)/(last year) — a `vs`
+    # comparison), the relative-date tokens are bound to those measures, NOT the whole
+    # viz. Applying them as element filters would AND contradictory years → "No data".
+    filters = parse_filters(sq)
+    if any((mtypes.get(m) or {}).get("kind") == "timeshift" for m in measures):
+        filters = [f for f in filters if f.get("kind") != "reldate"]
     return {"name": a.get("name", "Viz"), "chart": ctype, "dims": dims, "measures": measures,
-            "filters": parse_filters(a.get("search_query", "")), "sorts": parse_sorts(a),
+            "filters": filters, "sorts": parse_sorts(a),
             "mtypes": mtypes, "row_formulas": row_formulas, "flagged": flagged,
-            "color_dim": color, "topn": int(m.group(1)) if m else None,
+            "color_dim": color, "topn": topn, "date_col": date_col, "conditional_formats": cond_formats,
             "refmarks": parse_refmarks(a, measures, dims),
             "measure_color": parse_measure_color(a, measures),
+            "series_colors": parse_series_colors(a, measures, color),
             "af_names": sorted(af.keys())}
 
 # ── Reference / threshold lines (gap A) ──────────────────────────────────────
@@ -329,6 +379,67 @@ def parse_measure_color(a, measures):
     # team2 Liveboards (Sample Retail, Performance Tracking) 2026-06-15.
     return None
 
+# ── Per-viz series colors (gap D) ─────────────────────────────────────────────
+# ThoughtSpot stores each viz's colors in `client_state.systemSeriesColors` —
+# `{serieName: hex}` (v1) or `[{serieName, color}]` (v2). A SINGLE-series chart
+# (one measure, no category color dim) carries one hue there keyed by the
+# measure's series name (e.g. `"Total sales": "#06BF7F"`) = the viz's solid
+# color. A geo choropleth instead carries a sequential GRADIENT under
+# `systemMultiColorSeriesColors` (`{measure:{dim:[hex stops]}}` v1, or
+# `[{serieName, colorMap:[{serieName, color:[stops]}]}]` v2). Surfaced as:
+#   {"solid": "#hex"|None, "geo_scheme": [hex, ...]|None}
+# The builder applies `solid` → `color:{by:single}` on a bar/line/area, and
+# `geo_scheme` → `color:{by:scale}` on the region-map. Multi-series CATEGORY
+# palettes (a hue per category value) are intentionally NOT mapped — that is a
+# POSITIONAL Sigma scheme (order-dependent, see charts.md) and out of scope for
+# the per-viz-color pass; those keep Sigma's default category coloring.
+def parse_series_colors(a, measures, color_dim):
+    def _series_map(cs):
+        ss = cs.get("systemSeriesColors")
+        out = {}
+        if isinstance(ss, dict):
+            out = {str(k): v for k, v in ss.items() if isinstance(v, str)}
+        elif isinstance(ss, list):
+            for e in ss:
+                if isinstance(e, dict) and e.get("serieName") and isinstance(e.get("color"), str):
+                    out[str(e["serieName"])] = e["color"]
+        return out
+
+    def _geo_stops(cs):
+        mc = cs.get("systemMultiColorSeriesColors")
+        if isinstance(mc, dict):                       # v1: {measure: {dim: [stops]}}
+            for dmap in mc.values():
+                if isinstance(dmap, dict):
+                    for stops in dmap.values():
+                        if isinstance(stops, list) and len(stops) >= 2:
+                            return [s for s in stops if isinstance(s, str)]
+        elif isinstance(mc, list):                     # v2: [{serieName, colorMap:[{serieName, color:[stops]}]}]
+            for e in mc:
+                for cm in (e.get("colorMap") or []) if isinstance(e, dict) else []:
+                    stops = cm.get("color") if isinstance(cm, dict) else None
+                    if isinstance(stops, list) and len(stops) >= 2:
+                        return [s for s in stops if isinstance(s, str)]
+        return None
+
+    # The measure's own series can be keyed "sales" / "Total sales" / "sales" with
+    # the (TS) "Total " aggregation prefix — match any spelling.
+    mnames = set()
+    for m in measures:
+        mnames |= {m.lower(), ("total " + m).lower(), _strip_total(m).lower()}
+    solid, geo = None, None
+    single_series = len(measures) == 1 and not color_dim
+    for cs in _client_states(a):
+        if not isinstance(cs, dict):
+            continue
+        if geo is None:
+            geo = _geo_stops(cs)
+        if solid is None and single_series:
+            for name, hue in _series_map(cs).items():
+                if name.lower() in mnames:
+                    solid = hue
+                    break
+    return {"solid": solid, "geo_scheme": geo}
+
 def has_cf_rule(a):
     """True if the viz carries ThoughtSpot per-cell CONDITIONAL FORMATTING
     ({rule:[{range:{min,max}, color, plotAsBand}]}, or a client_state columnProperty
@@ -349,6 +460,48 @@ def has_cf_rule(a):
             if cp.get("conditionalFormatting") or prop.get("conditionalFormatting"):
                 return True
     return False
+
+# ThoughtSpot CF operator → Sigma conditionalFormats `condition`.
+_TS_CF_OP = {"LESS_THAN": "<", "GREATER_THAN": ">", "LESS_THAN_EQUAL": "<=", "LESS_THAN_OR_EQUAL": "<=",
+             "GREATER_THAN_EQUAL": ">=", "GREATER_THAN_OR_EQUAL": ">=", "EQUAL": "=", "EQUALS": "=",
+             "NOT_EQUAL": "!=", "NOT_EQUALS": "!=", "BETWEEN": "Between", "NOT_BETWEEN": "NotBetween"}
+
+def _cf_num(v):
+    try:
+        return float(v) if v not in (None, "") and "." in str(v) else int(v)
+    except (TypeError, ValueError):
+        return v
+
+def parse_conditional_formats(a):
+    """Real TS per-cell conditional formatting lives in client_state columnProperties:
+    `columnProperty.conditionalFormatting.rows[] = {operator, value, solidBackgroundAttrs:{color}}`.
+    Map SOLID-background threshold rules → [{col, condition, value, color}] (the col is the
+    measure display name, paren/Total-stripped). Gradient/data-bar rows return nothing (the
+    caller flags those). Sigma carries these as conditionalFormats on a pivot-table."""
+    out = []
+    for cs in _client_states(a):
+        if not isinstance(cs, dict):
+            continue
+        for cp in (cs.get("columnProperties") or []):
+            if not isinstance(cp, dict):
+                continue
+            col = _strip_total(cp.get("columnId") or "")
+            prop = cp.get("columnProperty") if isinstance(cp.get("columnProperty"), dict) else {}
+            cf = prop.get("conditionalFormatting") or cp.get("conditionalFormatting") or {}
+            for row in (cf.get("rows") or []):
+                if not isinstance(row, dict):
+                    continue
+                op = _TS_CF_OP.get(str(row.get("operator", "")).upper())
+                color = ((row.get("solidBackgroundAttrs") or {}).get("color")
+                         or (row.get("solidColorAttrs") or {}).get("color"))
+                if not (op and color and col):
+                    continue                      # gradient / data-bar / unmapped → skip (flagged)
+                if op in ("Between", "NotBetween"):
+                    val = [_cf_num(row.get("min", row.get("value"))), _cf_num(row.get("max"))]
+                else:
+                    val = _cf_num(row.get("value"))
+                out.append({"col": col, "condition": op, "value": val, "color": color})
+    return out
 
 def parse_sorts(a):
     """Carry the answer's sorts: (1) `sort by [Col] descending` tokens in the
@@ -393,6 +546,14 @@ def parse_filters(search_query):
         col, op = m.group(1), m.group(2)
         vals = [v.title() if v.islower() else v for v in re.findall(r"'([^']*)'", m.group(3))]
         out.append({"col": col, "mode": "include" if op == "=" else "exclude", "values": vals})
+    # ThoughtSpot date-scope token `[date].2021` = a calendar-year filter.
+    for m in re.finditer(r"\[([^\]]+)\]\s*\.\s*(\d{4})\b", search_query):
+        out.append({"col": m.group(1), "mode": "include", "values": [int(m.group(2))], "year": True})
+    # Relative date scopes `[date].'this year'` / `'last year'` / `'last 4 quarters'`
+    # → a today-anchored boolean filter (built in sigma_element where the date ref
+    # is known). Unrecognized scopes carry rel=… and get flagged there.
+    for m in _RELDATE_TOKEN_RE.finditer(search_query):
+        out.append({"col": m.group(1), "kind": "reldate", "rel": m.group(2).strip()})
     return out
 
 _NUM = lambda fs: {"kind": "number", "formatString": fs}
@@ -427,6 +588,59 @@ def _fmt(entry):
 
 def _resolve(resolver, base):
     return resolver.get(base) or {"measure": True, "ofv": base, "friendly": re.sub(r'[()]', '', base).strip()}
+
+# ── ThoughtSpot date buckets (Month(date)/Week(date)/…) → Sigma DateTrunc ─────
+# A TS Liveboard time axis is a bucketed date column — `Month(date)`, `Week(date)`,
+# `Quarter(date)`, `Year(date)`, etc. (also the `.monthly`/`.weekly` search tokens
+# resolve to these in answer_columns). Sigma has no such pseudo-column, so we
+# materialize a DateTrunc("<grain>", <date col>) calc column on the master and
+# reference THAT. Without this the bucket name falls through as an unknown column
+# and the workbook POST 400s ("dependency not found: …/month(date)").
+_DATE_BUCKET_RE = re.compile(
+    r'^\s*(month|week|quarter|year|day|hour|monthly|weekly|quarterly|yearly|daily)\s*\(\s*([^)]+?)\s*\)\s*$', re.I)
+_BUCKET_GRAIN = {"month": "month", "monthly": "month", "week": "week", "weekly": "week",
+                 "quarter": "quarter", "quarterly": "quarter", "year": "year", "yearly": "year",
+                 "day": "day", "daily": "day", "hour": "hour"}
+
+def date_bucket(name):
+    """'Month(date)' → ('month','date'); None for non-bucket names."""
+    m = _DATE_BUCKET_RE.match(name or "")
+    if not m:
+        return None
+    g = _BUCKET_GRAIN.get(m.group(1).lower())
+    return (g, m.group(2).strip()) if g else None
+
+def _bucket_friendly(name):
+    """Paren-free master-column name for a date bucket (parens collide with Sigma
+    function-call syntax in a column ref). 'Month(date)' → 'Month of date'."""
+    b = date_bucket(name)
+    return f"{b[0].title()} of {re.sub(r'[()]', '', b[1]).strip()}" if b else None
+
+# ── ThoughtSpot relative time-intelligence (search-query tokens) ──────────────
+# TS time scopes are anchored to TODAY (verified live team2 2026-06-16: 'this
+# year'=2026): `[date].'this year'`/'last year'/'last N quarters|months|...' is a
+# rolling window; a measure can also be period-shifted in answer_columns
+# (`sales(this year)` / `sales(last year)`). We translate a scope to a boolean
+# Year()/DateAdd() condition over the date column — applied as an element filter,
+# or wrapped into a SumIf for a shifted measure. `Growth of X` (period-over-period)
+# needs an ordered window we can't express on a chart element → flagged.
+_RELDATE_TOKEN_RE = re.compile(r"\[([^\]]+)\]\s*\.\s*'\s*((?:this|last|next|prior|previous)\b[^']*?)\s*'", re.I)
+_TIMESHIFT_RE = re.compile(r"^(.*?)\s*\(\s*(this year|last year|prior year|previous year)\s*\)\s*$", re.I)
+_GROWTH_RE = re.compile(r"^\s*growth\s+of\s+(.+?)\s*$", re.I)
+
+def reldate_condition(rel, dateref):
+    """A TS relative-date scope → a Sigma boolean over a date column ref, anchored
+    to Today(). None if unrecognized (caller flags it)."""
+    r = re.sub(r"\s+", " ", (rel or "").lower().strip())
+    if r == "this year":                       return f"Year({dateref}) = Year(Today())"
+    if r in ("last year", "prior year", "previous year"): return f"Year({dateref}) = Year(Today()) - 1"
+    if r == "next year":                       return f"Year({dateref}) = Year(Today()) + 1"
+    m = re.match(r"last (\d+) (year|quarter|month|week|day)s?$", r)
+    if m:                                       return f'{dateref} >= DateAdd("{m.group(2)}", -{m.group(1)}, Today())'
+    return None
+
+def _timeshift_period(p):
+    return "this" if "this" in (p or "").lower() else "last"
 
 # Sigma refMark axes: a measure/Y threshold → "series"; a dimension/X line →
 # "axis". value MUST be the wrapped {type:formula, formula} form (a bare number
@@ -473,6 +687,23 @@ def _apply_measure_color(el, spec, resolver):
     el["columns"].append(dup)
     el["color"] = {"by": "scale", "column": dup_id, "scheme": list(mc["scheme"])}
 
+def _apply_series_colors(el, spec):
+    """gap D — per-viz solid hue → color:{by:single} on a single-series
+    bar/line/area; geo gradient → color:{by:scale} on the region-map's measure
+    column. Never overrides an existing color channel (a category color_dim or a
+    measure-gradient set by _apply_measure_color wins)."""
+    sc = spec.get("series_colors") or {}
+    if el.get("color"):
+        return
+    kind = el.get("kind")
+    if sc.get("solid") and kind in ("bar-chart", "line-chart", "area-chart"):
+        el["color"] = {"by": "single", "value": sc["solid"]}
+    elif sc.get("geo_scheme") and kind == "region-map":
+        region_id = (el.get("region") or {}).get("id")
+        meas_col = next((c for c in el.get("columns", []) if c.get("id") != region_id), None)
+        if meas_col:
+            el["color"] = {"by": "scale", "column": meas_col["id"], "scheme": list(sc["geo_scheme"])}
+
 def _apply_refmarks(el, spec):
     """gap A — attach Sigma refMarks for axis charts."""
     if el.get("kind") not in _AXIS_KINDS:
@@ -507,6 +738,32 @@ def sigma_element(spec, resolver, master="OFV"):
     ftarget = next((s for s in _SCATTER_SRC if s["id"] == el["source"].get("elementId")), el) if grp else el
     for f in spec.get("filters", []):
         e = _resolve(resolver, f["col"])
+        if f.get("kind") == "reldate":
+            # `[date].'this year'` / `'last 4 quarters'` → a today-anchored boolean
+            # calc column + a filter to true (Year()/DateAdd over the date column).
+            cond = reldate_condition(f["rel"], f"[{master}/{e['friendly']}]")
+            if not cond:
+                el["name"] = el["name"] + f" [FLAGGED: date scope '{f['rel']}' not converted]"
+                continue
+            cname = f"{f['rel'].title()} ({e['friendly']})"
+            existing = next((c for c in ftarget["columns"] if c.get("name") == cname), None)
+            col_id = existing["id"] if existing else nid("f")
+            if not existing:
+                ftarget["columns"].append({"id": col_id, "formula": cond, "name": cname})
+            ftarget.setdefault("filters", []).append({"id": nid(), "columnId": col_id, "kind": "list",
+                                                 "mode": "include", "values": [True]})
+            continue
+        if f.get("year"):
+            # `[date].2021` → filter on a Year(<date>) calc column (a list filter on a
+            # datetime column is silently dropped; Year() yields a clean integer match).
+            yname = f"Year of {e['friendly']}"
+            existing = next((c for c in ftarget["columns"] if c.get("name") == yname), None)
+            col_id = existing["id"] if existing else nid("f")
+            if not existing:
+                ftarget["columns"].append({"id": col_id, "formula": f"Year([{master}/{e['friendly']}])", "name": yname})
+            ftarget.setdefault("filters", []).append({"id": nid(), "columnId": col_id, "kind": "list",
+                                                 "mode": "include", "values": f["values"]})
+            continue
         existing = next((c for c in ftarget["columns"] if c.get("name") == f["col"]), None)
         if existing:
             col_id = existing["id"]
@@ -516,6 +773,7 @@ def sigma_element(spec, resolver, master="OFV"):
                                              "mode": f["mode"], "values": f["values"]})
     _apply_sorts(el, spec)
     _apply_measure_color(el, spec, resolver)   # gap B: by-measure color scale
+    _apply_series_colors(el, spec)             # gap D: per-viz solid color + geo gradient
     _apply_refmarks(el, spec)                  # gap A: reference / threshold lines
     return el
 
@@ -550,10 +808,18 @@ def _element_core(spec, resolver, master="OFV"):
     name, chart, dims, meas = spec["name"], spec["chart"], spec["dims"], spec["measures"]
     src = {"elementId": "m-ofv", "kind": "table"}
     mtypes = spec.get("mtypes") or {}
-    dref = lambda b: f"[{master}/{_resolve(resolver, b)['friendly']}]"
+    dref = lambda b: f"[{master}/{_bucket_friendly(b) or _resolve(resolver, b)['friendly']}]"
 
     def mref(b):
         mt = mtypes.get(b)
+        if mt and mt.get("kind") == "timeshift":      # sales(this year) / sales(last year)
+            baseref = f"[{master}/{_resolve(resolver, mt['base'])['friendly']}]"
+            dcol = spec.get("date_col") or "date"
+            dateref = f"[{master}/{_resolve(resolver, dcol)['friendly']}]"
+            yr = "Year(Today())" if mt["period"] == "this" else "Year(Today()) - 1"
+            return f"SumIf({baseref}, Year({dateref}) = {yr})"
+        if mt and mt.get("kind") == "growth":         # period-over-period (flagged): show base agg
+            return f"Sum([{master}/{_resolve(resolver, mt['base'])['friendly']}])"
         if mt and mt.get("kind") == "aggregate":      # answer/model aggregate formula
             return ts_expr_to_sigma(mt["expr"], lambda n: dref(n))
         if mt and mt.get("kind") == "window":         # FLAGGED: inner raw aggregate fallback
@@ -561,6 +827,14 @@ def _element_core(spec, resolver, master="OFV"):
             return f"Sum([{master}/{_resolve(resolver, inner)['friendly']}])"
         agg = TS_AGG_TO_SIGMA.get((mt or {}).get("agg") or "SUM", "Sum")
         return f"{agg}([{master}/{_resolve(resolver, b)['friendly']}])"
+
+    def mfmt(b):
+        # Format follows the underlying measure: a period-shifted/growth measure
+        # (sales(this year), Growth of sales) inherits the base measure's format so
+        # the KPI/series shows the same currency/decimals as the plain measure.
+        mt = mtypes.get(b) or {}
+        base = mt["base"] if mt.get("kind") in ("timeshift", "growth") and mt.get("base") else b
+        return _fmt(_resolve(resolver, base))
 
     color_dim = spec.get("color_dim")
     if color_dim and chart not in ("PIE", "DONUT", "PIVOT_TABLE", "PIVOT", "TABLE", "ADVANCED_COLUMN"):
@@ -588,11 +862,11 @@ def _element_core(spec, resolver, master="OFV"):
                     "value": {"columnId": c}}
         return {"id": nid(), "kind": "kpi-chart", "name": name, "source": src,
                 "columns": [{"id": c, "formula": mref(meas[0]), "name": meas[0],
-                             "format": _fmt(_resolve(resolver, meas[0]))}], "value": {"columnId": c}}
+                             "format": mfmt(meas[0])}], "value": {"columnId": c}}
     if chart in ("PIE", "DONUT"):
         cid = nid("c"); vid = nid("v")
         cols = [{"id": cid, "formula": dref(dims[0]), "name": dims[0]},
-                {"id": vid, "formula": mref(meas[0]), "name": meas[0], "format": _fmt(_resolve(resolver, meas[0]))}]
+                {"id": vid, "formula": mref(meas[0]), "name": meas[0], "format": mfmt(meas[0])}]
         # ThoughtSpot renders pies as donuts → use the donut-chart kind (the hole is
         # inherent to the kind; holeValue is only an optional center-label column ref).
         return {"id": nid(), "kind": "donut-chart", "name": name, "source": src, "columns": cols,
@@ -603,15 +877,28 @@ def _element_core(spec, resolver, master="OFV"):
                 {"id": cidd, "formula": dref(dims[1]), "name": dims[1]}]
         mids = []
         for m in meas:
-            mid = nid("m"); cols.append({"id": mid, "formula": mref(m), "name": m, "format": _fmt(_resolve(resolver, m))}); mids.append(mid)
+            mid = nid("m"); cols.append({"id": mid, "formula": mref(m), "name": m, "format": mfmt(m)}); mids.append(mid)
         return {"id": nid(), "kind": "pivot-table", "name": name, "source": src, "columns": cols,
                 "rowsBy": [{"id": rid}], "columnsBy": [{"id": cidd}], "values": mids}
     if chart in ("TABLE", "ADVANCED_COLUMN"):
-        dids, cols, mids = [], [], []
+        dids, cols, mids, midbyname = [], [], [], {}
         for d in dims:
             did = nid("d"); cols.append({"id": did, "formula": dref(d), "name": d}); dids.append(did)
         for m in meas:
-            mid = nid("m"); cols.append({"id": mid, "formula": mref(m), "name": m, "format": _fmt(_resolve(resolver, m))}); mids.append(mid)
+            mid = nid("m"); cols.append({"id": mid, "formula": mref(m), "name": m, "format": mfmt(m)})
+            mids.append(mid); midbyname[m] = mid; midbyname[_strip_total(m)] = mid
+        cfs = spec.get("conditional_formats") or []
+        if cfs and dids and mids:
+            # Sigma conditionalFormats ride only pivot-table/input-table — emit the CF
+            # table as a pivot (rows=dims, values=measures) to carry the cell coloring.
+            cfmt = []
+            for r in cfs:
+                tgt = midbyname.get(r["col"]) or midbyname.get(_strip_total(r["col"])) or mids[0]
+                cfmt.append({"type": "single", "columnIds": [tgt], "condition": r["condition"],
+                             "value": r["value"], "style": {"backgroundColor": r["color"]}})
+            if cfmt:
+                return {"id": nid(), "kind": "pivot-table", "name": name, "source": src, "columns": cols,
+                        "rowsBy": [{"id": d} for d in dids], "values": mids, "conditionalFormats": cfmt}
         return {"id": nid(), "kind": "table", "name": name, "source": src, "columns": cols,
                 "groupings": [{"id": nid(), "groupBy": dids, "calculations": mids}]}
     # Scatter / bubble — measure-vs-measure with the dimension as the POINT
@@ -630,14 +917,14 @@ def _element_core(spec, resolver, master="OFV"):
         # grouped source columns (live on the hidden table): dim + measures over master
         sdc = nid("c"); sxc = nid("c"); syc = nid("c")
         scols = [{"id": sdc, "formula": dref(dims[0]), "name": dims[0]},
-                 {"id": sxc, "formula": mref(meas[0]), "name": meas[0], "format": _fmt(_resolve(resolver, meas[0]))},
-                 {"id": syc, "formula": mref(meas[1]), "name": meas[1], "format": _fmt(_resolve(resolver, meas[1]))}]
+                 {"id": sxc, "formula": mref(meas[0]), "name": meas[0], "format": mfmt(meas[0])},
+                 {"id": syc, "formula": mref(meas[1]), "name": meas[1], "format": mfmt(meas[1])}]
         scalc = [sxc, syc]
         size_meas = None
         if chart == "BUBBLE" and len(meas) >= 3:
             ssz = nid("c"); size_meas = meas[2]
             scols.append({"id": ssz, "formula": mref(meas[2]), "name": meas[2],
-                          "format": _fmt(_resolve(resolver, meas[2]))})
+                          "format": mfmt(meas[2])})
             scalc.append(ssz)
         _SCATTER_SRC.append({"id": src_id, "kind": "table", "name": src_name, "source": src,
                              "columns": scols, "visibleAsSource": False,
@@ -657,15 +944,15 @@ def _element_core(spec, resolver, master="OFV"):
     if chart in ("SCATTER", "BUBBLE") and len(meas) >= 2:
         # no point dimension: plain measure-vs-measure cartesian off the master
         xc = nid("c"); yc = nid("c")
-        cols = [{"id": xc, "formula": mref(meas[0]), "name": meas[0], "format": _fmt(_resolve(resolver, meas[0]))},
-                {"id": yc, "formula": mref(meas[1]), "name": meas[1], "format": _fmt(_resolve(resolver, meas[1]))}]
+        cols = [{"id": xc, "formula": mref(meas[0]), "name": meas[0], "format": mfmt(meas[0])},
+                {"id": yc, "formula": mref(meas[1]), "name": meas[1], "format": mfmt(meas[1])}]
         return {"id": nid(), "kind": "scatter-chart", "name": name, "source": src, "columns": cols,
                 "xAxis": {"columnId": xc}, "yAxis": {"columnIds": [yc]}}
     # Combo (column + line) — first measure as bars, remaining measures as line series.
     if chart in ("LINE_COLUMN", "LINE_STACKED_COLUMN") and dims and len(meas) >= 2:
         xc = nid("c"); cols = [{"id": xc, "formula": dref(dims[0]), "name": dims[0]}]; ycids = []
         for i, m in enumerate(meas):
-            y = nid("c"); cols.append({"id": y, "formula": mref(m), "name": m, "format": _fmt(_resolve(resolver, m))})
+            y = nid("c"); cols.append({"id": y, "formula": mref(m), "name": m, "format": mfmt(m)})
             ycids.append(y if i == 0 else {"columnId": y, "type": "line"})
         return {"id": nid(), "kind": "combo-chart", "name": name, "source": src, "columns": cols,
                 "xAxis": {"columnId": xc}, "yAxis": {"columnIds": ycids}}
@@ -674,7 +961,7 @@ def _element_core(spec, resolver, master="OFV"):
     if chart in ("GEO_AREA", "GEO_BUBBLE") and dims and meas:
         gid = nid("c"); vid = nid("c")
         cols = [{"id": gid, "formula": dref(dims[0]), "name": dims[0]},
-                {"id": vid, "formula": mref(meas[0]), "name": meas[0], "format": _fmt(_resolve(resolver, meas[0]))}]
+                {"id": vid, "formula": mref(meas[0]), "name": meas[0], "format": mfmt(meas[0])}]
         return {"id": nid(), "kind": "region-map", "name": name, "source": src, "columns": cols,
                 "region": {"id": gid, "regionType": _region_type(dims[0])}}
     # ThoughtSpot chart types with NO faithful Sigma equivalent (Sigma has no
@@ -687,12 +974,12 @@ def _element_core(spec, resolver, master="OFV"):
     if chart in _NO_SIGMA_EQUIV:
         cols = [{"id": nid("c"), "formula": dref(d), "name": d} for d in dims]
         cols += [{"id": nid("c"), "formula": mref(m), "name": m,
-                  "format": _fmt(_resolve(resolver, m))} for m in meas]
+                  "format": mfmt(m)} for m in meas]
         return {"id": nid(), "kind": "table", "source": src, "columns": cols,
                 "name": f"{name} [{chart} → table: no Sigma chart equivalent]"}
     x = nid("x"); cols = [{"id": x, "formula": dref(dims[0]), "name": dims[0]}]; ymids = []
     for m in meas:
-        y = nid("y"); cols.append({"id": y, "formula": mref(m), "name": m, "format": _fmt(_resolve(resolver, m))}); ymids.append(y)
+        y = nid("y"); cols.append({"id": y, "formula": mref(m), "name": m, "format": mfmt(m)}); ymids.append(y)
     el = {"id": nid(), "kind": KIND.get(chart, "bar-chart"), "name": name, "source": src,
           "columns": cols, "xAxis": {"columnId": x}, "yAxis": {"columnIds": ymids}}
     if color_dim:
@@ -820,12 +1107,29 @@ def master_element(specs, resolver, dm_id, denorm_elem, denorm_name="Order Fact 
             return materialize(name, mf.get(name, ""))
         return add_base(name)
 
+    def add_bucket(name):
+        g, inner = date_bucket(name)
+        fr = _bucket_friendly(name)
+        if fr in seen:
+            return fr
+        seen[fr] = 1
+        ie = _resolve(resolver, inner)
+        cols.append({"id": "ofv-%d" % len(cols), "name": fr,
+                     "formula": f'DateTrunc("{g}", [{denorm_name}/{ie["ofv"]}])'})
+        return fr
+
     for s in specs:
         mtypes, rfs = s.get("mtypes") or {}, s.get("row_formulas") or {}
         for base in s.get("dims", []) + s["measures"] + [f["col"] for f in s.get("filters", [])]:
             mt = mtypes.get(base)
-            if base in rfs:                                  # row-level formula dim
+            if date_bucket(base):                            # Month(date)/Week(date)/… → DateTrunc
+                add_bucket(base)
+            elif base in rfs:                                # row-level formula dim
                 materialize(base, rfs[base])
+            elif mt and mt.get("kind") in ("timeshift", "growth"):  # SumIf base over a date scope
+                ensure(mt["base"])
+                if s.get("date_col"):
+                    ensure(s["date_col"])
             elif mt and mt.get("kind") == "window":          # flagged: surface the raw measure
                 inner = window_inner_ref(mt.get("expr"))
                 ensure(inner) if inner else None

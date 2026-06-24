@@ -17,6 +17,8 @@ Env: SIGMA_BASE_URL, SIGMA_API_TOKEN (eval get-token.sh first).
 Prints JSON: {status: validated|error, workbook_id, error, ...}. Cleans up the test workbook.
 """
 import json, os, sys, urllib.request, argparse, datetime, re
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+import scout_gate
 
 BASE = os.environ["SIGMA_BASE_URL"]; TOK = os.environ["SIGMA_API_TOKEN"]
 def api(method, path, body=None, accept_json=True):
@@ -89,6 +91,9 @@ def main():
     ap.add_argument("--kind", default="kpi-chart", choices=["kpi-chart","table"])
     ap.add_argument("--home", default=os.path.expanduser("~/.qlik-to-sigma"))
     ap.add_argument("--skill", default="", help="skill name for issue routing (default: derived from --home)")
+    # Run-each-time gate (bead 5l5e): record this scout to the per-conversion ledger.
+    ap.add_argument("--gap-id", default="", help="the gap-report row this scout addressed (for the gate ledger)")
+    ap.add_argument("--workdir", default="", help="conversion working dir; ledger written here")
     a = ap.parse_args()
 
     elem_name, cols = dm_element_master_columns(a.data_model_id, a.element_id)
@@ -146,6 +151,8 @@ def main():
         result["escalation"] = build_escalation(a, err)
     # cleanup test workbook
     api("DELETE", f"/v2/files/{wb}")
+    # run-each-time gate ledger (bead 5l5e): 'error' → 'escalated' for the ledger.
+    scout_gate.record(a.workdir, a.gap_id, a.feature, "validated" if status == "validated" else "escalated")
     print(json.dumps({**result,"status":status}, indent=2))
 
 if __name__ == "__main__":

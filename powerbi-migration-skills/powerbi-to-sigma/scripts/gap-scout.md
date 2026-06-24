@@ -40,6 +40,7 @@ INPUTS
 - Sigma data-model id: <dm-id>
 - Sigma master element id: <element-id>
 - Sigma folder id: <folder-id>
+- Gate id + workdir: <dax:... and --workdir from migrate-powerbi.rb's GAP-SCOUT REQUIRED block>
 
 PROCEDURE
 1. Read refs/measure-patterns.md + the sibling sigma-workbooks spec (function context rules:
@@ -55,7 +56,8 @@ PROCEDURE
        --hint '<post-publish caveat, e.g. "needs a date-grouped element">' \
        --description '<one-line>' --example-from '<measure name>' \
        --data-model-id <dm-id> --element-id <element-id> --folder-id <folder-id> \
-       --home ~/.powerbi-to-sigma   [--kind table]
+       --home ~/.powerbi-to-sigma   [--kind table] \
+       --gap-id '<dax:... from the GAP-SCOUT REQUIRED list>' --workdir <migration workdir>
 4. Parse JSON: status=validated → done; status=error → retry (≤3). After the last
    failed attempt the result carries an `escalation.dry_run_cmd` / `escalation.file_cmd`
    and the gap is left as a WARN. Do NOT file anything yourself — see "Opt-in issue
@@ -66,6 +68,24 @@ One paragraph: feature, candidate, status, and — if escalated — the
 `escalation.dry_run_cmd` so the main agent can offer the user a tracking issue.
 The validator auto-deletes its test workbook.
 ```
+
+## Run-each-time gate (bead beads-sigma-5l5e) — why `--gap-id` + `--workdir` matter
+
+A flagged DAX measure surfaces in `migrate-powerbi.rb`'s OPEN QUESTIONS as a
+`dax_no_equivalent` (⛔ degrade-to-Null) or `dax_needs_restructure` (⚠) decision
+whose default is "proceed". To stop `--yes` from silently shipping that placeholder,
+`migrate-powerbi.rb` **STOPS** (exit 11) with a `GAP-SCOUT REQUIRED` block listing
+each unscouted measure's `--gap-id` (`dax:<first 80 chars of the warning>`) and the
+`--workdir`, **before** any Sigma object is created.
+
+`scout-validate.py` appends its result (`validated` or `escalated`) to
+`<workdir>/scout-ledger.jsonl` keyed by that `--gap-id` (via `lib/scout_gate.py`,
+the shared JSONL contract). So you MUST pass the `--gap-id` and `--workdir` the STOP
+block printed — otherwise the ledger entry won't match the measure and the re-run
+will STOP again. The gate cannot be skipped with `--yes`: an unscouted measure always
+stops; once every flagged measure is scouted (validated → translated and persisted,
+or escalated → genuinely-hard and flagged) the re-run proceeds to the normal decision
+checkpoint. Flow: build → STOP → scout each gap → re-run → proceed.
 
 ## Opt-in issue filing (escalations)
 

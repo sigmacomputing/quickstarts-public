@@ -125,6 +125,49 @@ Tag rules:
 - `score >= 10`                                              → `easy-win`
 - otherwise                                                  → `moderate`
 
+## `consolidation-candidates.json` (Phase 6b, PAT mode only)
+
+Workbook-variant groups that could collapse into one Sigma workbook + control.
+
+```json
+{
+  "generated_at": "YYYY-MM-DD",
+  "params": { "emit_floor": 0.45, "consolidate_min_field_overlap": 0.7,
+              "consolidate_min_sheet_jaccard": 0.6, "review_min_score": 0.55 },
+  "summary": { "workbooks_analyzed": <int>, "groups_total": <int>,
+               "consolidate": <int>, "review": <int>, "keep_separate": <int>,
+               "conversions_avoidable": <int> },
+  "groups": [{
+    "group_id": "consolidation-NN",
+    "recommendation": "consolidate" | "review" | "keep-separate",
+    "recommendation_reason": "<string>",
+    "workbooks": [{ "workbookId": "<luid>", "name": "...", "accesses": <int>,
+                    "sheets": <int>, "dashboards": <int>, "used_fields": <int>,
+                    "priority_tier": "<shortlist tag>", "recommended_path": "<plan path>" }],
+    "primary": { "workbookId": "<luid>", "name": "..." },
+    "shared_datasource": { "warehouse_tables": [...], "published_ids": [...] },
+    "field_overlap_pct": <int>,
+    "field_basis": "used" | "schema",
+    "similarity_drivers": ["<evidence string>", ...],
+    "differences": ["<evidence string>", ...],
+    "proposed_controls": [{ "column": "<field>", "kind": "list-control|date-range-control",
+                            "values_observed": [...] }],
+    "pairwise": [{ "a_name": "...", "b_name": "...", "score": <float>,
+                   "field_overlap": <float>, "field_basis": "...",
+                   "sheet_jaccard": <float>, "name_similarity": <float>,
+                   "filter_similarity": <float>, "feature_cosine": <float|null>,
+                   "differing_filter_values": [...] }],
+    "estimated_savings": { "conversions_avoided": <int> } | null
+  }]
+}
+```
+
+After `--decide`, `migration-plan.json` gains a top-level `consolidation` block
+(`decided_at` + `decisions[]`) and per-workbook keys: merged members get
+`recommended_path: "consolidate-into-primary"`, `consolidate_into`,
+`pre_consolidation_path`, `consolidation_group`, `consolidation_role: "merged"`;
+the primary gets `consolidation_role: "primary"` + `consolidation_controls`.
+
 ## `readout.md`
 
 12-section markdown. See `refs/readout-template.md` for the exact section
