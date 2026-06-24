@@ -11,6 +11,8 @@
 #   - move the logic into a Custom SQL data-model element (kind: "sql") and
 #     reference its columns as plain `[Custom SQL/COL]` refs
 
+require 'set'
+
 module SigmaFunctions
   CATEGORIES = {
     aggregate: %w[
@@ -71,6 +73,17 @@ module SigmaFunctions
   ALL = CATEGORIES.values.flatten.freeze
   ALL_SET = ALL.to_set rescue Set.new(ALL)
 
+  # Bug B (Tableau parity): bare Sigma boolean constants. Tableau calc fields use
+  # TRUE/FALSE (and NULL) as boolean/null literals; these are literals, not
+  # functions, and must never be treated as unknown identifiers by callers
+  # scanning a formula.
+  CONSTANTS = %w[True False TRUE FALSE Null null NULL].freeze
+  CONSTANTS_SET = CONSTANTS.to_set rescue Set.new(CONSTANTS)
+
+  def self.constant?(name)
+    CONSTANTS_SET.include?(name)
+  end
+
   def self.includes?(name)
     ALL_SET.include?(name)
   end
@@ -83,8 +96,17 @@ module SigmaFunctions
     # Strip string literals so SQL-ish content inside Custom SQL contexts doesn't
     # trigger false positives. Sigma calc formulas use "..." for strings.
     cleaned = formula.gsub(/"(?:\\.|[^"\\])*"/, '""')
+    # Bug B (Tableau parity): strip [...]-bracketed column refs BEFORE the
+    # function scan. A column name can contain "word(" — e.g.
+    # [Order Fact View/Customer Id (CUSTOMER_DIM)] — and the bare
+    # `\bword\s*\(` regex would otherwise flag "Id(" / "Name(" as an unknown
+    # function and FATAL-abort. Bracketed refs are never function calls, so
+    # remove them entirely first.
+    cleaned = cleaned.gsub(/\[[^\]]*\]/, '')
     names = cleaned.scan(/\b([A-Za-z_][A-Za-z0-9_]*)\s*\(/).flatten.uniq
-    names.reject { |n| includes?(n) }
+    # TRUE/FALSE/NULL are Tableau boolean/null literals, not user functions —
+    # never report them as unknown (Bug B: they are valid constants).
+    names.reject { |n| includes?(n) || constant?(n) }
   end
 
   # Known Tableau-syntax leak patterns. These DEFINITELY don't work in Sigma
@@ -97,12 +119,16 @@ module SigmaFunctions
     /\bIS\s+NULL\b/i     => 'x IS NULL → Sigma IsNull(x)',
     /\bIS\s+NOT\s+NULL\b/i => 'x IS NOT NULL → Sigma IsNotNull(x)',
     /\bDATEPART\s*\(\s*['"]/i => 'DATEPART("part", date) → Sigma DatePart("part", date) — capitalization matters',
-    /\bWINDOW_(SUM|AVG|MIN|MAX|COUNT|MEDIAN|PERCENTILE)\b/i =>
-      'WINDOW_* aggregates → use Sigma Cumulative*/Moving* OR a Custom SQL element with OVER(...)',
+    /\bWINDOW_(SUM|AVG|MIN|MAX|COUNT|STDEV)\b(?!P)/i =>
+      'WINDOW_*(agg, -n[, m]) → Sigma Moving*(agg, n[, m]); unbounded WINDOW_MAX/MIN/SUM → two-level grouped helper; agg/WINDOW_SUM(agg) → PercentOfTotal(agg, "grand_total") — all as CHART-element viz formulas on the yAxis (refs/window-functions.md), never DM calc columns',
+    /\bWINDOW_(MEDIAN|PERCENTILE|CORR|COVARP?|VARP?|STDEVP)\b/i =>
+      'WINDOW_MEDIAN/PERCENTILE/CORR/COVAR/VAR/STDEVP → no validated Sigma chart-formula mapping; Custom SQL element with OVER(...) or re-author',
     /\bRUNNING_(SUM|AVG|COUNT|MIN|MAX)\b/i =>
-      'RUNNING_* → Sigma CumulativeSum/CumulativeAvg/etc. inside a non-grouping context, OR Custom SQL with OVER(... ROWS UNBOUNDED PRECEDING)',
-    /\bRANK_(DENSE|MODIFIED|UNIQUE|PERCENTILE)\b/i =>
-      'RANK_* → Sigma RankDense / RankPercentile / RowNumber, OR Custom SQL with RANK()/DENSE_RANK()/ROW_NUMBER() OVER(...)',
+      'RUNNING_* → Sigma Cumulative* as a CHART-element viz formula on the yAxis (follows xAxis sort; auto-partitions by chart color) — never a DM calc column',
+    /\bRANK_(DENSE|PERCENTILE)\b/i =>
+      'RANK_DENSE/RANK_PERCENTILE → Sigma RankDense/RankPercentile(agg, "desc") as a chart viz formula (Tableau default direction = desc)',
+    /\bRANK_(MODIFIED|UNIQUE)\b/i =>
+      'RANK_MODIFIED/RANK_UNIQUE → no validated Sigma mapping; Custom SQL RANK()/ROW_NUMBER() OVER(...) or re-author',
     /\b\{\s*(FIXED|INCLUDE|EXCLUDE)\b/i =>
       'Tableau LOD → use Sigma window function family OR a Custom SQL data-model element',
     /\bIsIn\s*\(/        => 'IsIn() is not a Sigma function — use Sigma In(value, list...) OR an or chain',

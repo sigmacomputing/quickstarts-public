@@ -36,12 +36,18 @@ Env:
 """
 import argparse, json, os, re, ssl, subprocess, sys, time, urllib.request, urllib.error
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import yaml, ts_common, apply_layouts
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+import yaml, ts_common, apply_layouts, scout_gate
 yaml.SafeLoader.add_constructor("tag:yaml.org,2002:value", lambda l, n: l.construct_scalar(n))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _SSL = ssl._create_unverified_context()
 MCP_TOOL = "mcp__sigma-data-model__convert_thoughtspot_to_sigma"
+
+# Unattended mode (set from --yes in main). Regression fix (gap-scout PR #153):
+# under --yes the error-column gate is ADVISORY (ships FLAGGED columns + proceeds)
+# instead of a hard exit 11, restoring the unattended/demo path.
+UNATTENDED = False
 
 def need_env(*names):
     missing = [n for n in names if not os.environ.get(n)]
@@ -107,6 +113,46 @@ No local converter build (CONVERTER_PATH unset) — use the MCP converter:
 """)
     sys.exit(3)
 
+def auto_pick_dm(wd):
+    """Phase 2.5 (automatic) — score existing Sigma DMs against this model's
+    signature and auto-reuse a strong match, so we don't add a 4th near-identical
+    "Apparel" DM when one already covers the same warehouse table. Returns
+    (dm_id|None, match_dict|None). Best-effort: never raises — on any error the
+    caller falls back to building a new DM.
+
+    The picker already auto-reuses a column-SUPERSET match (score >= 0.85); the
+    reason reuse was under-leveraged is that this scan was never run unless the
+    caller hand-passed --reuse-dm. We also override the picker's tie-guard for a
+    guaranteed-safe SUPERSET (same tables + all referenced columns present): a
+    score tie there is exactly the duplicate-DM sprawl we want to collapse, so we
+    reuse through it instead of falling back to build-new."""
+    sig_path   = os.path.join(wd, "dm-signature.json")
+    match_path = os.path.join(wd, "dm-match.json")
+    model_path = os.path.join(wd, "model.tml")
+    try:
+        sig_cmd = [sys.executable, os.path.join(HERE, "ts-dm-signature.py"),
+                   "--tml", model_path, "--out", sig_path]
+        if os.environ.get("TS_DB"):     sig_cmd += ["--database", os.environ["TS_DB"]]
+        if os.environ.get("TS_SCHEMA"): sig_cmd += ["--schema", os.environ["TS_SCHEMA"]]
+        subprocess.run(sig_cmd, check=True, capture_output=True, text=True)
+        # Low auto-pick threshold (0.5) so a DM over the SAME table (table_match
+        # 1.0) with even partial column coverage is a candidate; the superset
+        # override below is what makes a guaranteed-safe reuse fire through ties.
+        subprocess.run(["ruby", os.path.join(HERE, "find-or-pick-dm.rb"),
+                        "--workbook-signature", sig_path, "--out", match_path,
+                        "--auto-pick", "--auto-pick-threshold", "0.5"],
+                       capture_output=True, text=True)
+        if not os.path.exists(match_path):
+            return None, None
+        m = json.load(open(match_path))
+        # The picker (reuse-first --auto-pick) already guards on table coverage and
+        # collapses duplicate-DM ties — reuse only when it actually auto-picked.
+        picked = m.get("recommended_dm_id") if m.get("auto_picked") else None
+        return picked, m
+    except Exception as ex:
+        print(f"  WARN: DM-reuse scan skipped ({ex}) — building a new DM")
+        return None, None
+
 def find_denorm(dm):
     """Read a DM's spec back and locate the denormalized "<root> View" element.
     Returns (denormElemId, denormName)."""
@@ -152,6 +198,50 @@ def post_workbook(spec, wd):
     with open(os.path.join(wd, "posted-workbooks.jsonl"), "a") as f:
         f.write(json.dumps({"id": wb, "name": spec.get("name")}) + "\n")
     return wb
+
+def error_column_gate(wb, wd, display):
+    """RUN-EACH-TIME GAP-SCOUT GATE (bead beads-sigma-5l5e). The ThoughtSpot
+    converter passes TML calc expressions through optimistically (no convert-time
+    degrade signal — same as Looker); a TML function with no Sigma equivalent
+    surfaces HERE as a type=error column at workbook readback. Each such column is
+    scout-eligible: the gap-scout must ATTEMPT a Sigma translation (scripts/
+    gap-scout.md → scout-validate.py, which records to <wd>/scout-ledger.jsonl via
+    lib/scout_gate.py) before a broken column ships. An UNSCOUTED error column
+    always STOPS (exit 11) — there is no --yes/--force escape; once scouted
+    (validated or escalated) the column is accounted for and the build proceeds."""
+    cols = json.loads(sigma("GET", f"/v2/workbooks/{wb}/columns"))
+    entries = cols.get("entries") or []
+    errs = [c for c in entries if (c.get("type") or {}).get("type") == "error"]
+    if not errs:
+        return
+    print(f"   workbook '{display}': {len(errs)} ERROR-typed column(s) at readback")
+    for c in errs[:6]:
+        print(f"     [{c.get('elementId')}] {c.get('label')}: {c.get('formula')}")
+    gid = lambda c: "errcol:%s/%s" % (c.get("elementId"), c.get("label"))
+    gap_ids = list(dict.fromkeys(gid(c) for c in errs))
+    bk = scout_gate.classify(wd, gap_ids)
+    if bk["unscouted"] and UNATTENDED:
+        # Regression fix (gap-scout PR #153): under --yes the gate is ADVISORY — the
+        # ERROR-typed columns ship FLAGGED in Sigma (as before the gate existed) and
+        # the run proceeds. Record them so re-runs don't re-surface; recommend the scout.
+        print("\n   gap-scout: %d ERROR-typed column(s) NOT scouted — proceeding (--yes); they ship FLAGGED/broken in Sigma."
+              % len(bk["unscouted"]))
+        print("   (optional: run scripts/gap-scout.md on these to persist a faithful Sigma translation)")
+        for i in bk["unscouted"]:
+            scout_gate.record(wd, i, "errcol", "accepted")
+        return
+    if bk["unscouted"]:
+        print("\n==================== GAP-SCOUT REQUIRED ====================")
+        print("%d of %d ERROR-typed column(s) have NOT been scouted — the gap-scout must"
+              % (len(bk["unscouted"]), len(gap_ids)))
+        print("attempt a Sigma translation before a broken column ships:")
+        for i in bk["unscouted"]:
+            print("  --gap-id '%s'" % i)
+        print("\nSpawn one gap-scout per column (scripts/gap-scout.md) with the exact --gap-id")
+        print("above plus --workdir %s, then re-run, OR re-run with --yes to ship them FLAGGED." % wd)
+        print("===========================================================")
+        sys.exit(11)
+    print("   gap-scout: all %d error column(s) accounted for (validated or escalated)" % len(gap_ids))
 
 def render_page_png(wb, page_id, out, w=1800, h=1000):
     """Render one workbook PAGE to a PNG via the REST export API (token explicit
@@ -240,6 +330,7 @@ def migrate_liveboard(lb_doc, dm, denorm_id, denorm_name, resolver, prefix, fall
             "pages": [{"id": "p-data", "name": "Data", "elements": data_elems},
                       {"id": "p-main", "name": display[:40], "elements": controls + elements}]}
     wb = post_workbook(spec, wd)
+    error_column_gate(wb, wd, display)             # run-each-time gap-scout gate (bead beads-sigma-5l5e)
     tiles = lb_tiles(lb, viz_specs, elements)
     control_ids = [c["id"] for c in controls]
     apply_layouts.apply(wb, tiles=tiles, controls=control_ids)
@@ -307,6 +398,7 @@ def migrate_answer(ans_id, dm, denorm_id, denorm_name, resolver, prefix, folder,
             "pages": [{"id": "p-data", "name": "Data", "elements": data_elems},
                       {"id": "p-main", "name": display[:40], "elements": [main_el]}]}
     wb = post_workbook(spec, wd)
+    error_column_gate(wb, wd, display)             # run-each-time gap-scout gate (bead beads-sigma-5l5e)
     apply_layouts.apply(wb)
     visual_qa(wb, spec, wd, display)               # Phase-5b: render full-page PNG (non-fatal)
     return wb, display
@@ -323,7 +415,13 @@ def main():
     ap.add_argument("--converted", default=None, help="JSON output of the convert_thoughtspot_to_sigma MCP tool")
     ap.add_argument("--reuse-dm", default=None, help="existing Sigma dataModelId to reuse — skips convert + POST "
                     "(decided via ts-dm-signature.py + find-or-pick-dm.rb; see SKILL.md step 2.5)")
+    ap.add_argument("--no-reuse", action="store_true", help="skip the automatic DM-reuse scan and always build a "
+                    "new data model (the scan runs by default and auto-reuses a same-table column-superset DM)")
+    ap.add_argument("--yes", action="store_true", help="unattended: accept unscouted ERROR-typed columns at the "
+                    "gap-scout gate (they ship FLAGGED in Sigma) and proceed instead of stopping")
     a = ap.parse_args()
+    global UNATTENDED
+    UNATTENDED = a.yes
     wd = resolve_workdir(a.workdir)
     offline = bool(a.model_tml)
     if not a.model and not a.model_tml:
@@ -357,6 +455,24 @@ def main():
         from concurrent.futures import ThreadPoolExecutor
         t_lane = time.time()
         lb_lane = ThreadPoolExecutor(max_workers=1).submit(collect_liveboards, a, model_name)
+
+    # Phase 2.5 — automatic DM-reuse scan (runs by default; opt out with
+    # --no-reuse, override with an explicit --reuse-dm). Avoids DM sprawl and
+    # skips the convert + POST + validate when an existing DM already covers the
+    # model's table(s) + columns.
+    if not a.reuse_dm and not a.no_reuse:
+        picked, match = auto_pick_dm(wd)
+        if picked:
+            a.reuse_dm = picked
+            top = (match.get("candidates") or [{}])[0]
+            print(f"  ♻ DM-REUSE (auto): '{top.get('dm_name')}' [{picked}]  "
+                  f"score {match.get('score')}, {int((top.get('column_match') or 0)*100)}% cols / "
+                  f"{int((top.get('table_match') or 0)*100)}% tables — convert + POST skipped")
+            if match.get("warning"):
+                print(f"     ⚠ {match['warning']}")
+        else:
+            r = (match or {}).get("rationale") or "no candidate"
+            print(f"  DM-reuse scan: no safe match ({r}) — building a new DM")
 
     if a.reuse_dm:
         dm = a.reuse_dm

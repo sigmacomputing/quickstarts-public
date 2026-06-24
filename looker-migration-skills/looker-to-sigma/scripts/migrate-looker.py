@@ -75,7 +75,9 @@ import argparse, csv, glob, io, json, os, re, statistics, subprocess, sys, time
 import urllib.request, urllib.error
 from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_workbook import build_field_index, disp, leaf
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+import scout_gate
+from build_workbook import build_field_index, parse_join_aliases, disp, leaf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 T0 = time.time()
@@ -420,7 +422,11 @@ def expected_live(el, measures=None, want_label=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--lookml-dir", required=True, help="LookML project dir (model + views)")
+    ap.add_argument("--lookml-dir", help="LookML project dir (model + views). "
+                    "Omit when using --project (pulled via the Looker API).")
+    ap.add_argument("--project", help="Looker project id — pull its LookML over the "
+                    "REST API instead of using a local --lookml-dir (needs DEVELOP "
+                    "permission on the project; see looker_project.py).")
     ap.add_argument("--dashboard", help="offline: a .dashboard.lookml file")
     ap.add_argument("--dashboard-id", help="live: Looker dashboard id (needs ~/.looker/looker.ini)")
     ap.add_argument("--explore", help="explore to convert (default: the contract's most-used)")
@@ -430,15 +436,44 @@ def main():
     ap.add_argument("--reuse-dm")
     ap.add_argument("--skip-dm-reuse-check", action="store_true")
     ap.add_argument("--folder")
+    ap.add_argument("--source-swap", action="append", default=[],
+                    help="FROM_DB.FROM_SCHEMA=TO_DB.TO_SCHEMA — repoint warehouse "
+                         "source paths when the LookML sql_table_name differs from "
+                         "the Sigma connection's catalog. Repeatable.")
+    ap.add_argument("--auto-source-swap-to", metavar="TO_DB.TO_SCHEMA",
+                    help="Resolve the FROM_DB.FROM_SCHEMA automatically from the "
+                         "Looker connection (GET /connections) and repoint it to "
+                         "this target. Saves hand-writing --source-swap; needs the "
+                         "Looker API (~/.looker/looker.ini).")
+    ap.add_argument("--reuse-auto", action="store_true",
+                    help="allow Phase 3.5 to AUTO-adopt a reusable DM (reuse-first). "
+                         "Default OFF: candidates are printed and the safe default is "
+                         "build-new (reuse only via explicit --reuse-dm).")
     ap.add_argument("--yes", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     if not a.dashboard and not a.dashboard_id:
         ap.error("--dashboard (offline .dashboard.lookml) or --dashboard-id (live) required")
+    if not a.lookml_dir and not a.project:
+        ap.error("--lookml-dir (local checkout) or --project (pull via Looker API) required")
     offline = not a.dashboard_id
-    lookml_dir = os.path.abspath(os.path.expanduser(a.lookml_dir))
     wd = os.path.abspath(os.path.expanduser(a.workdir or "./looker-migration"))
     os.makedirs(wd, exist_ok=True)
+
+    # ── --project: pull the LookML over the Looker REST API (no local checkout).
+    # Needs DEVELOP permission on the project (raw LookML is only served in the dev
+    # workspace); on a permission/API failure, fail loud with the --lookml-dir hint.
+    if a.project and not a.lookml_dir:
+        import looker_project
+        pulled = os.path.join(wd, "lookml")
+        print(f"── pulling LookML for project '{a.project}' via the Looker API → {pulled} ──")
+        try:
+            files = looker_project.pull_project(a.project, pulled)
+            print(f"   pulled {len(files)} .lkml file(s)")
+        except Exception as ex:
+            sys.exit(f"FATAL: --project pull failed: {ex}")
+        a.lookml_dir = pulled
+    lookml_dir = os.path.abspath(os.path.expanduser(a.lookml_dir))
     prefix = (a.name.strip() + " ") if a.name else ""
     ensure_sigma_env()
     if not a.dry_run:
@@ -467,9 +502,28 @@ def main():
     if not os.path.isdir(views_dir):
         views_dir = lookml_dir
     view_files = sorted(glob.glob(os.path.join(views_dir, "*.view.lkml")))
-    measures, _dims, view_pk, _formats, _yesno, _dim_groups = build_field_index(view_files)
+    _aliases = parse_join_aliases(glob.glob(os.path.join(lookml_dir, "*.model.lkml")))
+    measures, _dims, view_pk, _formats, _yesno, _dim_groups, _labels = build_field_index(view_files, _aliases)
     print(f"   '{dash['title']}': {len(dash['elements'])} tile(s), {len(dash['filters'])} filter(s), "
           f"explore '{explore}' · {len(view_files)} view file(s), {len(measures)} measure(s) · workdir {wd}")
+
+    # ── --auto-source-swap-to: ask Looker what DB.SCHEMA this explore's connection
+    # targets (the FROM) and build the swap to the requested TARGET. Removes the
+    # postmortem's hand-written --source-swap. Production-safe (no develop perm).
+    if a.auto_source_swap_to:
+        import looker_project
+        model = next((el.get("model") for el in dash["elements"] if el.get("model")), None)
+        conn, fdb, fsch = (looker_project.explore_connection_target(model, explore)
+                           if model and explore else (None, None, None))
+        if fdb and fsch:
+            swap = f"{fdb}.{fsch}={a.auto_source_swap_to}"
+            if swap not in a.source_swap:
+                a.source_swap.append(swap)
+            print(f"   auto-source-swap: Looker connection '{conn}' targets {fdb}.{fsch} "
+                  f"→ repointing to {a.auto_source_swap_to}")
+        else:
+            print(f"   ⚠ --auto-source-swap-to: could not resolve the Looker connection "
+                  f"target for model={model} explore={explore} — pass --source-swap explicitly")
 
     # ── Phase 2 — RLS gate (zero overhead when clean; LOUD when not) ─────────
     # Scoped to the model(s)/explore(s) THIS dashboard uses (bead 8nq5): RLS on
@@ -651,22 +705,30 @@ console.error('stats:', JSON.stringify(res.stats));
         match_out = os.path.join(wd, "dm-match.json")
         run(["python3", os.path.join(HERE, "lookml-dm-signature.py"),
              "--lookml-dir", lookml_dir, "--label", dash["title"], "--out", sig])
+        # Auto-pick is OFF by default (POSTMORTEM 2026-06-18 #4): the gate fires on
+        # TABLE coverage, not COLUMN coverage, so a DM that covers the tables but
+        # lacks a column the workbook needs gets adopted → the workbook POST then
+        # 400s "Dependency not found". This contradicted Phase 3.5's own contract
+        # ("default = BUILD NEW; reuse only on explicit --reuse-dm"). Opt back into
+        # reuse-first with --reuse-auto.
+        pick_args = ["--auto-pick", "--auto-pick-threshold", "0.5"] if a.reuse_auto else []
         rc, _ = run(["ruby", os.path.join(HERE, "find-or-pick-dm.rb"),
-                     "--workbook-signature", sig, "--out", match_out,
-                     "--auto-pick", "--auto-pick-threshold", "0.5"], check=False)
+                     "--workbook-signature", sig, "--out", match_out] + pick_args,
+                    check=False)
         try:
             match = json.load(open(match_out))
             cands = match.get("candidates") or []
             for c in cands[:5]:
                 print(f"     candidate: {c.get('dm_name')} ({c.get('dm_id')}) score={c.get('score')}")
-            if match.get("auto_picked") and match.get("recommended_dm_id"):
+            if a.reuse_auto and match.get("auto_picked") and match.get("recommended_dm_id"):
                 a.reuse_dm = match["recommended_dm_id"]
-                print(f"   DM-REUSE (auto): {match.get('rationale')}")
+                print(f"   DM-REUSE (auto, --reuse-auto): {match.get('rationale')}")
                 if match.get("warning"):
                     print(f"   ⚠ {match.get('warning')}")
-            elif rc == 0 and cands:
-                print("   ➤ a reusable DM scored ≥ threshold — DEFAULT IS STILL BUILD-NEW. To reuse it, re-run with:")
-                print(f"       --reuse-dm {cands[0].get('dm_id')}")
+            elif cands:
+                print(f"   ➤ {len(cands)} candidate DM(s) found — DEFAULT IS BUILD-NEW "
+                      "(safe: a partial-coverage reuse can break the workbook). To reuse the")
+                print(f"     top match explicitly, re-run with:  --reuse-dm {cands[0].get('dm_id')}")
             else:
                 print("   no existing DM scores above the reuse threshold — building new")
         except Exception as ex:
@@ -691,8 +753,11 @@ console.error('stats:', JSON.stringify(res.stats));
         if prefix:
             spec["name"] = f"{prefix}{spec.get('name') or dash['title']}"
             json.dump(spec, open(dm_spec_path, "w"), indent=2)
+        swap_args = []
+        for s in a.source_swap:
+            swap_args += ["--source-swap", s]
         rc, out = run(["python3", os.path.join(HERE, "post_dm.py"), dm_spec_path,
-                       "--folder-id", folder])
+                       "--folder-id", folder] + swap_args)
         m = re.search(r'dataModelId"?\s*[:=]\s*"?([0-9a-f-]{36})', out)
         if not m:
             sys.exit("FATAL: could not parse dataModelId from post_dm.py output")
@@ -721,13 +786,28 @@ console.error('stats:', JSON.stringify(res.stats));
     json.dump([{"id": e["id"], "name": e.get("name")
                 or ((e.get("source") or {}).get("path") or [None])[-1]}
                for e in els], open(dm_els_path, "w"))
+    # Use --flag=value for ids: Sigma-reassigned element ids can start with '-'
+    # (e.g. "-BGy34L4Yj"), which argparse otherwise mis-reads as a flag.
     run(["python3", os.path.join(HERE, "build_workbook.py"), contract_path,
-         "--views", views_dir, "--dm-id", dm, "--element-id", denorm["id"],
-         "--dm-element-name", denorm_name, "--dm-elements", dm_els_path,
-         "--folder-id", folder, "--out", wb_spec_path])
+         "--views", views_dir, f"--dm-id={dm}", f"--element-id={denorm['id']}",
+         f"--dm-element-name={denorm_name}", f"--dm-elements={dm_els_path}",
+         f"--folder-id={folder}", f"--out={wb_spec_path}"])
     wspec = json.load(open(wb_spec_path))
     wspec["name"] = f"{prefix}{dash['title']} (from Looker)"
-    resp = sigma("POST", "/v2/workbooks/spec", wspec)       # responds in YAML
+    try:
+        resp = sigma("POST", "/v2/workbooks/spec", wspec)   # responds in YAML
+    except RuntimeError as e:
+        msg = str(e)
+        dep = re.search(r"Dependency not found: '([^']+)'", msg)
+        if dep:
+            sys.exit(
+                f"FATAL: workbook POST rejected — missing DM column '{dep.group(1)}'. "
+                f"A tile references a data-model column the converter did not emit "
+                f"(e.g. an unconverted dimension/measure, or a join column not denormalized "
+                f"onto the explore element). Inspect the spec at {wb_spec_path} and the DM "
+                f"element columns; the offending tile field should be dropped or the converter "
+                f"gap fixed — never POST past it.")
+        sys.exit(f"FATAL: workbook POST failed: {msg[:400]}")
     m = re.search(r"workbookId[\"'\s:]+([0-9a-f-]{36})", resp)
     if not m:
         sys.exit("FATAL: workbook POST: " + resp[:300])
@@ -742,6 +822,43 @@ console.error('stats:', JSON.stringify(res.stats));
           + (f" — {len(errs)} ERROR-typed" if errs else ""))
     for c in errs[:6]:
         print(f"     [{c.get('elementId')}] {c.get('label')}: {c.get('formula')}")
+
+    # RUN-EACH-TIME GAP-SCOUT GATE (bead beads-sigma-5l5e). Looker's converter
+    # passes calc expressions through optimistically (no convert-time degrade
+    # signal); a calc that has no Sigma equivalent surfaces HERE as a type=error
+    # column at readback. Each such column is scout-eligible — the gap-scout must
+    # ATTEMPT a Sigma translation before we accept a broken column. --yes only
+    # accepts columns the scout already tried (validated or escalated); an
+    # unscouted error column always stops. Recorded to the ledger by
+    # scout-validate.py via lib/scout_gate.py.
+    if errs:
+        gid = lambda c: "errcol:%s/%s" % (c.get("elementId"), c.get("label"))
+        gap_ids = list(dict.fromkeys(gid(c) for c in errs))
+        bk = scout_gate.classify(wd, gap_ids)
+        if bk["unscouted"] and not args.yes:
+            print("\n==================== GAP-SCOUT REQUIRED ====================")
+            print("%d of %d ERROR-typed column(s) have NOT been scouted — the gap-scout must"
+                  % (len(bk["unscouted"]), len(gap_ids)))
+            print("attempt a Sigma translation before a broken column ships:")
+            for i in bk["unscouted"]:
+                print("  --gap-id '%s'" % i)
+            print("\nSpawn one gap-scout per column (scripts/gap-scout.md) with the exact --gap-id")
+            print("above plus --workdir %s, then re-run, OR re-run with --yes to ship them FLAGGED." % wd)
+            print("===========================================================")
+            sys.exit(11)
+        elif bk["unscouted"]:
+            # Regression fix (gap-scout PR #153 made this a hard exit 11 that overrode
+            # --yes, stalling the unattended/demo path). Under --yes the gate is ADVISORY:
+            # the ERROR-typed columns ship FLAGGED in Sigma (as they did before the gate
+            # existed) and the run proceeds. Record them so re-runs don't re-surface;
+            # recommend the gap-scout for anyone who wants a faithful translation.
+            print("\n   gap-scout: %d ERROR-typed column(s) NOT scouted — proceeding (--yes); they ship FLAGGED/broken in Sigma."
+                  % len(bk["unscouted"]))
+            print("   (optional: run scripts/gap-scout.md on these to persist a faithful Sigma translation)")
+            for i in bk["unscouted"]:
+                scout_gate.record(wd, i, "errcol", "accepted")
+        else:
+            print("   gap-scout: all %d error column(s) accounted for (validated or escalated)" % len(gap_ids))
 
     # ── Phase 4c — Visual QA: render each content page to a FULL-PAGE PNG ─────
     # so the layout (applied inline by build_workbook.py and POSTed above) can be
@@ -776,7 +893,17 @@ console.error('stats:', JSON.stringify(res.stats));
 
     # ── Phase 5 — SOURCE-FRESHNESS preflight (read BEFORE any side-by-side) ───
     hdr(5, TOTAL, "Source freshness (preflight — before parity)")
-    mh, mr = parse_csv(export_csv(wb, "m-master"))
+    try:
+        mh, mr = parse_csv(export_csv(wb, "m-master"))
+    except RuntimeError as e:
+        # A CSV-export timeout here almost always means the master ended up with 0
+        # columns (every tile field was dropped/unresolved upstream). Don't crash the
+        # whole run with a raw stack trace — warn and skip the freshness readout so
+        # the parity gate still runs and reports the real coverage problem.
+        print(f"   ⚠ source-freshness export skipped: {e}")
+        print("     (the master may have no resolvable columns — check the Phase-4b "
+              "field-drop warnings above; parity will still run and surface it.)")
+        mh, mr = [], []
     print("   ── SOURCE FRESHNESS (read this before any side-by-side) ──")
     if offline:
         newest = max((os.path.getmtime(f) for f in view_files + [a.dashboard]), default=None)
@@ -864,6 +991,49 @@ console.error('stats:', JSON.stringify(res.stats));
     grc, _ = run(["ruby", os.path.join(HERE, "assert-phase6-ran.rb"),
                   "--workdir", wd, "--workbook-id", wb], check=False)
     summary = json.load(open(os.path.join(wd, "parity-final.json")))
+
+    # ── Parity-RED triage (POSTMORTEM 2026-06-18 #4) ─────────────────────────
+    # When the gate is RED, tell the operator WHY without hand-math: compute the
+    # per-chart actual/expected ratio of total magnitude. If the ratios cluster
+    # tightly around a common multiplier (≠1), the conversion is faithful and the
+    # two warehouses just hold different data volumes — a SCALE mismatch, not a
+    # conversion bug. Divergent ratios point at a real conversion error.
+    if grc != 0:
+        def total(rows):
+            return sum(v for _, v in (rows or []) if isinstance(v, (int, float)))
+        ratios = []
+        for cname in expected:
+            e, ac = total(expected.get(cname)), total(actuals.get(cname))
+            if e and ac:
+                ratios.append((cname, ac / e))
+        if ratios:
+            print("\n   ── PARITY-RED TRIAGE (ratio analysis) ──")
+            for cname, r in ratios:
+                print(f"     {r:6.3f}×  {cname}")
+            # Two-cluster signature of a SCALE mismatch (not a conversion bug):
+            # ratio-type measures (AOV, margin %) are scale-invariant → cluster at
+            # ~1.0×; additive measures (revenue, counts) scale with data volume →
+            # cluster at a common N×. So split, don't just measure overall spread.
+            near_one = [r for _, r in ratios if abs(r - 1.0) <= 0.05]
+            scaled = [r for _, r in ratios if abs(r - 1.0) > 0.05]
+            scaled_spread = (max(scaled) / min(scaled)) if scaled and min(scaled) else None
+            if not scaled:
+                print("   ⇒ every chart matches within ±5% yet the strict gate is RED — the delta is")
+                print("     row-level / ordering / formatting, not magnitude. Inspect parity-final.json.")
+            elif scaled_spread is not None and scaled_spread <= 1.15:
+                mult = statistics.median(scaled)
+                tail = (f"; {len(near_one)} ratio-measure(s) stay ~1.0× as expected"
+                        if near_one else "")
+                print(f"   ⇒ additive measures cluster at ~{mult:.2f}× (spread {scaled_spread:.2f}×, ≤1.15)"
+                      f"{tail}.")
+                print("     This is the signature of a DATASET-SCALE mismatch — same formulas over a")
+                print("     larger/smaller table — NOT a conversion bug. Confirm both sides point at the")
+                print("     SAME warehouse schema (LookML sql_table_name vs the Sigma connection; see")
+                print("     --source-swap).")
+            else:
+                print(f"   ⇒ scaled ratios DIVERGE (spread {scaled_spread:.2f}× > 1.15) — no consistent")
+                print("     multiplier, so this is likely a REAL conversion error on the outlier")
+                print("     chart(s), not just a data-volume difference. Investigate those tiles.")
 
     # ── Summary ────────────────────────────────────────────────────────────────
     green = grc == 0 and not errs

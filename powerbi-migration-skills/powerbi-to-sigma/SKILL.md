@@ -6,6 +6,23 @@ user-invocable: true
 
 # Power BI → Sigma
 
+## Preflight the workbook spec before POST (mandatory)
+
+Before POSTing any workbook spec, run `ruby scripts/lib/preflight_lint.rb <spec.json>` — it exits 1 with a precise message on the two migration-killer bugs: a `table` with aggregate columns + dimensions but **no `groupings`** (renders raw detail rows), and a malformed `control` (missing `id`/`controlId`/`controlType` or nesting value fields under a `value` object instead of flat, a non-double-nested `source`, or a list control wired to neither `source` nor `filters` — a filters-only list control is valid). Fix every violation first — never POST past it, and **never conclude a feature is "unsupported" from an `Invalid kind` error** (it means the inner fields are wrong). Verified shapes: `sigma-workbooks` `controls.md` / `tables.md`.
+
+## Phase 0 — Choose where to build (ask first when no destination given)
+
+Don't silently land the migrated data model + workbook in an auto-picked folder.
+If the user didn't supply a destination (no `--folder <id>`), ASK before building:
+
+1. `ruby scripts/pick-destination.rb list` → `{ workspaces, folders (editable, with parentName), myDocuments }`
+2. Let the user pick ONE: a **workspace** (its `id` lands content in the workspace root),
+   an existing **folder**, **My Documents** (when non-null — null for service tokens), or
+   **create a new folder**: `ruby scripts/pick-destination.rb create --name "<name>" [--parent <workspace-or-folder-id>]`
+3. Pass the chosen id as `--folder <id>`. `folderId` accepts a workspace id or a folder id.
+
+If a destination is already supplied, honor it silently — don't ask.
+
 > Status: **foundation** (validated end-to-end 2026-05-31 on the "Employee Dashboard" workforce report).
 > Beads: build = `beads-sigma-cs2`; converter gaps = `j89` (M-Snowflake path), `tkd` (element names / schemaVersion / folderId).
 > Defers to: `sigma-workbooks` (canonical workbook spec), `sigma-data-models` (DM spec), the `convert_powerbi_to_sigma` MCP tool, and `tableau-to-sigma/scripts/*` (reused verbatim for posting + layout + parity).
@@ -48,7 +65,18 @@ Pulls the refresh history (`GET datasets/{id}/refreshes` via the cached token) �
 
 ## Phase 3 — Convert (MCP)
 `convert_powerbi_to_sigma(model_json, connection_id, database, schema)`.
+
+> ⚠️ **`--converter-out` takes the MCP converter's output — never a hand-authored spec.**
+> The flag exists so you can run the `convert_powerbi_to_sigma` MCP tool, save its
+> result, and resume the pipeline with it (`convert-model.rb --converter-out <that file>`).
+> It is **not** an invitation to write `dm-raw.json` by hand. Hand-authored specs skip
+> the converter's column-name/SQL/formula-prefix guarantees and reliably produce
+> `Missing "kind" field`, `source.statement: undefined`, and `dependency not found`
+> errors (validate-spec.rb now catches the first two, but the right fix is to feed it
+> real converter output). If the MCP tool is unavailable, STOP and gate — don't fabricate.
+
 - DAX measures → Sigma metrics. ~70% mechanical; see `refs/dax-to-sigma-coverage.md` and `fixtures/MANIFEST.md` (test oracle: 94 DAX expressions bucketed a/b/c).
+- **PromoteHeaders**: if `pbi-dm-signature.py` reports `promoted_header_tables` (the model's M-query used `Table.PromoteHeaders`), the warehouse table's real columns are auto-named (`C1`, `C2`, …) with the semantic names in row 0 — the TMSL `sourceColumn` names will NOT resolve. Verify the landed table's real columns and remap with `convert-model.rb --table-map` (in Sigma formulas the columns appear as `C 1`, `C 2`, … and in JOIN SQL alias them, e.g. `c.C2 AS CUSTOMER_NAME`).
 - **Known gap `j89`**: the Snowflake `Snowflake.Databases(...) + Navigation` M pattern isn't parsed → pass `database`/`schema` explicitly until fixed.
 - **DAX gaps → gap-scout**: for measures the converter buckets `b` (restructure) or `c` (no-equivalent) — `RANKX`, `ALLEXCEPT`, `SUMMARIZE`, `USERELATIONSHIP`, `PATH*` — spawn the **gap-scout** sub-agent (`scripts/gap-scout.md`): it proposes a Sigma translation, validates it against the live API (`scripts/scout-validate.py`), and persists the rule to `~/.powerbi-to-sigma/learned-rules.yaml` (loaded by `scripts/learned-rules.py`) so future conversions auto-apply it. Time-intelligence (YTD/SPLY) is usually translatable — see `refs/measure-patterns.md`, not the scout.
 
@@ -86,9 +114,50 @@ Then: `tableau-to-sigma/scripts/post-and-readback.rb --type datamodel`. See `ref
 ## Phase 5d — Layout (do NOT skip — stacked ≠ done)
 Map each visual's `x,y,w,h` → 24-col grid (`COL_UNIT = page_w/24`, `ROW_UNIT ≈ 30`) → single top-level `layout` XML (one `<Page>` per page, server page IDs) → `tableau-to-sigma/scripts/put-layout.rb`. Math + snap rules in `research/powerbi-visual-layout.md §4`.
 
+## Phase 5e — VISUAL COMPARE vs the SOURCE (MANDATORY — numbers lie about looks)
+Phase 6 proves the NUMBERS; this phase proves the PAGES. A conversion shipped
+with exact query parity and still looked broken (collapsed KPIs, stacked bars
+that should be clustered, alphabetical months) — caught only by putting full
+pages next to the Power BI renders. Do this BEFORE Phase 6, every run:
+
+1. Export the SOURCE pages: `"$PY" scripts/export-pbi-pages.py --report <reportId> --out-dir $WORK/visual-qa`
+   (PNG is commonly tenant-disabled — the script falls through to PDF; per-page when pypdf is installed).
+2. Export EVERY Sigma page: `"$PY" scripts/sigma-export-png.py --workbook <wbId> --page <pageId> --out $WORK/visual-qa/sigma-<page>.png`.
+3. **Read both images for each page, side by side.** Check, per page: same
+   elements in the same spots; charts show MARKS (not just axes); clustered vs
+   stacked matches the source; axis order (months Jan→Dec, not alphabetical);
+   KPI tiles show value AND label; no giant decorative text; no dead bands.
+4. Write `$WORK/visual-qa/visual-compare.json`: `[{page, verdict: PASS|ACCEPTED|FAIL, deltas: ["…"]}]`
+   — ACCEPTED means the user explicitly OK'd a listed delta (e.g. zip
+   choropleth instead of PBI's bubble map; theme colors). FAIL = fix and re-export.
+5. Gate: `ruby scripts/assert-visual-compare.rb --dir $WORK/visual-qa --signals $WORK/signals.json`
+   must print GREEN before Phase 6 may be declared.
+
+Layout escalation if the compare fails on arrangement: the builder's default
+`--layout clean` preserves the source positions inside a normalized grid; use
+`--layout pbi` for literal 1:1 canvas geometry; `--layout banded` is legacy.
+
+## Phase 5f — Visual QA (mandatory gate — never skip)
+A workbook that POSTs 200 and passes numeric parity can still be visually broken — **overlapping tiles, clipped KPI titles, dead zones, filters floating over charts.** Power BI free-form/absolute visual coords float over each other and Sigma's grid has no z-order; the shared layout lib now de-overlaps bands (`decollide_bands`), but this visual gate is the safety net.
+
+1. Render every page to PNG: `python3 scripts/sigma-export-png.py --workbook <id> --page <pageId> --out /tmp/<page>.png --w 1600` (or use `scripts/assert-visual-compare.rb` for source-vs-target).
+2. **Read each PNG** and check it against `refs/layout-visual-qa.md` (no overlaps/stacking, no dead zones, controls in their own band, no clipped titles, even heights, right chart kind/format).
+3. Fix any failure in the spec — for multi-page workbooks use `sigma-skills/sigma-workbooks/scripts/wb-rep.rb` (pull → edit → push) — then **re-render and re-read**.
+4. Declare the migration done on a **clean render**, not on HTTP 200.
+
 ## Phase 6 — Verify (mandatory)
 - `sigma-mcp-v2 query` each element → confirm real rows (not blank).
-- True parity: PBI `POST /v1.0/myorg/groups/{ws}/datasets/{id}/executeQueries` (DAX) vs the same Sigma aggregation. DAX-only; breaks under service-principal if RLS.
+- **Two ways to get the `expected` (source-of-truth) side — pick by whether you can reach Power BI online:**
+  - **Warehouse-SQL oracle (DEFAULT for warehouse-backed models — OFFLINE, no Power BI):** the warehouse is what BOTH PBI and Sigma read, so the aggregate computed directly in SQL is a valid independent expected value. No `api.powerbi.com`, Entra app, or workspace/dataset id.
+    ```
+    ruby scripts/build-oracle-sql.rb --in oracle-input.json --out chart-oracle-sql.json   # DAX→SQL (aggregate measures); --dm-spec seeds fqn
+    # run each `sql` via mcp__sigma-mcp-v2__query {type:connection, connectionId:<the DM's conn>} → save rows to parity-expected.json
+    ruby scripts/phase6-parity-pbi.rb --local-sql --expected parity-expected.json --workbook-id <wb> --out plan.json
+    # collect Sigma actuals (one MCP query per chart) → parity-actuals.json, then --finalize (below)
+    ```
+    `build-oracle-sql.rb` covers SUM/AVG/MIN/MAX/COUNT/DISTINCTCOUNT/COUNTROWS + DIVIDE with an optional GROUP BY; anything else (RANKX/CALCULATE/time-intel) is flagged `supported:false` → use the online path or waive it. **Pass an explicit `column_map`** when columns are renamed/auto-named (`Table.PromoteHeaders` → C1/C2, see `pbi-dm-signature.py`); without one it falls back to a NAME→UPPER_SNAKE heuristic and warns.
+  - **Online DAX (high-fidelity / import-only models):** PBI `POST /v1.0/myorg/groups/{ws}/datasets/{id}/executeQueries` (DAX) via `--emit-dax`, vs the same Sigma aggregation. DAX-only; breaks under service-principal if RLS; needs the workspace/dataset (auto-wired from `freshness.json`).
+- **Finalize (both paths):** `ruby scripts/phase6-parity-pbi.rb --finalize --plan plan.json --actuals parity-actuals.json --out-dir <dir>` → writes `parity-final.json` (`source` records which oracle was used).
 - Hard gate: `ruby scripts/assert-phase6-ran.rb --workdir <dir> --workbook-id <wb>` — 7 gates incl. layout lint (6) and **control lint (7**: dead controls / ghost targets / partial same-page reach / `control-scope.json` coverage; `--skip-control-lint` escape; see `refs/control-parity.md`**)**.
 - Optional flip test when the report has slicers→controls: `ruby scripts/probe-controls.rb --workbook-id <wb> --check-out-of-closure` — runtime proof a control actually filters (in-closure export changes under a non-default `parameters` value, out-of-closure doesn't). MCP query can NOT flip controls (defaults only) — export API `parameters` is the only mechanism.
 
@@ -222,6 +291,9 @@ The conversion is script-driven (mirrors `tableau-to-sigma/scripts/`). `scripts/
 | `fabric-extract-batch.py` | 1 batch | Fleet extraction: every requested report → 2 artifact tasks (model TMSL + report def) on ONE 4-wide pool; report→model binding via PBI REST `datasetId` (name-match fallback); `manifest.json` + `timings.json`. 3 reports = 7.5s measured. |
 | `extract-pbir.py` | 1 extract | Fetch a report's PBIR (or parse one already on disk) → normalized `signals.json` (per-visual `sigma_kind` + role bindings + x/y/w/h). Live fetch uses the `pbi_fabric` fast LRO path. The PBI analog of `parse-twb-layout.rb`. |
 | `pbi-freshness.py` | 1.5 preflight | SOURCE-FRESHNESS: refresh history (incl. FAILED/creds-expired refreshes) + cheap executeQueries row-count/max-date snapshot (**4-wide parallel per-table probes**) → `freshness.json`. Launched **non-blocking** by run.sh/migrate-powerbi.rb (consumed at parity). Leads the parity output; deltas classify MATCH / STALE-EXPLAINED / DIVERGENT (bead fmte). |
+| `export-pbi-pages.py` | 5e compare | SOURCE page renders via ExportToFile (PNG → PDF fallback; per-page split with pypdf) for the mandatory visual compare. |
+| `sigma-export-png.py` | 5e/5f compare | Renders a built Sigma page to PNG (`--workbook <id> --page <pageId> --out … --w 1600`) for the source-vs-target compare AND the Phase 5f Visual QA read (checked against `refs/layout-visual-qa.md`). |
+| `assert-visual-compare.rb` | 5e gate | HARD GATE: blocks Phase 6 unless visual-compare.json has a PASS/ACCEPTED verdict (with explained deltas) for every content page. |
 | `convert-model.rb` | 2–3 convert/post | MODE A prints the exact `convert_powerbi_to_sigma` MCP call for a `model.bim`; MODE B takes the converter output and applies the 3 fixups (schemaVersion + folderId/ownerId via a ref-DM harvest + base-element names) → postable DM spec. |
 | `build-workbook-from-pbir.rb` | 4 build | `signals.json` + a `master-map.json` → full workbook spec + 24-col layout XML. Applies the measure-translation patterns in `refs/measure-patterns.md`; **line charts default to a single series** (`beads-sigma-c07`) unless PBI bound a Series/Legend role. **Carries the PBI visual sort** (`f972` — PBIR `query.sortDefinition` / classic `prototypeQuery.OrderBy` → chart `xAxis.sort`/`color.sort`; grouped table → `groupings[0].sort` — element-level sort is rejected on grouped tables). Analog of `build-charts-from-signals.rb`. |
 | `phase6-parity-pbi.rb` | 7 parity | executeQueries(DAX) adapter: `--emit-dax` runs the PBI side and writes the parity plan's `expected` rows; `--finalize` injects Sigma actuals and runs the shared `verify-parity.rb`. The PBI analog of Tableau's view-CSV parity adapter. |

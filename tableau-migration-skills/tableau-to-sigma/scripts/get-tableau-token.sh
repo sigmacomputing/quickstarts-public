@@ -9,6 +9,13 @@
 
 set -euo pipefail
 
+# Agent-neutral credential bootstrap. Claude Code auto-loads creds from
+# ~/.claude/settings.json into the env; other agents don't. If the creds aren't
+# already present, source the neutral cred file written by setup-tableau.rb.
+if [ -z "${TABLEAU_PAT_SECRET:-}" ] && [ -f "$HOME/.sigma-migration/env" ]; then
+  . "$HOME/.sigma-migration/env"
+fi
+
 : "${TABLEAU_SERVER_URL:?Run scripts/setup-tableau.rb to configure credentials}"
 : "${TABLEAU_SITE_CONTENT_URL:?Run scripts/setup-tableau.rb to configure credentials}"
 : "${TABLEAU_PAT_NAME:?Run scripts/setup-tableau.rb to configure credentials}"

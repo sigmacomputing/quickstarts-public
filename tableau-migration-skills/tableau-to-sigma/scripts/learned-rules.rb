@@ -10,15 +10,24 @@
 #
 # Schema (YAML):
 #   rules:
-#     - feature: "WINDOW_AVG"
-#       description: "Tableau WINDOW_AVG(SUM(x)) → Sigma MovingAvg"
-#       tableau_pattern: '\bWINDOW_AVG\s*\(\s*SUM\s*\(\[([^\]]+)\]\)\s*\)'
-#       sigma_template: 'MovingAvg(Sum([Master/\1]), -10, 10)'
-#       hint: "Sigma window functions silently error in grouping-table charts"
+#     - feature: "FINDNTH_EMAIL"
+#       description: "customer-specific FINDNTH wrapper → array composition"
+#       tableau_pattern: '\bFINDNTH\s*\(\s*\[Email\]\s*,\s*"\."\s*,\s*2\s*\)'
+#       sigma_template: 'Len(ArrayJoin(ArraySlice(SplitToArray([Master/Email], "."), 0, 2), ".")) + 1'
+#       hint: "validated against this customer's warehouse"
 #       validated_at: "2026-05-19T16:42:00Z"
 #       validated_workbook: "wb-id-here"
 #       example_from: "workbook.twb line 1234"
 #       confidence: "validated" | "proposed" | "experimental"
+#
+# ⚠ SHADOWING: learned rules run BEFORE the built-in translators in
+# build-charts-from-signals.rb. The WINDOW_* / RUNNING_* / RANK / LOOKUP /
+# INDEX / TOTAL table-calc family is now BUILT-IN (WINPROBE-validated mapping,
+# refs/window-functions.md) — do NOT add learned rules for those functions
+# unless deliberately overriding for one customer; a stale rule (e.g. an old
+# `MovingAvg(Sum(x), -10, 10)` template — that arg shape is WRONG, Sigma
+# Moving* takes positive back/forward counts) silently shadows the correct
+# built-in translation.
 #
 # Usage from the build script:
 #   require_relative 'learned-rules'

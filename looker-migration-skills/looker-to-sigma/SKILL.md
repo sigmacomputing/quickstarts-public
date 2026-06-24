@@ -90,10 +90,24 @@ python3 scripts/migrate-looker.py --lookml-dir /path/to/lookml \
   runs first — RLS findings STOP the command (exit 10, nothing posted) until you
   either port them via `apply_sigma_rls.py` (Phase 1.5) or re-run with `--yes`
   (proceed WITHOUT RLS — loud + recorded). The DM-reuse check (Phase 2.5) always
-  runs and PRINTS candidates+scores; it is **reuse-first** — auto-reuses an
-  existing DM that covers all the dashboard's warehouse table(s) (collapsing
-  duplicate-DM sprawl, skipping the POST). Opt out with `--skip-dm-reuse-check`
-  or pin one with `--reuse-dm <id>`. The folder is auto-resolved and printed.
+  runs and PRINTS candidates+scores. **Default is BUILD-NEW** — reuse only when
+  you pin one with `--reuse-dm <id>`. (Auto-reuse keyed on *table* coverage could
+  adopt a DM missing a *column* the workbook needs → the workbook POST then 400s
+  `Dependency not found`; that footgun is now opt-in via `--reuse-auto`.) Skip the
+  scan entirely with `--skip-dm-reuse-check`. The folder is auto-resolved + printed.
+- **Source repointing:** if the LookML `sql_table_name` points at a DB.SCHEMA the
+  Sigma connection doesn't serve (e.g. dev `CSA.TJ.*` vs the connection's
+  `QUICKSTARTS.LOOKER_RETAIL_ANALYTICS.*`), pass
+  `--source-swap FROM_DB.FROM_SCHEMA=TO_DB.TO_SCHEMA` (repeatable). A not-yet-indexed
+  schema (catalog miss) self-heals — `post_dm.py` auto-syncs and retries once.
+  Don't know the FROM? `--auto-source-swap-to TO_DB.TO_SCHEMA` asks Looker what
+  DB.SCHEMA the explore's connection targets (`GET /connections`) and builds the
+  swap for you (production-safe; needs `~/.looker/looker.ini`).
+- **No local checkout? `--project <id>`** pulls the LookML over the Looker REST API
+  (model + views) instead of `--lookml-dir`. Requires DEVELOP permission on the
+  project (Looker only serves raw LookML in the dev workspace); without it the
+  command fails loud and tells you to clone the Git repo and use `--lookml-dir`.
+  `scripts/looker_project.py` is the standalone helper (`pull` / `connection`).
 - **Converter paths:** `CONVERTER_SRC` (patched `src/lookml.ts` via tsx) or
   `CONVERTER_PATH` (`build/lookml.js`) — both auto-located; with neither, the
   command writes `<workdir>/convert-request.json` (the exact
@@ -557,7 +571,8 @@ Tile-type, filter-type, and layout maps are in `refs/dashboard-contract.md` and
 | Looker tile `type:` | Sigma kind |
 |---|---|
 | `single_value` | `kpi-chart` |
-| `looker_column` / `looker_bar` | `bar-chart` |
+| `looker_column` | `bar-chart` (vertical) |
+| `looker_bar` | `bar-chart` + `orientation: horizontal` (Looker `looker_bar` = horizontal bars) |
 | `looker_line` | `line-chart` |
 | `looker_area` | `area-chart` |
 | `looker_pie` | `pie-chart` |
@@ -604,6 +619,28 @@ Newspaper layout math (a single arithmetic transform, no spatial heuristic):
   best-effort (currency symbol / thousands separator / decimals / percent). Counts and dimensions
   get no format (raw). Without this the side-by-side render (Phase 4a) shows bare numbers where
   Looker showed `$`/`%`.
+- **Bar orientation.** Looker `looker_bar` renders **horizontal** bars, `looker_column` vertical —
+  both map to a Sigma `bar-chart`. `build_workbook.py` emits `orientation: horizontal` for
+  `looker_bar` and omits the key (Sigma's vertical default) for `looker_column`. Field verified:
+  `sigma-workbooks` `charts.md`.
+- **Grid cell visualizations (`series_cell_visualizations`).** A Looker grid can draw in-cell bars
+  on a measure column, often colored by VALUE (low→high gradient). **Sigma data bars are
+  SIGN-colored** — one fill for positive, one for negative (verified live 2026-06-24: the
+  `Format rule` → `Data bars` UI exposes only a *Negative color* + *Positive color*, and a
+  multi-stop `scheme` collapses to the single positive color). So the bar fill **cannot** vary by
+  value. The mappings `build_workbook.py` emits from contract `cellVisualizations: {field:{scheme}}`:
+    - Looker bar **colored by value** (a `custom_colors` palette) → Sigma **Color scale**
+      (`conditionalFormats: [{type: backgroundScale, columnIds:[<calc col>], scheme:[…]}]`) — tints
+      the cell low→high, reproducing Looker's value encoding — **plus a warning** (the bar+value-color
+      combo isn't reproducible; flip the rule to `dataBars` if you'd rather keep a magnitude bar).
+    - Looker **plain** bar (no value palette) → `conditionalFormats: [{type: dataBars, columnIds:[…]}]`
+      (magnitude). Verified spec shapes: `sigma-workbooks` `tables.md`.
+  **Render-only caveat:** Looker frequently does **not** return `series_cell_visualizations` from the
+  dashboard/query API even when the rendered dashboard shows the bars (confirmed on dash 11 via the
+  query, `result_maker`, and `dashboard_element` endpoints — all empty). That case can't be
+  auto-detected from the contract, so the Phase-4a visual-QA gate is where you catch it: if the Looker
+  render shows value-colored in-cell bars but the Sigma table has none, add a `backgroundScale`
+  `conditionalFormat` by hand (sample the source colors for the `scheme`) and `PUT` the spec.
 
 ### 3c. POST the workbook + verify
 
@@ -747,7 +784,7 @@ declaring Phase 4 green.
 | Converter dropped all view fields after an `html:` dim | Stale build predating BUG4 fix | Use the patched source path; the `;;`-block pre-extraction now includes `html`/`sql_on`/etc. |
 | Metric formula contains `${...}` literals or `0 *` | Stale build predating BUG1/BUG3 fixes | Patched source resolves `${dim}`/`${measure}` refs and preserves `1.0` |
 | `metric()` returns "Missing Metric" in a Sigma query | Known Sigma quirk | Verify via raw aggregate (`Sum`/`CountDistinct`), not `metric()` |
-| `Source not found: warehouse table …` on DM POST | Short connectionId, or table not in Sigma's static catalog | Use the FULL connection UUID; if still failing, source via a Custom SQL DM element (`kind: "sql"`) |
+| `Source not found: warehouse table …` on DM POST | (a) connection catalog hasn't indexed the schema yet, OR (b) the LookML `sql_table_name` DB.SCHEMA differs from what the connection serves, OR (c) short connectionId | `post_dm.py` now AUTO-SYNCs the named schema (`POST /v2/connections/{id}/sync`) and retries once — (a) self-heals. For (b) pass `--source-swap FROM_DB.FROM_SCHEMA=TO_DB.TO_SCHEMA`. For (c) use the FULL connection UUID. Last resort: a Custom SQL DM element (`kind: "sql"`) |
 | `jq: parse error: Invalid numeric literal` | Sigma spec endpoints return YAML | Never pipe spec responses to `jq` / `json.load` |
 | `Invalid kind: "control"` on workbook POST | Control element missing its own `id` (separate from `controlId`) | Add a distinct `id` |
 | KPI POSTs 400 with `value.id` / donut POSTs 400 with `value.columnId` | The two element types use different value keys | KPI → `value.columnId`; donut/pie → `value.id` |

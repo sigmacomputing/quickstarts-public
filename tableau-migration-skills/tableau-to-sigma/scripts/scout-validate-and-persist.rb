@@ -27,14 +27,22 @@
 #     "rule_path": "~/.tableau-to-sigma/learned-rules.yaml",     // on success
 #     "workbook_id": "...",                                       // on success
 #     "escalation_path": "~/.tableau-to-sigma/escalations/...",   // on failure
+#     "escalation": { "dry_run_cmd": "...", "file_cmd": "..." },  // on failure
 #     "attempts": [...]
 #   }
+#
+# Escalation is OPT-IN. On failure this script records the gap locally and
+# returns a ready-to-run `escalate-gap.py` command. It does NOT file anything.
+# The main agent shows the user the dry-run draft and only files (--yes) if the
+# user accepts. See scripts/gap-scout.md.
 
 require 'json'
 require 'optparse'
 require 'open3'
+require 'shellwords'
 require 'time'
 require_relative 'learned-rules'
+require_relative 'lib/scout_gate'
 
 opts = { max_attempts: 1 }
 OptionParser.new do |p|
@@ -50,11 +58,20 @@ OptionParser.new do |p|
   p.on('--example-from S')         { |v| opts[:example_from] = v }
   p.on('--max-attempts N', Integer){ |v| opts[:max_attempts] = v }
   p.on('--chart-kind S')           { |v| opts[:chart_kind] = v }
-  p.on('--escalate-to S', 'gh | beads | none (default: auto — try gh, then beads)') { |v| opts[:escalate_to] = v }
-  p.on('--github-repo S', 'GitHub repo for issue filing (default: sigmacomputing/quickstarts-public)') { |v| opts[:github_repo] = v }
+  # Run-each-time gate (bead 5l5e): record this scout in a per-conversion
+  # ledger so the orchestrator can prove the scout ran for EVERY unhandled gap
+  # before it proceeds. --gap-id is the gap-report row this scout addressed
+  # (NOT the function-level --feature); --workdir is the conversion working dir.
+  p.on('--gap-id S')               { |v| opts[:gap_id] = v }
+  p.on('--workdir S')              { |v| opts[:workdir] = v }
 end.parse!
 
 %i[feature pattern template test_formula dm_id el_id].each { |k| abort("missing --#{k.to_s.tr('_','-')}") unless opts[k] }
+
+# Append a row to the per-conversion scout ledger via the shared gate module.
+def record_ledger(opts, status)
+  ScoutGate.record(opts[:workdir], gap_id: opts[:gap_id], feature: opts[:feature], status: status)
+end
 
 VALIDATE = File.join(__dir__, 'validate-sigma-formula.rb')
 
@@ -89,6 +106,7 @@ if result['status'] == 'ok'
     'confidence'         => 'validated'
   }
   path = LearnedRules.append(rule)
+  record_ledger(opts, 'validated')
   puts JSON.pretty_generate({
     'status'      => 'validated',
     'rule_path'   => path,
@@ -109,45 +127,46 @@ else
     'escalated_at'    => Time.now.utc.iso8601
   }
   esc_path = LearnedRules.escalate(payload)
+  record_ledger(opts, 'escalated')
 
-  # Auto-file: try gh first, then beads, then skip.
-  filed_via = nil
-  filed_id  = nil
-  target    = opts[:escalate_to] || 'auto'
-  title = "Tableau→Sigma gap: #{opts[:feature]} (#{opts[:description] || 'no description'})"
-  body  = String.new
-  body << "**Feature:** `#{opts[:feature]}`\n\n"
-  body << "**Tableau pattern:** `#{opts[:pattern]}`\n\n"
-  body << "**Tried Sigma template:** `#{opts[:template]}`\n\n"
-  body << "**Test formula POSTed:** `#{opts[:test_formula]}`\n\n"
-  body << "**Sigma response:**\n```json\n#{JSON.pretty_generate(attempt['result'])}\n```\n\n"
-  body << "**Example source:** #{opts[:example_from] || '(not provided)'}\n\n"
-  body << "**Escalation YAML:** `#{esc_path}`\n\n"
-  body << "_Filed automatically by `scripts/scout-validate-and-persist.rb`._\n"
-
-  if %w[auto gh].include?(target) && system('which gh > /dev/null 2>&1')
-    repo = opts[:github_repo] || 'sigmacomputing/quickstarts-public'
-    out, _err, st = Open3.capture3('gh', 'issue', 'create', '--repo', repo, '--title', title, '--body', body, '--label', 'tableau-to-sigma,gap-scout-escalation')
-    if st.success?
-      filed_via = 'gh'
-      filed_id  = out.strip.split('/').last
-    end
-  end
-
-  if filed_via.nil? && %w[auto beads].include?(target) && system('which bd > /dev/null 2>&1') && Dir.exist?(File.expand_path('~/.beads-sigma'))
-    out, _err, st = Open3.capture3({ 'PWD' => File.expand_path('~/.beads-sigma') }, 'bd', 'create', title, '--priority', '2', '--labels', 'sigma-converter,tableau-to-sigma,gap-scout-escalation', '--description', body, '--silent', chdir: File.expand_path('~/.beads-sigma'))
-    if st.success?
-      filed_via = 'beads'
-      filed_id  = out.strip
-    end
-  end
+  # Opt-in escalation (NOT automatic). We record the gap locally and hand the
+  # main agent a ready-to-run command for the shared filer. The agent shows the
+  # user the draft (dry run) and only files if they say yes (--yes). Tableau
+  # calc-field gaps are converter gaps → mirror to the converter repos.
+  escalate = File.join(__dir__, 'escalate-gap.py')
+  # Trim the validator output to the error verdict — never forward spec_used /
+  # all_columns into the issue body (it bloats the command + issue to KBs).
+  res = attempt['result'] || {}
+  resp_summary = {
+    'status'        => res['status'],
+    'phase'         => res['phase'],
+    'error_columns' => res['error_columns']
+  }.compact
+  esc_cmd = [
+    'python3', escalate,
+    '--skill',              'tableau-to-sigma',
+    '--category',           'converter',
+    '--feature',            opts[:feature],
+    '--description',        (opts[:description] || ''),
+    '--source-pattern',     (opts[:pattern] || ''),
+    '--template-attempted', (opts[:template] || ''),
+    '--test-formula',       (opts[:test_formula] || ''),
+    '--sigma-response',     JSON.generate(resp_summary),
+    '--example-from',       (opts[:example_from] || ''),
+    '--escalation-yaml',    esc_path
+  ]
+  suggested = esc_cmd.map { |a| Shellwords.escape(a) }.join(' ')
 
   puts JSON.pretty_generate({
     'status'          => 'escalated',
     'escalation_path' => esc_path,
-    'filed_via'       => filed_via,
-    'filed_id'        => filed_id,
-    'attempts'        => [attempt]
+    'attempts'        => [attempt],
+    'escalation' => {
+      'note'         => 'Gap recorded locally. To offer the user a tracking issue, ' \
+                        'run the dry-run command (shows the draft + dedupe), then re-run with --yes if they accept.',
+      'dry_run_cmd'  => suggested,
+      'file_cmd'     => "#{suggested} --yes"
+    }
   })
   exit 2
 end

@@ -117,6 +117,6 @@ See `SKILL.md` "Troubleshooting" section. Common things:
 
 ## Where it lives
 
-This skill ships with the `Migrating From Tableau Made Easy` QuickStart in [`sigmacomputing/quickstarts-public`](https://github.com/sigmacomputing/quickstarts-public/tree/main/tableau-migration-skills), alongside its sibling skills `tableau-to-sigma` and `tableau-vds-to-snowflake`.
+This skill is part of [`twells89/sigma-skills-staging`](https://github.com/twells89/sigma-skills-staging) — Sigma's staging repo for not-yet-graduated skills. Once it's been validated against a few real customer sites, it'll move to the public [`sigmacomputing/sigma-agent-skills`](https://github.com/sigmacomputing/sigma-agent-skills) repo.
 
 Sibling skill: [`tableau-to-sigma`](../tableau-to-sigma/) — the conversion skill the migration shortlist feeds into.

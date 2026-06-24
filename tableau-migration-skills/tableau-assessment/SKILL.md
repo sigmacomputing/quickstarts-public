@@ -1,6 +1,7 @@
 ---
 name: tableau-assessment
 description: Take inventory of a Tableau Cloud site and produce a migration-readiness readout — environment counts, licenses, datasource mix, refresh history, per-workbook usage, per-workbook complexity (via .twb gap-scan), and a value/cost-ranked migration shortlist. Use when a user wants to scope a Tableau→Sigma migration, audit BI sprawl, or pick which workbooks to convert first. Lightweight (~90s) MCP-driven pre-scoping; complements Hakkoda's deeper Assessment App rather than replacing it.
+user-invocable: true
 ---
 
 # Tableau Assessment
@@ -73,6 +74,7 @@ permissions audit, dataset similarity at depth). Those still live in Hakkoda.
 | `scripts/build-shortlist.rb` | Cross-tabulate usage × complexity; rank by `value / (1 + cost)`; emit `shortlist.json` |
 | `scripts/render-readout.rb` | Compose final `readout.md` from `inventory.json` + `complexity.json` + `shortlist.json` |
 | `scripts/migration-plan.rb` | Phase 6: combine shortlist + data-sources + .twb warehouse-table extraction into `migration-plan.json` with per-workbook `recommended_path` (`tableau-to-sigma` / `vds-to-snowflake` / `retire` / `blocked`), DM clusters (Jaccard ≥ 0.5 on shared warehouse tables + fact-table overlap), and a suggested first batch. Input contract for the conversion handoff. |
+| `scripts/consolidation-candidates.rb` | Phase 6b: within each shared-datasource pool, score workbook-variant similarity (actually-used fields, sheet/zone structure, filter sets, gap-scan feature profile, name-stem heuristics) and emit `consolidation-candidates.json` — groups of workbooks that could collapse into ONE Sigma workbook + a control. `--decide` records the user's per-group choice into `migration-plan.json`. Pure analysis; no Tableau/Sigma writes. |
 | `scripts/orchestrate-batch.rb` | Phase 7 (optional): produce a `batch-plan.json` with wave-style scheduling for parallel `tableau-to-sigma` subagent execution. Cluster leaders run first to build/pick their DM; followers reuse via `find-or-pick-dm.rb` + `inspect-dm-shape.rb`. Continue-on-failure. Outputs ready-to-fire `agent_brief` strings for the conversation-layer to pass into `Agent()` calls. |
 
 Scripts that need warehouse-table data (the MCP query-datasource calls against
@@ -447,7 +449,7 @@ For each data source (published + embedded), classifies:
 | `verify-db` | Database supported via a Sigma connector that may need extra config |
 | `verify-modeling` | Federated cross-source join; review Sigma data-model relationship coverage |
 | `resolve-published` | References another published datasource; resolve recursively |
-| `land-in-warehouse` | File-based (Excel / CSV / Google Drive / .hyper); needs warehouse upload first. **Recommended path: use the sibling `tableau-vds-to-snowflake` skill to auto-generate Snowflake DDL + Sigma data model from the .tds.** |
+| `land-in-warehouse` | File-based (Excel / CSV / Google Drive / .hyper); needs warehouse upload first. **Recommended path: use the sibling `tableau-vds-to-cdw` skill to auto-generate warehouse DDL (Snowflake or Databricks) + Sigma data model from the .tds.** |
 
 Also emits:
 - **Similarity clusters** — embedded datasources whose field-name sets overlap by ≥75% (Jaccard). Strong consolidation candidates.
@@ -500,6 +502,7 @@ Deliverables in `/tmp/assessment-<site>/`:
 - `inventory.json` — raw Admin Insights aggregates
 - `complexity.json` — per-workbook gap counts (PAT mode)
 - `shortlist.json` — ranked migration shortlist (PAT mode)
+- `consolidation-candidates.json` — workbook-variant consolidation groups (Phase 6b; re-render after it runs)
 - `twbs/` — cached `.twb` files (PAT mode; can be deleted after rendering)
 
 ---
@@ -526,6 +529,74 @@ The plan also computes **DM clusters** — workbooks that share warehouse tables
 
 ---
 
+## Phase 6b — Consolidation candidates (MANDATORY: prompt per group)
+
+DM clusters answer "which workbooks can share one Sigma **data model**". This
+phase answers the next question up the stack: which workbooks are *variants of
+the same dashboard* that should become one Sigma **workbook** — e.g. regional
+or yearly copies, `v2` / `final` / `Republish` clones, where the only real
+difference is a filter value. In Sigma those collapse to one workbook plus a
+control.
+
+After `migration-plan.rb`, **always** run:
+
+```bash
+ruby scripts/consolidation-candidates.rb --out /tmp/assessment-<site>
+```
+
+Pure analysis (no Tableau/Sigma calls) over artifacts the assessment already
+cached: per-pair it scores actually-used field overlap (from each `.twb`'s
+`datasource-dependencies`, falling back to schema fields for stub workbooks),
+sheet/zone structure, filter-field sets (and whether only the *values* differ),
+the gap-scan feature profile from `complexity.json`, and name-stem heuristics
+(shared stem after stripping copy/test/version/year tokens; Levenshtein +
+token overlap). Pairs are pooled only within shared-datasource boundaries
+(overlapping warehouse tables or a shared published-datasource id), grouped by
+complete linkage so weak links can't chain unrelated workbooks together.
+
+Writes `consolidation-candidates.json`. Each group carries `recommendation`:
+
+| Recommendation | Means |
+|---|---|
+| `consolidate` | ≥70% actually-used-field overlap, ≥60% sheet-set similarity, same datasource, and the differences map to a control (or the variants are outright duplicates). Conservative by design — only fires on strong evidence. |
+| `review` | Same datasource + meaningful overlap, but structure/field usage diverges beyond what one control parameterizes — or all members are blank publish-test stubs (keep one / retire instead). Show the user the evidence; don't auto-consolidate. |
+| `keep-separate` | Considered (shared datasource, scored above the floor) but rejected. Kept in the output as evidence of what was checked. |
+
+**Then prompt the user — one `AskUserQuestion` per `consolidate`/`review`
+group** (do NOT silently fold this into the readout). Present the group's
+members, the `similarity_drivers` + `differences` evidence, the proposed
+control(s), and the savings (N−1 conversions avoided):
+
+```
+Group consolidation-01: "Sales — East" + "Sales — West" + "Sales — Central"
+  evidence: 92% used-field overlap · identical sheets · filter 'Region' values differ
+  proposal: 1 Sigma workbook + a Region list-control · saves 2 conversions
+  → Consolidate into one workbook with controls (recommended)
+  → Migrate as-is (3 separate workbooks)
+```
+
+For `review` groups present the same menu but do NOT pre-select; lead with the
+divergence evidence. Record every answer so the conversion handoff knows:
+
+```bash
+ruby scripts/consolidation-candidates.rb --out /tmp/assessment-<site> \
+  --decide consolidation-01=consolidate --decide consolidation-02=as-is
+```
+
+This updates `migration-plan.json` in place: merged members get
+`recommended_path: "consolidate-into-primary"` + `consolidate_into` (the
+primary's workbookId; original path preserved in `pre_consolidation_path`),
+the primary gets `consolidation_role: "primary"` + `consolidation_controls`,
+and the plan gains a top-level `consolidation` block. Downstream
+(`tableau-to-sigma`, `orchestrate-batch.rb`) should convert ONLY the primary
+and add the proposed control(s); merged members are skipped as conversions.
+
+Re-rendering the readout after this phase (`render-readout.rb` /
+`render-readout-html.rb`) adds the "Consolidation candidates" section
+automatically when `consolidation-candidates.json` is present.
+
+---
+
 ## Phase 7 — Hand off to the next skill (MANDATORY: ask the user)
 
 **After Phase 6, the assessment agent MUST present a `AskUserQuestion` menu** so the user picks the next step. Do NOT silently end the assessment — the user is here to migrate something, surface the choice. Build the menu dynamically from `migration-plan.json`'s summary:
@@ -539,7 +610,7 @@ Assessment summary:
 What next?
   → Migrate top N dashboards in parallel  [tableau-to-sigma × N subagents]
   → Migrate one specific dashboard  [pick from list]
-  → Land Tableau datasources in Snowflake first  [tableau-vds-to-snowflake]
+  → Land Tableau datasources in Snowflake first  [tableau-vds-to-cdw]
   → Do both: VDS first, then dashboards  [chained]
   → Just write the readout — act later
 ```
@@ -590,7 +661,7 @@ User wants to land Tableau-managed datasources into Snowflake before dashboards.
 
 ```
 Skill(
-  skill: "tableau-vds-to-snowflake",
+  skill: "tableau-vds-to-cdw",
   args:  "Land these <K> datasources from /tmp/assessment-<site>/migration-plan.json (each flagged recommended_path=vds-to-snowflake) into Snowflake. After completion, workbooks that source from these datasources become candidates for tableau-to-sigma conversion."
 )
 ```
@@ -643,9 +714,9 @@ unchanged.
 
 ### Snowflake-flavored examples
 
-Every worked example in this SKILL.md (the `MYDB.MYSCHEMA.*` fixture tables,
+Every worked example in this SKILL.md (the `TJ.PUBLIC.*` fixture tables,
 the `snow sql` reconciliation, the `--snowflake-conn` flag, the
-`tableau-vds-to-snowflake` sibling skill) uses Snowflake because that's
+`tableau-vds-to-cdw` sibling skill) uses Snowflake because that's
 where the development corpus and audit-run fixtures live. The Sigma-side
 calls (`/v2/connections`, `/v2/connections/tables/<inodeId>/columns`,
 `mcp__sigma-mcp-v2__query`) are warehouse-agnostic, so a customer running

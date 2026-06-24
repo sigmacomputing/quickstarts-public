@@ -23,12 +23,15 @@ tpl = File.read(template_path)
 inv_path        = File.join(opts[:out], 'inventory.json')
 complexity_path = File.join(opts[:out], 'complexity.json')
 shortlist_path  = File.join(opts[:out], 'shortlist.json')
+consol_path     = File.join(opts[:out], 'consolidation-candidates.json')
 
 inventory  = JSON.parse(File.read(inv_path))
 complexity = File.exist?(complexity_path) ? JSON.parse(File.read(complexity_path)) : nil
 shortlist  = File.exist?(shortlist_path)  ? JSON.parse(File.read(shortlist_path))  : nil
+consolidation = File.exist?(consol_path)  ? JSON.parse(File.read(consol_path))     : nil
 
 has_shortlist = !shortlist.nil? && !shortlist.empty?
+has_consolidation = has_shortlist && !consolidation.nil? && !(consolidation['groups'] || []).empty?
 limited_mode  = inventory['licenses'].nil? && inventory['refresh_jobs'].nil?
 
 # -------- helpers ------------------------------------------------------------
@@ -219,10 +222,33 @@ if has_shortlist
   end
 end
 
+# Section 8b — consolidation candidates
+consolidation_table = ''
+n_consol_groups = 0
+n_consolidate = 0
+n_consol_review = 0
+conversions_avoidable = 0
+if has_consolidation
+  cs = consolidation['summary'] || {}
+  n_consol_groups       = cs['groups_total'] || 0
+  n_consolidate         = cs['consolidate'] || 0
+  n_consol_review       = cs['review'] || 0
+  conversions_avoidable = cs['conversions_avoidable'] || 0
+  crows = (consolidation['groups'] || []).map do |g|
+    members = g['workbooks'].map { |w| w['name'] }.join(' + ')
+    controls = (g['proposed_controls'] || []).map { |c| "#{c['kind']} on `#{c['column']}`" }.join(', ')
+    proposal = g['recommendation'] == 'consolidate' ? "#{g['workbooks'].size} → 1 workbook#{controls.empty? ? ' (keep primary)' : " + #{controls}"}" : '—'
+    [g['group_id'], members, "#{g['field_overlap_pct']}%", proposal,
+     g['recommendation'] == 'consolidate' ? '**consolidate**' : g['recommendation']]
+  end
+  consolidation_table = md_table(['Group', 'Workbook variants', 'Field overlap', 'Proposal', 'Recommendation'], crows)
+end
+
 # -------- apply template -----------------------------------------------------
 
 out = tpl.dup
 out = section_block(out, 'has_shortlist',         has_shortlist)
+out = section_block(out, 'has_consolidation',     has_consolidation) if has_shortlist
 out = section_block(out, 'limited_mode_banner',   limited_mode)
 out = section_block(out, 'has_pricing',           has_pricing)
 
@@ -262,6 +288,11 @@ repl = {
   '{{shortlist_pct_usage}}'         => shortlist_pct_usage.to_s,
   '{{shortlist_total_unhandled}}'   => shortlist_total_unhandled.to_s,
   '{{complexity_table}}'            => complexity_table,
+  '{{consolidation_table}}'         => consolidation_table,
+  '{{n_consol_groups}}'             => n_consol_groups.to_s,
+  '{{n_consolidate}}'               => n_consolidate.to_s,
+  '{{n_consol_review}}'             => n_consol_review.to_s,
+  '{{conversions_avoidable}}'       => conversions_avoidable.to_s,
   '{{total_unhandled}}'             => total_unhandled.to_s,
   '{{n_workbooks_with_unhandled}}'  => n_workbooks_with_unhandled.to_s,
   '{{n_workbooks_scanned}}'         => n_workbooks_scanned.to_s,

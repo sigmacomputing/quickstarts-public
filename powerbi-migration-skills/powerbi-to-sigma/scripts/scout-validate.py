@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""scout-validate — gap-scout validation primitive (Qlik & Power BI).
+"""scout-validate — gap-scout validation primitive (Power BI → Sigma).
 
 Validates a candidate Sigma formula against a real data-model element by building a
 throwaway test workbook, checking the column resolves (type != "error"), and — on
@@ -7,16 +7,25 @@ success — persisting the rule to the customer-local learned-rules.yaml. Generi
 skills via --home.
 
     python3 scout-validate.py \
-      --formula 'Avg([Master/Days To Ship])' \
+      --formula 'Rank([Master/Net Revenue])' \
       --data-model-id <dm> --element-id <denorm-elem-id> --folder-id <folder> \
-      --feature 'RangeAvg' --pattern '\\bRangeAvg\\s*\\(\\s*(.+?)\\s*\\)' \
-      --template 'Avg([Master/\\1])' --hint 'aggregate context only' \
-      --description 'Qlik RangeAvg -> Sigma Avg' --home ~/.qlik-to-sigma
+      --feature 'RANKX' --pattern '\\bRANKX\\s*\\(' \
+      --template 'Rank([Master/\\1])' --hint 'grouped-element context' \
+      --description 'DAX RANKX -> Sigma Rank' --home ~/.powerbi-to-sigma
+
+To feed the run-each-time gap-scout gate (bead beads-sigma-5l5e), also pass the
+flagged DAX gap's gate id and the conversion working dir — the result is appended
+to <workdir>/scout-ledger.jsonl so migrate-powerbi.rb's OPEN-QUESTIONS gate sees
+the gap as scouted (validated → ok; error → escalated):
+
+      --gap-id 'dax:<first 80 chars of the converter warning>' --workdir <wd>
 
 Env: SIGMA_BASE_URL, SIGMA_API_TOKEN (eval get-token.sh first).
 Prints JSON: {status: validated|error, workbook_id, error, ...}. Cleans up the test workbook.
 """
 import json, os, sys, urllib.request, argparse, datetime, re
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+import scout_gate
 
 BASE = os.environ["SIGMA_BASE_URL"]; TOK = os.environ["SIGMA_API_TOKEN"]
 def api(method, path, body=None, accept_json=True):
@@ -87,8 +96,10 @@ def main():
     ap.add_argument("--hint", default=""); ap.add_argument("--description", default="")
     ap.add_argument("--example-from", default="")
     ap.add_argument("--kind", default="kpi-chart", choices=["kpi-chart","table"])
-    ap.add_argument("--home", default=os.path.expanduser("~/.qlik-to-sigma"))
+    ap.add_argument("--home", default=os.path.expanduser("~/.powerbi-to-sigma"))
     ap.add_argument("--skill", default="", help="skill name for issue routing (default: derived from --home)")
+    ap.add_argument("--gap-id", default="", help="flagged DAX gap this scout addressed (gate ledger; e.g. dax:<warning[:80]>)")
+    ap.add_argument("--workdir", default="", help="conversion working dir; ledger written here")
     a = ap.parse_args()
 
     elem_name, cols = dm_element_master_columns(a.data_model_id, a.element_id)
@@ -146,6 +157,9 @@ def main():
         result["escalation"] = build_escalation(a, err)
     # cleanup test workbook
     api("DELETE", f"/v2/files/{wb}")
+    # record to the run-each-time gap-scout ledger (bead beads-sigma-5l5e) so the
+    # migrate-powerbi.rb OPEN-QUESTIONS gate sees this flagged DAX gap as scouted.
+    scout_gate.record(a.workdir, a.gap_id, a.feature, "validated" if status == "validated" else "escalated")
     print(json.dumps({**result,"status":status}, indent=2))
 
 if __name__ == "__main__":

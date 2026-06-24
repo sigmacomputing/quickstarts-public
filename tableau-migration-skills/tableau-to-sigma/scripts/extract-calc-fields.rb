@@ -78,18 +78,32 @@ end
 
 # ---- formula translation hints (carried over from the v1 script) --------
 
-TABLEAU_WINDOW_FNS = %w[
-  WINDOW_SUM WINDOW_AVG WINDOW_MEDIAN WINDOW_MIN WINDOW_MAX
-  WINDOW_COUNT WINDOW_VAR WINDOW_VARP WINDOW_STDEV WINDOW_STDEVP
-  WINDOW_PERCENTILE WINDOW_CORR WINDOW_COVAR WINDOW_COVARP
+# Window/table-calc split (WINPROBE-validated, bead 427, 2026-06-12):
+# AUTO functions translate to Sigma-NATIVE window math emitted as chart-element
+# viz formulas on the yAxis by build-charts-from-signals.rb — single DM base
+# element, ZERO Custom SQL (930/930 cells exact vs warehouse). MANUAL functions
+# have no validated mapping and still require human translation (Custom SQL or
+# re-authoring). See refs/window-functions.md for the full mapping table.
+TABLEAU_WINDOW_FNS_AUTO = %w[
+  WINDOW_SUM WINDOW_AVG WINDOW_MIN WINDOW_MAX WINDOW_COUNT WINDOW_STDEV
   RUNNING_SUM RUNNING_AVG RUNNING_COUNT RUNNING_MIN RUNNING_MAX
-  RANK RANK_DENSE RANK_MODIFIED RANK_PERCENTILE RANK_UNIQUE
-  INDEX FIRST LAST SIZE TOTAL
-  LOOKUP PREVIOUS_VALUE
+  RANK RANK_DENSE RANK_PERCENTILE
+  INDEX TOTAL LOOKUP
 ].freeze
+TABLEAU_WINDOW_FNS_MANUAL = %w[
+  WINDOW_MEDIAN WINDOW_PERCENTILE WINDOW_CORR WINDOW_COVAR WINDOW_COVARP
+  WINDOW_VAR WINDOW_VARP WINDOW_STDEVP
+  RANK_MODIFIED RANK_UNIQUE
+  FIRST LAST SIZE PREVIOUS_VALUE
+].freeze
+TABLEAU_WINDOW_FNS = (TABLEAU_WINDOW_FNS_AUTO + TABLEAU_WINDOW_FNS_MANUAL).freeze
 
 def detect_window_fns(formula)
   TABLEAU_WINDOW_FNS.select { |fn| formula =~ /\b#{Regexp.escape(fn)}\s*\(/i }
+end
+
+def detect_manual_window_fns(formula)
+  TABLEAU_WINDOW_FNS_MANUAL.select { |fn| formula =~ /\b#{Regexp.escape(fn)}\s*\(/i }
 end
 
 def lod?(formula)
@@ -103,28 +117,55 @@ def gotchas(formula)
   notes << 'Tableau IF/IFNULL falls through to ELSE on NULL; Sigma If returns Null — wrap nullable source with Coalesce' \
     if formula =~ /\bIF\b[\s\S]+(>=|<=|=|<|>)/i
 
-  hits = detect_window_fns(formula)
-  if hits.any?
-    notes << "REQUIRES SIGMA CUSTOM SQL ELEMENT (kind: \"sql\"). Tableau window functions detected: #{hits.join(', ')}. " \
-             'Sigma CountOver/SumOver/RankOver/etc. SILENTLY ERROR in DM calc columns and grouping-table master ' \
-             'calcs — translate as ANSI SQL OVER(...) inside a Custom SQL element on the data model.'
+  manual_hits = detect_manual_window_fns(formula)
+  auto_hits   = detect_window_fns(formula) - manual_hits
+  if auto_hits.any?
+    notes << "AUTO-TRANSLATED when plotted (WINPROBE-validated mapping, refs/window-functions.md): #{auto_hits.join(', ')} → " \
+             'Sigma-NATIVE window math emitted as a CHART-element viz formula on the yAxis by build-charts-from-signals.rb. ' \
+             'RUNNING_*→Cumulative*; WINDOW_AVG/SUM/MAX/MIN(x,-n,0)→Moving*(x,n); agg/WINDOW_SUM(agg)→PercentOfTotal(agg,"grand_total"); ' \
+             'RANK/RANK_DENSE/RANK_PERCENTILE→Rank/RankDense/RankPercentile(agg,"desc"); INDEX()→RowNumber(); LOOKUP(x,±n)→Lag/Lead(x,n); ' \
+             'RUNNING_SUM/TOTAL pareto→CumulativeSum(PercentOfTotal(agg,"grand_total")); unbounded WINDOW_MAX/MIN/SUM→hidden two-level ' \
+             'grouped helper (consumer re-aggregates Max/Min, NEVER Sum). Single DM base element, NO Custom SQL. ' \
+             'Placement: chart yAxis ONLY — these silently error in DM calc columns and grouping-table master calcs, ' \
+             'and the *Over family (SumOver/RankOver/...) is "Unknown function" in every spec context.'
+  end
+  if manual_hits.any?
+    notes << "MANUAL. #{manual_hits.join(', ')} has no validated Sigma chart-formula mapping — port via a Custom SQL " \
+             'data-model element (kind: "sql", ANSI OVER(...)) or re-author in Sigma. Also MANUAL: any compute-using/' \
+             'addressing override beyond the default Table(Across) / a simple partition ("restart every", pane-relative, ' \
+             'compute-along-non-axis-dim) — build-charts emits these as flags, never guesses.'
   end
 
-  if formula =~ /\{\s*FIXED\b/i
-    notes << 'REQUIRES SIGMA CUSTOM SQL ELEMENT. {FIXED <dim>:<agg>} pre-aggregates at a fixed grain — ' \
-             'translate as <agg>(<expr>) OVER (PARTITION BY <dim>) or a pre-aggregated subquery joined back.'
+  if formula.scan(/\{\s*FIXED/i).length >= 2
+    notes << 'AUTO-DECOMPOSED (nested LOD): {FIXED…{FIXED…}} becomes a helper-element CHAIN — ' \
+             'build-charts-from-signals.rb writes the per-level plan to the -lod-chains.json sidecar ' \
+             '(innermost first); build one grouped element per level, each outer level sourcing the inner ' \
+             'element WITH groupingId (or a Custom SQL GROUP BY) or outer Avg/Median/Count come out row-weighted.'
+  elsif formula =~ /\{\s*FIXED\b/i
+    notes << 'AUTO-TRANSLATED when plotted: {FIXED <dims>:<agg>} becomes a hidden two-level grouped helper element ' \
+             '(visibleAsSource:false; inner grouping = the FIXED dims computing the LOD aggregate, outer grouping = ' \
+             'the chart dims computing the 2nd-stage aggregate; the chart Max()es the outer calc). ' \
+             '⚠ carried chart dims must be functionally dependent on the FIXED dims — verify in Sigma. ' \
+             'NEVER translate as SumOver/CountOver in master or DM-element calc columns (silent error).'
   end
   if formula =~ /\{\s*INCLUDE\b/i
-    notes << 'REQUIRES SIGMA CUSTOM SQL ELEMENT. {INCLUDE <dim>:<agg>} — fine-grain subquery joined back to the view-grain.'
+    notes << 'MANUAL. {INCLUDE <dim>:<agg>} needs the chart grouping context: add <dim> to the chart grouping and use ' \
+             'the plain aggregate, OR a fine-grain subquery (Custom SQL element) joined back to the view grain.'
   end
   if formula =~ /\{\s*EXCLUDE\b/i
-    notes << 'REQUIRES SIGMA CUSTOM SQL ELEMENT. {EXCLUDE <dim>:<agg>} — <agg>(<expr>) OVER (PARTITION BY <view-dims-minus-excluded>).'
+    notes << 'MANUAL. {EXCLUDE <dim>:<agg>} needs the chart grouping context: remove <dim> from the chart grouping and ' \
+             'use the plain aggregate, OR <agg>(<expr>) OVER (PARTITION BY <view-dims-minus-excluded>) via Custom SQL.'
   end
   notes
 end
 
+# FIXED LODs and the AUTO window/table-calc family are auto-translated (hidden
+# grouped helper / Sigma-native chart viz formulas — see gotchas above), so
+# they no longer force the Custom-SQL decision path or the exit-4 workbook
+# handoff. Only the MANUAL window residues (WINDOW_MEDIAN/PERCENTILE/CORR/...,
+# PREVIOUS_VALUE, SIZE, FIRST/LAST) and INCLUDE/EXCLUDE LODs still do.
 def requires_custom_sql?(formula)
-  detect_window_fns(formula).any? || !!lod?(formula)
+  detect_manual_window_fns(formula).any? || !!(formula =~ /\{\s*(INCLUDE|EXCLUDE)\b/i)
 end
 
 # ---- Metadata API path --------------------------------------------------

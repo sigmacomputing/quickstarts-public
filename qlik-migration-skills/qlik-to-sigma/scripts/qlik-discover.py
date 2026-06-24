@@ -76,6 +76,10 @@ _LOCK = threading.Lock()
 # --pool the true total, whatever shape the fan-out has.
 _SEM = threading.Semaphore(8)
 
+# On-prem (client-managed) Qlik Sense: point QLIK_BIN at scripts/qlik-onprem-shim.py
+# (qlik-cli is Cloud-only; the shim speaks the same command subset over QRS + Engine).
+QLIK_BIN = os.environ.get("QLIK_BIN", "qlik")
+
 TRANSIENT_RX = re.compile(
     r"session closed|socket: close|websocket|connection reset|broken pipe"
     r"|unexpected EOF|timed? ?out|temporarily unavailable"
@@ -99,7 +103,7 @@ def qlik_run(args, attempts=4):
     out = None
     for attempt in range(attempts):
         with _SEM:
-            out = subprocess.run(["qlik", *args], capture_output=True, text=True)
+            out = subprocess.run([QLIK_BIN, *args], capture_output=True, text=True)
         if out.returncode == 0:
             return out
         if attempt < attempts - 1 and TRANSIENT_RX.search((out.stderr or "") + (out.stdout or "")):
@@ -113,14 +117,31 @@ def qlik_run(args, attempts=4):
 
 def qlik(*args, parse_json=True):
     out = qlik_run(list(args))
-    if out.returncode != 0 and parse_json:
-        sys.stderr.write(f"WARN {' '.join(args)} -> {out.stderr[:160]}\n")
+    if out.returncode != 0:
+        # Warn on ANY non-zero exit — including parse_json=False calls like the
+        # load-script fetch, whose failure was previously swallowed silently.
+        sys.stderr.write(f"WARN {' '.join(str(x) for x in args)} -> {((out.stderr or out.stdout) or '')[:200]}\n")
     if not parse_json:
         return out.stdout
     try:
         return json.loads(out.stdout or "null")
     except json.JSONDecodeError:
         return None
+
+
+def _reflines(refline):
+    """Normalize a Qlik object's refLine config -> {x:[...], y:[...]} of
+    {show,label,color,value,expr}. refLinesX = X-axis lines, refLines = Y/measure."""
+    def conv(arr):
+        out = []
+        for r in (arr or []):
+            e = r.get("refLineExpr") or {}
+            out.append({"show": r.get("show", True),
+                        "label": r.get("label") or e.get("label"),
+                        "color": r.get("color") or (r.get("paletteColor") or {}).get("color"),
+                        "value": e.get("value"), "expr": e.get("label")})
+        return out
+    return {"x": conv(refline.get("refLinesX")), "y": conv(refline.get("refLines"))}
 
 
 def awrite(path, obj):
@@ -243,6 +264,24 @@ def qlik_eval(app, ctx_args, expr):
     return lines[1].strip() if out.returncode == 0 and len(lines) >= 2 else None
 
 
+def _resolve_title(props, app, ctx_args):
+    """A chart title may be a STATIC string or a Qlik string-expression
+    ({qStringExpression:{qExpr:"='Total Revenue = ' & num(Sum(...))"}}). Return a
+    plain string: static as-is, dynamic EVALUATED via the engine to its rendered
+    text (a snapshot — matches what Qlik shows). Without this the dict reached the
+    builder as the element name and the title rendered broken/blank."""
+    for t in [(props.get("qMetaDef") or {}).get("title"), props.get("title")]:
+        if isinstance(t, str) and t.strip():
+            return t
+        if isinstance(t, dict):
+            qexpr = (t.get("qStringExpression") or {}).get("qExpr")
+            if qexpr:
+                val = qlik_eval(app, ctx_args, qexpr)
+                if val not in (None, ""):
+                    return val
+    return None
+
+
 def bucket_expr(dims):
     """The distinct-bucket-count expression Phase 6 compares per chart —
     MUST stay in sync with migrate-qlik.rb's bucket parity (same string)."""
@@ -361,7 +400,9 @@ def main():
     results = {}
     def _script():
         with stage("script"):
-            results["script"] = qlik("app", "script", "get", "-a", a.app, *ctx, parse_json=False)
+            out = qlik_run(["app", "script", "get", "-a", a.app, *ctx])
+            results["script"] = out.stdout if out.returncode == 0 else ""
+            results["script_error"] = None if out.returncode == 0 else ((out.stderr or out.stdout) or "unknown error").strip()[:200]
 
     def _items():
         with stage("app-meta"):
@@ -406,6 +447,25 @@ def main():
     awrite(os.path.join(a.out, "dimensions.json"), dims_raw)
     app_meta = results["app_meta"]
     awrite(os.path.join(a.out, "app-meta.json"), app_meta)
+
+    # HARD FAIL if the load script — the data-model source of truth — is empty.
+    # A silent empty script yields tables=0 and a Sigma data model with no data
+    # (the "migration ran but produced nothing useful" failure). The usual cause
+    # is GetScript "GENERIC ACCESS DENIED": the app is owned by another user /
+    # unpublished and the connecting identity lacks read rights. DirectQuery apps
+    # legitimately carry no load script, so they are exempt.
+    if not script.strip() and not app_meta.get("isDirectQueryMode"):
+        sys.stderr.write("\nFATAL: load script is empty — cannot build a data model (tables=0).\n")
+        if results.get("script_error"):
+            sys.stderr.write(f"  GetScript failed: {results['script_error']}\n")
+        sys.stderr.write(
+            "  The load script is the data-model source of truth; without it the converter\n"
+            "  produces an empty model. Most common cause: the connecting identity cannot read\n"
+            "  this app (owned by another user / unpublished -> 'GENERIC ACCESS DENIED').\n"
+            "  Fix one of: (a) run discovery as the app OWNER, (b) copy/transfer the app so the\n"
+            "  connecting identity owns it, or (c) publish it to a managed space that identity\n"
+            "  can read. (DirectQuery apps have no script and are exempt.)\n")
+        sys.exit(3)
 
     # sheets first, so each chart can be annotated with its sheet
     charts, sheets, obj_sheet = [], [], {}
@@ -486,7 +546,7 @@ def main():
                     break
         rec = {
             "id": oid, "vizType": qtype,
-            "title": (props.get("qMetaDef") or {}).get("title") or (props.get("title")),
+            "title": _resolve_title(props, a.app, ctx),
             "sheet": obj_sheet.get(oid),
             "dimensions": [ (dd.get("qDef", {}).get("qFieldDefs") or [dd.get("qLibraryId")]) for dd in qdims ],
             "dimLabels": [ ((dd.get("qDef", {}).get("qFieldLabels") or [None]) or [None])[0] for dd in qdims ],
@@ -495,6 +555,14 @@ def main():
             "measureLabels": [ mm.get("qDef", {}).get("qLabel") for mm in qmeas ],
             "measureFmts": [ (mm.get("qDef", {}).get("qNumFormat") or {}).get("qFmt") for mm in qmeas ],
             "sort": sort,
+            # color encoding (byMeasure gradient / byDimension category) so the
+            # builder can reproduce the Qlik chart's color, not default it.
+            "color": props.get("color"),
+            # reference lines (e.g. a "Margin Target" at x=0.45). refLinesX sit on
+            # the X axis, refLines on the measure/Y axis. The builder emits Sigma
+            # refMarks from these. value comes from refLineExpr.value (a constant)
+            # or refLineExpr.label (an expression string).
+            "refLines": _reflines(props.get("refLine") or {}),
         }
         # Filter objects (control-targeting wave): a listbox's field lives on
         # qListObjectDef (NOT the hypercube), and an alternate-state object

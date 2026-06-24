@@ -98,6 +98,28 @@ need engineering triage before the workbook can be quoted.
 {{complexity_table}}
 
 **Total unhandled features across the site: {{total_unhandled}}** spanning {{n_workbooks_with_unhandled}} workbooks. Each gets a `gap-scout` subagent at migration time.
+
+{{#has_consolidation}}
+---
+
+## 8b. Consolidation candidates
+
+Workbook **variants** detected on the same datasource — copies that differ only
+by a filter value, a year, or a copy/test suffix. In Sigma each group collapses
+into **one workbook plus a control**, avoiding the extra conversions and
+leaving one asset to govern. Recommendations are conservative — `consolidate`
+only when the actually-used fields and sheet structure overlap heavily AND the
+differences map to a control.
+
+{{consolidation_table}}
+
+**{{n_consol_groups}} candidate group(s)** — {{n_consolidate}} recommended to
+consolidate, {{n_consol_review}} to review side-by-side; **{{conversions_avoidable}}
+conversion(s) avoidable**. During migration you'll be prompted per group
+(*consolidate into one workbook with controls* vs *migrate as-is*); decisions are
+recorded in `migration-plan.json` for the conversion handoff. Full per-group
+evidence in `consolidation-candidates.json`.
+{{/has_consolidation}}
 {{/has_shortlist}}
 
 {{^has_shortlist}}

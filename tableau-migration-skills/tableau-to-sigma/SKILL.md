@@ -18,10 +18,99 @@ that mirrors the Tableau dashboard layout as closely as possible.
 - `refs/column-gotchas.md` — column naming rules and special-character landmines
 - `refs/data-model-spec.md` — data model JSON schema, element format, relationship format
 - `refs/workbook-layout.md` — Ruby layout generation (mandatory), multi-series chart patterns
+- `refs/story-points.md` — Tableau stories → one Sigma page per story point (`build-story-pages.rb`)
+- `refs/blending.md` — data-blend detection + routing decision tree (same-warehouse repoint / VDS materialize / flag)
+- `refs/window-functions.md` — Tableau window/table calcs → Sigma-native window math (WINPROBE-validated mapping table, two-level helper shape, sort/partition/week-anchor rules, manual residues)
+- `refs/coverage-matrix.md` — converter-wide Tableau→Sigma coverage matrix (every construct → Sigma output + status: ✅ spec / 🧩 workbook pattern / 🔐 reported / 🟡 verify / ❌ flagged / ⛔ silent gap). Static companion to the per-workbook `scan-workbook-gaps.rb` readout.
 
-**For canonical workbook spec shape** (element kinds, source kinds, controls, formulas, formatting), defer to the sibling **`sigma-workbooks`** skill at `~/sigma-skills/sigma-workbooks/`. This skill restates only the Tableau-conversion-specific patterns; everything else (KPI fields, color channel, pivot-table shape, manual sources, container styling, YAML default, etc.) lives there. Read `sigma-workbooks/reference/specification/` whenever you need the current spec surface.
+**For canonical workbook spec shape** (element kinds, source kinds, controls, formulas, formatting), defer to the companion **`sigma-workbooks`** skill, which ships as the **`sigma-authoring`** plugin in this same marketplace — install it alongside this converter (it's the canonical Sigma workbook spec reference, and this converter assumes it is present). This skill restates only the Tableau-conversion-specific patterns; everything else (KPI fields, color channel, pivot-table shape, manual sources, container styling, YAML default, etc.) lives there. Read its `reference/specification/` whenever you need the current spec surface.
 
 ---
+
+## One command (orchestrated path)
+
+```bash
+eval "$(scripts/get-token.sh)"
+# PASS 1 — discover → gap gate → DM-reuse scan → DM → workbook → layout → parity plan
+ruby scripts/migrate-tableau.rb \
+  --workbook "<name>" --connection <SIGMA_CONNECTION_ID> --folder <SIGMA_FOLDER_ID> \
+  [--db CSA --schema TJ] [--name '<prefix>'] [--row-scale 1.5] \
+  [--reuse-dm [ID]] [--force] [--yes]
+# … pass 1 auto-fills <workdir>/parity-actuals.json via the pooled CSV-export
+#   collector (collect-parity-actuals.rb); run the printed mcp-v2 queries for
+#   the REMAINING charts only (pivot grids) and merge them in …
+# PASS 2 — finalize: phase6 verify + cleanup-orphans + census-aware hard gate
+ruby scripts/migrate-tableau.rb --workbook "<name>" \
+  --finalize --actuals <workdir>/parity-actuals.json [--allow-missing-tiles N]
+```
+
+> **Converter backend — LOCAL by default, never upload customer data silently.** The
+> mechanical path needs the Tableau→Sigma converter. It runs **locally** when
+> `TABLEAU_MCP_BUILD` points at a `build/tableau.js` (or a locally-run `sigma-data-model`
+> MCP) — **nothing leaves the machine**, which is required for customers who can't send
+> `.twb` contents (schema/SQL/formulas) off-box. The **hosted** converter
+> (`https://sigma-data-model-mcp.onrender.com/mcp`) is used **only** with explicit consent
+> (`--converter hosted` or `SIGMA_CONVERTER_ALLOW_HOSTED=1`) because it uploads the `.twb`
+> to a third-party server. With neither, pass 1 STOPS and prints both options — it never
+> falls back to hosted on its own. See QUICKSTART "the data-model converter backend".
+
+> **Parity is EXACT for warehouse-backed migrations — never blame "drift."** Sigma
+> queries the **same warehouse** the Tableau source reads, so a value gap is a real
+> bug (a missing view filter / NULL bucket, an ungrouped table, a wrong aggregate),
+> NOT data freshness. The drift-tolerance path (`extract-mode`) is **only** valid for
+> `hasExtracts=true` workbooks (frozen `.hyper` snapshots) and must be explicitly
+> flagged. Do not attribute a gap to drift on a live-warehouse source, and do not
+> declare GREEN while a table renders base-row-count detail or a chart shows a
+> NULL-dominant bucket — run `scripts/lib/preflight_lint.rb` on the spec first.
+
+Chains the scripted spine (discover → scan-workbook-gaps → discover-columns →
+find-or-pick-dm → DM build/validate/post → build-charts-from-signals → workbook
+post-and-readback → build-dashboard-layout + put-layout → phase6-parity →
+cleanup-orphan-workbooks + assert-phase6-ran) and STOPS with exact instructions
+wherever agent judgment is genuinely required. Phase 1 is **interleaved**:
+Tableau discovery + gap scan run as a background lane while the pure-Sigma-side
+read-only phases (1.6 DM-reuse scan, 2 warehouse columns) run concurrently; the
+lanes join before anything consumes discovery output, so every designed
+stop/gate fires exactly as in the serial flow. A `PHASE TIMINGS` summary line
+prints at every terminal exit so the speedup stays visible. Exit codes: `10` = OPEN QUESTIONS
+(re-run with `--yes`/`--answers`), `11` = ❌-unhandled gap-scan features (close via
+gap-scout or `--force`), `12` = pass 1 done, parity PENDING (collect mcp-v2 actuals,
+then `--finalize`), `4` = DM posted but the workbook layer needs the agent path,
+`3` = a gate failed, `14` = migration GREEN + Phase E proposals pending
+acceptance, `0` = ALL gates green (only reachable via `--finalize`).
+DM-reuse is **reuse-first** — auto-reuses an existing DM that covers all the
+workbook's source tables (collapsing duplicate-DM sprawl, skipping the POST);
+`--reuse-dm <id>` pins one, `--skip-reuse-scan` forces build-new.
+Optional `--enhance [--enhance-accept <ids|all-low-risk>]` runs Phase E
+(opt-in) after all gates are green — see the Phase E section below.
+
+**Still manual by design (the orchestrator stops and tells you):**
+- **Parity actuals (pivot grids only)** — pass 1 now collects actuals for every
+  exportable chart itself: `collect-parity-actuals.rb` pools the element CSV
+  exports (`POST /v2/workbooks/{wb}/export` → poll → download, 5-wide, under
+  `sigma_rest`'s auto-refresh) straight into `parity-actuals.json`. Only
+  pivot-tables stay agent-mediated (their CSV export is the WIDE grid, not the
+  long row/col/value tuples the plan compares) — pass 1 prints exactly those
+  `mcp__sigma-mcp-v2__query` calls; merge their rows into the same file.
+- **Empty-view-CSV recovery** — a view that exports an empty CSV produces no
+  chart; surfaced at the OPEN-QUESTIONS checkpoint AND by the tile census at
+  `--finalize` (exit 7 → rebuild the chart manually or explain with
+  `--allow-missing-tiles`, naming the zones in your report).
+- **Master-level calc overrides** — when the workbook layer exits 4 naming a
+  field like `master/ship speed category`, translate the Tableau calc (see
+  `calc-fields.json`) and re-run the same command with
+  `--master-col 'Name=<Sigma formula>'`.
+- **Shared relative-date filters** — a dashboard-wide filter like
+  `'Order Date ' = this year` only surfaces as a uniform parity DIVERGE (every
+  Sigma value too big). Fix: expose the date key on the DM if the converter
+  consumed it, add a master boolean (e.g. `[Order Year] = Year(Today())`) plus a
+  master `filters: [{id, columnId, kind: list, mode: include, values: [true]}]`
+  entry — it propagates to every chart sourcing the master — then re-query and
+  re-`--finalize`. (Validated live on Orders Conversion Test, 2026-06-10.)
+- **❌-unhandled gap features** — gap-scout subagent or `--force` (degraded).
+- **DM-reuse shape preflight** — when `--reuse-dm` hits a differently-shaped DM
+  the workbook gate exits 4; run Phase 1.5b (`inspect-dm-shape.rb`) and the
+  agent path against the reused DM.
 
 ## Scripts
 
@@ -31,18 +120,20 @@ which calc translation, which layout) — not orchestration.
 
 | Script | Purpose |
 |---|---|
+| `scripts/migrate-tableau.rb` | **The one command** — chains the whole scripted spine (gap gate → DM-reuse scan → DM → workbook → layout → two-pass parity → cleanup + census gate) and stops with exact instructions where agent judgment is required. See "One command" above. |
 | `scripts/setup.rb` | One-time Sigma credential setup |
 | `scripts/get-token.sh` | Exchange `SIGMA_CLIENT_ID`/`SIGMA_CLIENT_SECRET` for `SIGMA_API_TOKEN` (~1h TTL) |
 | `scripts/setup-tableau.rb` | One-time Tableau PAT setup (only needed for PAT mode — see `refs/tableau-rest.md`) |
 | `scripts/get-tableau-token.sh` | One-shot signin → exports `TABLEAU_AUTH_TOKEN` + `TABLEAU_SITE_ID` |
-| `scripts/tableau-discover.rb` | PAT-mode Phase 1 discovery in one CLI: workbook + views + VDS metadata + GraphQL + .twb content |
-| `scripts/scan-workbook-gaps.rb` | **Phase 0a (mandatory):** scan a `.twb` and emit `gaps-report.md` + `gaps.json` categorising every feature into ✅ auto / ⚠️ hint / 🛠 manual / ❌ unhandled. Run BEFORE any other phase. |
+| `scripts/tableau-discover.rb` | PAT-mode Phase 1 discovery in one CLI: workbook + views + VDS metadata + GraphQL + .twb content. ONE unified fetch pool (default 5, `--pool N`, longest-job-first) with 429/timeout backoff + 401 re-mint; always writes per-task `timings.json`. Measured 61.8s → 13.7–18.9s on the 7-view reference workbook |
+| `scripts/scan-workbook-gaps.rb` | **Phase 0a (mandatory):** scan a `.twb` and emit `gaps-report.md` + `gaps.json` categorising every feature into ✅ auto / ⚠️ hint / 🛠 manual / ❌ unhandled. Run BEFORE any other phase. Also detects multi-datasource **data blends** (secondary `datasource-dependencies` + linking fields) and writes `blend-plan.json` with a per-blend route — same-warehouse-repoint / materialize-via-vds / flag-unreachable (decision tree: `refs/blending.md`). |
 | `scripts/gap-scout.md` | **Phase 0a-scout:** subagent prompt + protocol for resolving ❌ Unhandled gaps. Main agent spawns one scout per gap via the Agent tool. |
 | `scripts/validate-sigma-formula.rb` | Scout primitive: POST a tiny test workbook with a candidate formula, read back column types, return JSON `{ status: ok|error }`. Auto-expands the DM element's columns onto the test master so candidate refs to real data resolve. |
-| `scripts/scout-validate-and-persist.rb` | Scout wrapper: call validate-sigma-formula, on success append the rule to `~/.tableau-to-sigma/learned-rules.yaml` (customer's HOME, never the skill repo), on failure write `~/.tableau-to-sigma/escalations/<ts>-<slug>.yaml` AND auto-file a GitHub or beads issue. |
+| `scripts/scout-validate-and-persist.rb` | Scout wrapper: call validate-sigma-formula, on success append the rule to `~/.tableau-to-sigma/learned-rules.yaml` (customer's HOME, never the skill repo), on failure write `~/.tableau-to-sigma/escalations/<ts>-<slug>.yaml` AND return an opt-in `escalate-gap.py` command (confirm-before-file). |
+| `scripts/escalate-gap.py` | Shared opt-in issue filer. Dry-run by default (drafts the issue + dedupes against open issues/beads); files only with `--yes`. Routes by gap category: converter→`sigma-data-model-manager`+`sigma-data-model-mcp` (mirrored), builder/skill→`sigma-migration-skills`. |
 | `scripts/learned-rules.rb` | Loader module: reads `~/.tableau-to-sigma/learned-rules.yaml` at startup. Customer-discovered rules apply BEFORE the built-in translators in `build-charts-from-signals.rb`. |
-| `scripts/parse-twb-layout.rb` | Parse a `.twb` XML file into a per-dashboard zone list plus a sister `*-meta.json` (worksheets + shared_filters + parameters + column_aliases). Per chart zone surfaces: position (`x/y/w/h%`), `chart_kind`, `mark_class`, `geo_role`, `sort`, `filters` (with resolved column captions + member values + action-vs-value flag), `aggregations`, `channels`, `formats` (Tableau format strings → Sigma d3-format with paren-negative handling), `calculations`, `dual_axis` (synchronized-axes detection), `ref_marks` (reference lines/bands/trendlines), `filter_column_caption`. |
-| `scripts/build-charts-from-signals.rb` | Generate Sigma chart-element specs from parse-twb-layout output + view CSVs + master-column map. Auto-translates: column aliases → `Switch(…)` calc, parameter-driven CASE/IF chains → `Switch([ctl-param-x], …)` with controlId rewrite per page, table calcs (INDEX/LOOKUP/TOTAL/RANK/ZN/IIF/COUNTD) → Sigma equivalents, Tableau formats (p%.%/C1033%/`(neg)`) → Sigma d3-format. Honors `--page-per-worksheet`, `--auto-controls`. Loads customer learned-rules first. Writes `*-actions.md` companion listing Tableau action filters for post-publish cross-filter setup. |
+| `scripts/parse-twb-layout.rb` | Parse a `.twb` XML file into a per-dashboard zone list plus a sister `*-meta.json` (worksheets + shared_filters + parameters + column_aliases). Per chart zone surfaces: position (`x/y/w/h%`), `chart_kind`, `mark_class`, `geo_role`, `sort`, `filters` (with resolved column captions + member values + action-vs-value flag), `aggregations`, `channels`, `formats` (Tableau format strings → Sigma d3-format with paren-negative handling), `calculations`, `dual_axis` (synchronized-axes detection), `ref_marks` (reference lines/bands/trendlines), `filter_column_caption`. Detects Tableau **stories** (both `<story>` and storyboard-dashboard shapes): flags storyboard dashboards `is_story: true` and writes `story-plan.json` (story → ordered points with captions + captured sheets) — when present, run `build-story-pages.rb`. Bin calc columns surface `bin_size`/`bin_peg`. |
+| `scripts/build-charts-from-signals.rb` | Generate Sigma chart-element specs from parse-twb-layout output + view CSVs + master-column map. Auto-translates: column aliases → `Switch(…)` calc, parameter-driven CASE/IF chains → `Switch([ctl-param-x], …)` with controlId rewrite per page, table calcs (INDEX/LOOKUP/TOTAL/RANK/ZN/IIF/COUNTD) → Sigma equivalents, `DATEPART('iso-year')` → Thursday-of-ISO-week `Year(DateAdd(...))` composition, `FINDNTH` → `SplitToArray`/`ArraySlice`/`ArrayJoin` composition, Tableau bins → native `BinFixed`/`BinRange` recipe, **nested `{FIXED}` LODs → helper-element chain** (innermost LOD = helper element 1, outer consumes `[LOD Helper k/Value]`; machine-readable sidecar `<out>-lod-chains.json`), Tableau formats (p%.%/C1033%/`(neg)`) → Sigma d3-format. Honors `--page-per-worksheet`, `--auto-controls`. Loads customer learned-rules first. Writes `*-actions.md` companion listing Tableau action filters for post-publish cross-filter setup. |
 | `scripts/extract-custom-sql.rb` | Phase 1f: pull Custom SQL blocks behind a workbook via Metadata GraphQL + .twb XML fallback. Output → `/tmp/<name>/custom-sql.json`. |
 | `scripts/lib/tableau_rest.rb` | Ruby wrapper for the Tableau REST endpoints the skill uses |
 | `scripts/estimate-cost.rb` | Predict input/output token cost from workbook + datasource metadata |
@@ -53,19 +144,25 @@ which calc translation, which layout) — not orchestration.
 | `scripts/remap-wb-spec-to-dm-ids.rb` | When a DM is re-POSTed and element IDs churn, remaps a cached `wb-spec.json` to the new IDs via name-based matching. Optional `--rename` for renamed elements. |
 | `scripts/extract-calc-fields.rb` | Phase 1e: pull every Tableau calc field (with formula) via Metadata API (`POST /api/metadata/graphql`); falls back to `.twb` XML when Metadata API is unavailable. Drops VDS dependency. Caches to `<wb-dir>/calc-fields.json`. |
 | `scripts/validate-spec.rb` | DM or workbook spec validator. Accepts `--type` and `--dm-context` |
-| `scripts/post-and-readback.rb` | POST a DM or workbook spec, parse YAML response, GET back the spec, emit element ID map. Also runs a universal **column-type guard** afterward: any column whose formula resolved to type `error` aborts the script with exit 2 and the failing formula. Catches silent-error columns the validator doesn't pattern-match (typo refs, `IsIn`, unsupported functions) without waiting for Phase 6. |
+| `scripts/post-and-readback.rb` | POST a DM or workbook spec, parse YAML response, GET back the spec, emit element ID map. Also runs a universal **column-type guard** afterward: any column whose formula resolved to type `error` aborts the script with exit 2 and the failing formula. Catches silent-error columns the validator doesn't pattern-match (typo refs, `IsIn`, unsupported functions) without waiting for Phase 6. Then the shared **layout lint** (exit 3) and **control lint** (`scripts/lib/control_lint.rb`, exit 4 — dead controls / ghost targets / partial same-page reach; honors the `<workdir>/control-scope.json` sidecar, `--skip-control-lint` escape). |
+| `scripts/lib/preflight_lint.rb` | **MANDATORY before any workbook POST** — static lint of the spec that catches the two EDNA-class failure modes with a precise message instead of the opaque `Invalid kind: control` / a silently-detail-rendered table: (T1) a `table` with aggregate columns + dimensions but **no `groupings`** → renders raw 9.6M detail rows; (T2) a grouping calculation that passes through an already-aggregated column → "multiple values"; (C1/C2/C3) a `control` missing `id`/`controlId`/`controlType` nesting value fields under a `value` object (must be FLAT top-level), carrying a non-double-nested `source`, or a list-type control wired to neither `source` nor `filters` (a filters-only list control is valid). `ruby scripts/lib/preflight_lint.rb <spec.json>` (exit 1 on violations). Fix all violations before POST. Verified shapes: `sigma-workbooks` `controls.md`/`tables.md`. |
 | `scripts/put-layout.rb` | Apply a layout XML to an existing workbook (strips read-only fields) |
 | `scripts/auto-parity-plan.rb` | Phase 6a: auto-build a parity plan by matching Sigma chart elements to Tableau view CSVs (with `--rename` for renamed tiles). Output → `/tmp/<name>/parity-plan.json` wrapped as `{ extract, charts: [...] }` |
 | `scripts/verify-parity.rb` | Phase 6c: diff expected (Tableau) vs actual (Sigma) per chart. `--extract-mode` switches to structural comparison (bucket count + dim set + sort) with value-drift tolerance for hasExtracts=true workbooks |
-| `scripts/assert-phase6-ran.rb` | **Conversion hard gate (3 gates)** — exits 0 only when ALL three pass: (1) Phase 6 ran and parity-final.json shows status=PASS at the required rate, (2) no uncleaned orphan workbooks (posted-workbooks.jsonl has ≤1 entry OR cleanup-marker.json shows a successful non-dry-run cleanup), (3) the live workbook's `/columns` endpoint shows no column with `type=error` (catches circular refs / runtime errors introduced after the initial POST's column-type guard). Exits 1 for missing parity sentinel, 2 for parity FAIL / extract-mode-without-flag / charts_total==0, 4 for uncleaned orphans (beads-sigma-38a), 5 for live type=error columns (beads-sigma-38a). Subagent flows MUST call this as their final step. |
+| `scripts/assert-phase6-ran.rb` | **Conversion hard gate (8 gates)** — exits 0 only when ALL pass: (1) Phase 6 ran and parity-final.json shows status=PASS at the required rate, (2) no uncleaned orphan workbooks (posted-workbooks.jsonl has ≤1 entry OR cleanup-marker.json shows a successful non-dry-run cleanup), (3) the live workbook's `/columns` endpoint shows no column with `type=error` (catches circular refs / runtime errors introduced after the initial POST's column-type guard), (4) a non-empty top-level layout XML is applied (beads-sigma-bw3), (5) tile census — parity-final.json's `tile_census` shows no unexplained dashboard zones without a matching chart (catches the empty-view-CSV N-1-charts escape, bead gjhe; `--allow-missing-tiles N` for legitimately unbuildable zones), (6) layout lint, (7) control lint, **(8) Phase 6f visual render — a valid Sigma render PNG exists in the workdir (`sigma-render.png` or a `screenshots/_manifest.json` entry), proving the mandatory full-dashboard visual comparison could run. Closes the "declared done on HTTP 200 / CSV-parity-only" regression where the workbook shipped without anyone rendering the PNG.** Exits 1 for missing parity sentinel, 2 for parity FAIL / extract-mode-without-flag / charts_total==0, 4 for uncleaned orphans, 5 for live type=error columns, 6 for missing layout, 7 for census failure, 8 for layout-lint violations (`lib/layout_lint.rb`, `--skip-layout-lint`), 9 for control-lint violations (`lib/control_lint.rb` — dead controls / ghost targets / partial reach / control-scope coverage; `--skip-control-lint`, `--control-scope PATH`), 10 for missing visual render (`--sigma-render PATH`, escape hatch `--skip-visual-gate "<reason>"`). Subagent flows MUST call this as their final step. |
+| `scripts/probe-controls.rb` | **Phase 6 (optional) — control flip test**: per control, export one in-closure element CSV with and without `parameters:{controlId: <first non-default value>}` (must differ) and, with `--check-out-of-closure`, one out-of-closure element (must NOT differ). Runtime proof the wiring works; the static check is gate 7. Shared, vendored byte-identical (md5 discipline). See `refs/control-parity.md`. |
 | `scripts/cleanup-orphan-workbooks.rb` | Delete orphan workbooks left by spec-iteration retries. Reads `<workdir>/posted-workbooks.jsonl`, keeps the most-recent ID, deletes the rest via `DELETE /v2/files/{id}`. Writes `cleanup-marker.json` so the hard gate can confirm cleanup ran (and wasn't `--dry-run`). Idempotent (404 on delete is treated as success). See beads-sigma-38a. |
 | `scripts/build-dashboard-layout.rb` | **MANDATORY in Phase 5d** (dashboard-fidelity mode) — auto-build the Sigma layout XML from the parsed Tableau zone tree (`dashboard-layout.json`) + the workbook readback IDs (`wb-ids.json`). Positions each chart at the grid cell derived from its zone's x/y/w/h%. Without this step, the workbook PUTs without a top-level layout and Sigma renders elements as a single-column stack — see `assert-phase6-ran.rb` gate 4 (beads-sigma-bw3). |
-| `scripts/export-chart-png.rb` | Phase 6d (visual): export PNG screenshots of every chart in the converted Sigma workbook via `/v2/workbooks/{wb}/export` → `/v2/query/{q}/download`. Catches visual regressions CSV value parity can miss (silently-dropped log scale, missing data labels, wrong chart kind, palette drift). Output: per-element PNGs + `_manifest.json`. Pair with the Tableau MCP `get-view-image` to side-by-side compare source vs target. |
+| `scripts/build-story-pages.rb` | **Story workbooks only** — when `parse-twb-layout.rb` wrote `story-plan.json`, emit one Sigma page per story point: pass 1 (`--spec`/`--out`) appends caption-named pages (annotation text atop + cloned elements with fresh ids/controlIds) to the workbook spec pre-POST; pass 2 (`--wb-ids`/`--layout-out`) emits the banded per-page layout + container sidecar post-readback. See `refs/story-points.md`. |
+| `scripts/export-chart-png.rb` | Phase 6d (visual) **drill-down only** — per-element PNGs for diagnosing a chart-level regression (dropped log scale, missing data labels, wrong kind, palette drift). **NOT the primary visual gate:** the mandatory check is **full-dashboard ↔ full-dashboard** — render the whole Sigma page with `sigma-export-png.py --page <pageId>` and compare it to the FULL source dashboard image (Tableau MCP `get-view-image` on the *dashboard view*, not each worksheet). Per-element screenshots miss layout/relationship defects (overlaps, dead zones, stranded controls, wrong relative sizing). See `refs/layout-visual-qa.md`; loop-fix-and-re-render until the full page matches the source — never declare done on HTTP 200. |
+| `scripts/pick-destination.rb` | **Phase 0b:** list build destinations (`list` → workspaces + editable folders + My Documents) and create folders (`create --name [--parent]`). Drives the "where should this land?" prompt when no `--folder`/`SIGMA_FOLDER_ID` is given. `folderId` accepts a workspace id (workspace root) or a folder id. Shared across the migration skills. |
 | `scripts/find-or-pick-dm.rb` | Phase 1.5: scan existing DMs in the org and recommend reuse when one already covers the workbook's columns. Score = 0.7·column-overlap + 0.2·table-overlap + 0.1·metric-overlap. Parallel-fetches DM specs (~2s for 50 DMs). Output: `dm-match.json` with ranked candidates + recommendation. Non-destructive. Reuse skips Phase 2 + 3 entirely. `--auto-pick` flag (with tie-window safety) skips the user-confirm step when there's a clear winner. |
 | `scripts/inspect-dm-shape.rb` | Phase 1.5b (MANDATORY when reusing): inspect the reused DM's element graph and emit a denormalization plan classifying every column as `fact` (direct ref) or `dim` (needs Lookup). Output: `dm-denorm-plan.json` with the exact Lookup formula per dim column. Eliminates the 2–3 min spec-rework loop when the reused DM has separate dim elements (a non-pre-denormalized DM shape). |
 | `scripts/scan-customer-style.rb` | Phase 0c: sample N recent workbooks in the customer's Sigma org and aggregate style signals (color palettes, number-format strings, layout grids, chart-kind mix, dataLabel preference, element naming case, density). Lets the converter emit specs that match house conventions instead of generic defaults. |
 | `scripts/dev/phase-timer.sh` | **Dev / profiling only — do NOT source in customer conversions.** Source helper for phase timing when iterating on the skill itself; emits `▶`/`■` log lines per phase and a `phase-timings.json` summary. Only invoke when the user explicitly asks for timing data ("time it", "where did the minutes go", "profile"). Usage: `phase_start "<name>"` / `phase_end` around each phase, `phase_report` at the end. **Across multiple Bash tool-call blocks**, export `PHASE_TIMINGS_TMP=<path>` BEFORE the first source so the helper appends across blocks. |
 | `scripts/lib/layout.rb` | Layout-XML helpers (`gc`, `le`, `page_xml`, `assemble`) — `require`'d by per-workbook layout configs |
+| `scripts/enhance-scan.rb` | **Phase E (opt-in) part 1 — SCAN (read-only).** Source signals + built spec + live element exports → `enhancements.json` candidates `{id, category, evidence, proposed, risk, verdict_hint, patch}` + descoped propose-in-UI notes. Shared Phase-E engine, vendored byte-identical across plugins (md5 discipline). |
+| `scripts/enhance-apply.rb` | **Phase E (opt-in) part 2 — APPLY (accept-only, clone-first).** Clones the parity workbook as `"<name> — Enhanced"` (1:1 artifact never written), applies ONLY `--accept`-ed candidates one at a time, each gated by an untouched-element clone-vs-original spot-check (auto-revert on shift). Writes `enhance-report.json`. Shared engine, byte-identical twin of the tableau/powerbi copy. |
 
 ---
 
@@ -79,16 +176,19 @@ Run the setup script once:
 ruby scripts/setup.rb
 ```
 
-It writes credentials to a config file your agent loads automatically.
+It writes credentials to two places: `~/.claude/settings.json` (which Claude
+Code auto-loads) and `~/.sigma-migration/env` (a neutral, sourceable file any
+other agent or plain shell can use). The scripts fall back to the neutral file
+automatically when the env vars aren't already set, so the skill works under
+any agent.
 <!-- agents:claude-only -->
-For Claude Code that's `~/.claude/settings.json` — open a new Claude Code
-session (or run `! source ~/.claude/settings.json`) so the env vars are live.
+On Claude Code, open a new session (or run `! source ~/.claude/settings.json`)
+so the env vars are live — no manual sourcing needed thereafter.
 <!-- /agents:claude-only -->
 <!-- agents:non-claude
-Source the resulting env file in your shell before running anything that
-needs the Sigma API — e.g. `source ~/.claude/settings.json` if you let the
-script write there by default, or whatever path you configured. Then start
-a new agent session so the env vars are live.
+On other agents (Cursor, Cortex Code, plain shell), the scripts auto-source
+`~/.sigma-migration/env` for you. To have the vars live in your own shell too,
+run `source ~/.sigma-migration/env` once per session.
 agents:end -->
 
 Required env vars:
@@ -111,17 +211,17 @@ eval "$(scripts/get-token.sh)"
 
 ### Tableau access — two modes
 
-The skill supports two transports for Tableau-side discovery. **Prefer MCP** when
-it's available; the PAT path is a fallback.
+The skill supports two transports for Tableau-side discovery. **Prefer the
+API/PAT path** — it is dramatically faster (measured on "Orders Conversion
+Test", 7 views: **61.8s serial → 13.7–18.9s** with the unified fetch pool, zero
+rate-limiting at pool 5). The MCP is the **no-PAT fallback only** (each MCP
+fetch is a separate agent tool turn; the PAT CLI does everything in one
+process).
 
 | Mode | When to use | Setup |
 |---|---|---|
-| **MCP** | `mcp__tableau__*` tools are loaded in the session | None — host handles auth |
-| **PAT (REST)** | MCP tools not available, OR you need `.twb` content (layout-hint extraction, embedded datasources) | `ruby scripts/setup-tableau.rb` once, then `eval "$(scripts/get-tableau-token.sh)"` per session |
-
-**Detection at session start:** try `mcp__tableau__list-workbooks`. If the tool is
-loaded and responds, you're in MCP mode. If it errors with "tool not found", fall
-back to PAT mode.
+| **PAT (REST)** — preferred | A Tableau PAT is available (run `setup-tableau.rb` once). Also the only path to `.twb` content (layout-hint extraction, embedded datasources) | `ruby scripts/setup-tableau.rb` once, then `eval "$(scripts/get-tableau-token.sh)"` per session |
+| **MCP** — fallback | No PAT can be provisioned, and `mcp__tableau__*` tools are loaded in the session | None — host handles auth |
 
 **PAT mode in one command:**
 
@@ -129,22 +229,34 @@ back to PAT mode.
 eval "$(scripts/get-tableau-token.sh)"
 ruby scripts/tableau-discover.rb \
   --workbook-id <luid> \
-  --out /tmp/<name>
+  --out /tmp/<name>   # [--pool N] (default 5)
 ```
 
 Produces the same artifacts as MCP-driven Phase 1 in a single run: `get-workbook.json`,
 `workbook-content.twb`, `ds-metadata.json` + `graphql-fields.json` (VDS field list + GraphQL
-formulas), `views/*.csv` (fetched concurrently), and the dashboard PNG. Downstream scripts
-in Phases 2–6 are unchanged. Full endpoint inventory and gotchas in `refs/tableau-rest.md`.
+formulas), `views/*.csv`, the dashboard PNG, **and `timings.json`** (per-task
+start/duration/attempts — always written; it's the evidence trail for any future
+"discovery is slow" report). Downstream scripts in Phases 2–6 are unchanged.
+Full endpoint inventory and gotchas in `refs/tableau-rest.md`.
 
 `--datasource-name` / `--datasource-luid` are **optional** — the script parses the
 downloaded `.twb` for the first non-Parameters `<datasource caption='X'>` and looks it up
 on the site automatically. Pass `--no-auto-ds` to disable, or `--datasource-luid` to force
-a specific datasource when the workbook has multiple.
+a specific datasource when the workbook has multiple (`--datasource-luid` must be the
+**full UUID** — the REST filter has no prefix matching).
 
-View CSV fetches run in parallel (4 concurrent threads, with one auto-retry on 401 after a
-1.5s backoff per view — see `tableau-discover.rb` line ~145). The dashboard PNG is fetched solo
-afterward to avoid VizQL session contention.
+**How the pool works (and why 5):** every fetch after the initial workbook GET
+(.twb, VDS read-metadata, GraphQL fields, all view CSVs, dashboard PNG) goes
+through ONE shared pool of 5 threads, enqueued longest-job-first — the PNG
+render is the longest single fetch, so it starts at t≈0 and hides behind the
+CSV batch. **5 is the measured sweet spot; 8 risks long-tail stragglers** — at
+8 threads a contended VizQL session parked one CSV fetch for ~40s (56s total
+run vs. 13.7–18.9s at 5). The pool keeps 429/timeout exponential backoff and
+single-flight 401 re-mint machinery as insurance even though neither fired at
+pool 5 in validation. Also note Tableau's **~60s server-side render cache**:
+a view rendered within the last minute returns much faster, so back-to-back
+runs land at the fast end of the range and cold-cache runs at the slow end —
+don't read a 5s spread between runs as a regression.
 
 > **One signin attempt only.** Tableau Cloud invalidates a PAT after 4 consecutive failed
 > signins. `get-tableau-token.sh` runs exactly once; never wrap it in a retry loop.
@@ -169,10 +281,51 @@ Categories emitted:
 - **🛠 Manual** — customer wires up post-publish (action filters, ref-marks)
 - **❌ Unhandled** — feature is used in the .twb but the skill does not yet
   cover it; the agent should escalate via the `gap-scout` subagent OR file
-  an issue at github.com/sigmacomputing/quickstarts-public
+  an issue at github.com/twells89/sigma-skills-staging
 
 Share the markdown report with the customer up front to set expectations.
 Save the JSON for the subagent.
+
+## Phase 0b — Choose where to build (MANDATORY when no destination given)
+
+Never silently dump the migrated data model + workbook into an auto-picked
+folder. If the user did **not** supply a destination (no `--folder <id>` on
+`migrate-tableau.rb` and no `SIGMA_FOLDER_ID`), ASK first:
+
+1. List candidates:
+   ```bash
+   ruby scripts/pick-destination.rb list
+   # -> { "workspaces":[{id,name}], "folders":[{id,name,parentId,parentName}], "myDocuments": <id|null> }
+   ```
+2. Present the options to the user and let them pick ONE:
+   - a **workspace** (content lands in the workspace root — pass its `id` as the folder)
+   - an existing **folder** (use its `id`; `parentName` shows its workspace)
+   - **My Documents** (only when `myDocuments` is non-null — null for service-account tokens)
+   - **create a new folder** (optionally inside a chosen workspace/folder):
+     ```bash
+     ruby scripts/pick-destination.rb create --name "<name>" [--parent <workspace-or-folder-id>]
+     # -> { "id", "name", "parentId" }
+     ```
+3. Pass the chosen id to the migration as `--folder <id>` — it flows into both
+   the DM and workbook POSTs.
+
+`folderId` accepts a workspace id (lands in the root) **or** a folder id. If the
+user already passed `--folder` / `SIGMA_FOLDER_ID`, honor it silently — do NOT ask.
+
+> **Data blending:** when the scanner writes `blend-plan.json`, route each
+> blend BEFORE Phase 2 using its `route` field — (a) `same-warehouse-repoint`
+> → one DM, both sources as elements + relationship on the linking fields
+> (deep-walk `connectionId` incl. `joins[].left/right` when repointing);
+> (b) `materialize-via-vds` → run the **tableau-vds-to-cdw** skill to land the
+> secondary in the primary's warehouse first; (c) `flag-unreachable` → keep
+> manual, report the linking fields. Full decision tree: `refs/blending.md`.
+
+> **Story points:** when `parse-twb-layout.rb` writes `story-plan.json`
+> (Phase 1d), plan one Sigma page per story point and run
+> `scripts/build-story-pages.rb` in Phase 5 (spec pass) and Phase 5d (layout
+> pass). Storyboard dashboards are flagged `is_story: true` in
+> `dashboard-layout.json` — do NOT build a regular page from the flipboard
+> chrome. See `refs/story-points.md`.
 
 ### Phase 0a-scout — spawn the gap-scout subagent for unhandled features
 
@@ -191,8 +344,13 @@ customer's Sigma site via `scripts/validate-sigma-formula.rb`, and:
   (the customer's home dir — `git pull` of the skill cannot clobber it).
   All future workbook conversions on this machine pick up the rule via
   `scripts/learned-rules.rb` automatically.
-- on failure → writes to `~/.tableau-to-sigma/escalations/` and (Phase 4)
-  files a GitHub issue via `gh`.
+- on failure → writes to `~/.tableau-to-sigma/escalations/` and returns an
+  **opt-in** `escalate-gap.py` command. Filing a tracking issue is never
+  automatic: run the returned `escalation.dry_run_cmd` to draft the issue
+  (shows target repo + dedupe), show the user, and only re-run with `--yes`
+  if they accept. Calc-field gaps route to the converter repos
+  (`sigma-data-model-manager` + `sigma-data-model-mcp`, mirrored) with a
+  cross-linked bead. See "Opt-in issue filing" in `scripts/gap-scout.md`.
 
 The build script (`build-charts-from-signals.rb`) loads learned rules at
 startup; matching rules apply *before* the built-in translators, so customer-
@@ -226,37 +384,6 @@ Tableau dashboard's zone x/y/w/h percentages (parse-twb-layout already
 extracts these).
 
 For page-per-worksheet mode, pass `--page-per-worksheet`.
-
----
-
-### Phase 0c — Ask user how to identify warehouse tables (MANDATORY, runs right after URL resolution)
-
-After resolving the URL to a workbook (Phase 1a) and **before any Sigma catalog search, DM picker, or warehouse column discovery**, run `prompt-data-location.rb` to ask the user how they want Claude to identify the warehouse tables for this conversion.
-
-```bash
-ruby scripts/prompt-data-location.rb --workdir /tmp/<name>
-```
-
-The script offers three modes and writes `/tmp/<name>/data-location.json` with a `mode` field:
-
-- `"mode": "user-provided"` — user supplied `connection_name`, `database`, `schema`. Use these values directly. No catalog search needed.
-- `"mode": "auto-search"` — user authorized Claude to search Sigma's catalog. You may now call `mcp__sigma-mcp-v2__search`, `discover-columns.rb`, `find-or-pick-dm.rb`, etc. to find matching tables.
-- `"mode": "probe-fallback"` — user opted into brute-force probing across all connections. Slow path; many bash-approval prompts.
-
-**HARD RULE — do not call `mcp__sigma-mcp-v2__search`, `discover-columns.rb`, `find-or-pick-dm.rb`, or any other Sigma-side catalog-lookup tool until `data-location.json` exists AND its `mode` field has been read.** Doing so silently bypasses the user's authorization choice and produces invisible behavior — the failure mode that motivated Phase 0c in the first place. If the user picked `user-provided`, catalog search is forbidden regardless of how convenient it would be.
-
-**When `mode == "user-provided"`:**
-- Phase 1.5 (find-or-pick-dm) scopes the DM search to candidates that source from this connection + schema.
-- Phase 2 (warehouse columns) resolves `connection_name` → connection ID via a single `GET /v2/connections` call, then uses `database.schema.<table>` directly for each Tableau-referenced table. Do NOT iterate connections or guess paths.
-
-**When `mode == "auto-search"`:**
-- Run `find-or-pick-dm.rb` and `discover-columns.rb` as normal.
-- If those find nothing, fall through to probing with a WARN telling the user they can re-run `prompt-data-location.rb --force` to switch to `user-provided` mode.
-
-**When `mode == "probe-fallback"`:**
-- Brute-force probe with WARN.
-
-**Never synthesize a "remembered" or "saved" location** from these docs, from `refs/`, or from prior conversation. Example warehouse paths in this skill (`MYDB.MYSCHEMA.ORDERS`, `MY_CONNECTION`, etc.) are illustrative placeholders, not real defaults.
 
 ---
 
@@ -507,18 +634,24 @@ Each calc record carries:
 - `name`, `formula`, `role`, `data_type`, `aggregation`, `is_hidden` — direct from Tableau
 - `is_lod` — `true` for `{FIXED/INCLUDE/EXCLUDE}` expressions
 - `depends_on` — referenced field names (metadata-api path only)
-- `requires_custom_sql` — `true` for Tableau table calcs (`WINDOW_*`,
-  `RUNNING_*`, `RANK*`, `INDEX`, `FIRST`, `LAST`, `SIZE`, `TOTAL`, `LOOKUP`,
-  `PREVIOUS_VALUE`) and LODs. These CANNOT be Sigma DM calc columns —
-  Sigma's `CountOver` / `SumOver` / `RankOver` / `CumulativeSum` etc.
-  **silently produce `error` type columns** in a DM calc column or grouping-
-  table master calc. They MUST be implemented as a Sigma Custom SQL data-
-  model element (`kind: "sql"`). See Phase 3 below for the spec shape.
+- `requires_custom_sql` — `true` ONLY for the **manual window residues**
+  (`WINDOW_MEDIAN/PERCENTILE/CORR/COVAR(P)/VAR(P)/STDEVP`, `PREVIOUS_VALUE`,
+  `SIZE`, `FIRST`, `LAST`, `RANK_UNIQUE/MODIFIED`) and `{INCLUDE/EXCLUDE}`
+  LODs. The mainstream window/table-calc family (`WINDOW_SUM/AVG/MIN/MAX/
+  COUNT/STDEV`, `RUNNING_*`, `RANK`/`RANK_DENSE`/`RANK_PERCENTILE`, `INDEX`,
+  `LOOKUP`, `TOTAL`) is **AUTO-TRANSLATED** by `build-charts-from-signals.rb`
+  into Sigma-NATIVE window math emitted as CHART-element viz formulas on the
+  yAxis — single DM base element, zero Custom SQL (WINPROBE-validated
+  930/930 cells; full mapping table in `refs/window-functions.md`). The
+  functions still CANNOT be Sigma DM calc columns (silent `error` type) and
+  the `*Over` family is `Unknown function` everywhere — the chart yAxis is
+  the only valid placement.
 - `translation_notes` — common Tableau→Sigma gotchas to apply during the
   Phase 3 DM build: `IIF`→`If`, `COUNTD`→`CountDistinct`, IF/ELSEIF chains
   ending in literal need `Coalesce` wraps on nullable inputs (Tableau
-  collapses NULL into ELSE; Sigma `If(NULL >= …, …)` returns NULL), and the
-  full Custom-SQL escalation for window/LOD calcs.
+  collapses NULL into ELSE; Sigma `If(NULL >= …, …)` returns NULL), the
+  per-function window mapping (`refs/window-functions.md`), and the
+  Custom-SQL escalation for the manual window residues only.
 
 If the workbook has > 1000 calcs on a single page or the GraphQL response
 exceeds ~5 MB, the API may truncate. In that case re-run with
@@ -533,11 +666,9 @@ pulled from a same-named `LOYALTY_TIER` warehouse column.
 
 ### 1e.1. Warehouse-table source rejected? Fall back to Custom SQL
 
-> When a `warehouse-table` DM element points at a table that physically exists
-> in the warehouse and is queryable via `mcp__sigma-mcp-v2__query` but POST
-> still returns `Source not found: warehouse table 'DB.SCHEMA.TABLE' on
-> connection 'X'`, the cause is below. Two agents (Superstore, NASA) hit this
-> during conversion testing — the affected DM element had
+> **Verified 2026-05-24** against the `tj-wells-1989` org during audit-run-1.
+> Two agents (Superstore, NASA) hit `Source not found: warehouse table
+> 'TJ.PUBLIC.XXX' on connection 'YYY'` POSTing a DM element whose
 > `source.kind: "warehouse-table"` pointed at a table that physically existed
 > in the warehouse and was queryable via `mcp__sigma-mcp-v2__query`. This is
 > a **Sigma static-catalog visibility** issue: the `warehouse-table` source
@@ -558,7 +689,7 @@ The fallback is to source the same table via Custom SQL:
   "source": {
     "kind": "sql",
     "connectionId": "<connection-id>",
-    "statement": "SELECT * FROM MYDB.MYSCHEMA.MY_TABLE"
+    "statement": "SELECT * FROM TJ.PUBLIC.NASA_GISS_LOTI"
   },
   "columns": [
     { "id": "c-year", "name": "Year", "formula": "[Custom SQL/YEAR]" },
@@ -586,7 +717,7 @@ trade-offs vs `warehouse-table` are:
 >   --out /tmp/<name>/probe-columns.json
 > ```
 >
-> Validated 2026-05-24 against MYDB.MYSCHEMA.ORDERS — 19 columns
+> Validated 2026-05-24 against TJ.PUBLIC.SUPERSTORE_ORDERS — 19 columns
 > resolved in 7s. **Saves ~120s on every Custom SQL fallback** vs.
 > POST-fail-cleanup-retrying on column-name permutations (CUSTOMER_ID vs
 > CUST_ID vs ID vs RECORD_ID…). Don't skip this step.
@@ -687,7 +818,6 @@ Measured 2026-05-22 against the same Tableau workbook in two consecutive convers
 
 > **This step is mandatory. Do not skip it or infer column names from Tableau.**
 > **Skip Phase 2 entirely if Phase 1.5 recommended a DM you reused.**
-> **If `/tmp/<name>/data-location.json` exists (from Phase 0c), use it.** Resolve `connection_name` → connection ID via a single `GET /v2/connections` call, then jump straight to step 2 below with the known connectionId and use `database.schema.<table>` as each table's FQN. Do NOT iterate connections or guess warehouse paths.
 
 Tableau display names ("Sub-Category", "Country/Region") are NOT the same as
 warehouse column names ("SUB_CATEGORY", "COUNTRY_REGION" in Snowflake;
@@ -735,7 +865,7 @@ and emits a JSON column list:
 
 ```bash
 ruby scripts/discover-columns.rb --connection-id <id> \
-  --table-path MYDB.MYSCHEMA.ORDERS --out /tmp/<name>/orders-cols.json
+  --table-path TJ.PUBLIC.ORDERS --out /tmp/<name>/orders-cols.json
 # (or any warehouse path: my_project.my_dataset.orders, main.public.orders, etc.)
 ```
 
@@ -834,13 +964,30 @@ Write the spec to `/tmp/<name>/dm-spec.json`. Full schema is in
 3. **Column name special characters** — read `refs/column-gotchas.md`. Rename any column whose `name` contains `/` ("Country/Region" → `"Country"`, "State/Province" → `"State"`).
 4. **Element name = formula prefix**. The `name` field on a DM element (e.g. `"Orders"`) becomes the prefix in all workbook formulas that reference it: `[Orders/Sales]`. Choose clean, stable names.
 5. **Relationships go on the source element**, not the target. See `refs/data-model-spec.md`.
-6. **Column formulas use the warehouse table name as prefix**: path `["MY_CONNECTION", "MYDB", "ORDERS"]` → formula `"[ORDERS/Column Name]"`.
+6. **Column formulas use the warehouse table name as prefix**: path `["CSA", "Tableau Test", "ORDERS"]` → formula `"[ORDERS/Column Name]"`.
 
 ### When to use a Custom SQL element instead of a calc column
 
-> **Sigma window functions silently fail in DM calc columns and in workbook master (grouping-table) calc columns.** `CountOver`, `SumOver`, `RankOver`, `RowNumberOver`, `MaxOver`, `MinOver`, `AvgOver`, `FirstOver`, `LastOver`, `MedianOver`, `StdDevOver`, `CumulativeSum`, `CumulativeAvg`, etc. all POST/PUT successfully and return `success: true`, but the column resolves as `error` on GET and the chart that references it renders blank. The validator now hard-fails on these (see `scripts/validate-spec.rb`), but the right fix at design time is to NOT write them as calc columns in the first place.
+> **Sigma window functions silently fail in DM calc columns and in workbook master (grouping-table) calc columns** — `CumulativeSum`, `Rank`, `Lag`, etc. POST successfully but resolve as `error` on GET, and the `*Over` family (`SumOver`/`RankOver`/`MaxOver`/...) is `Unknown function` in every spec context. **But they are FIRST-CLASS as CHART-element viz formulas on the yAxis** (WINPROBE-validated 2026-06-12, 930/930 cells): `build-charts-from-signals.rb` auto-emits the whole mainstream window/table-calc family that way — `RUNNING_*`→`Cumulative*`, bounded `WINDOW_*`→`Moving*`, share→`PercentOfTotal(agg, "grand_total")`, pareto→`CumulativeSum(PercentOfTotal(...))`, `RANK*`→`Rank/RankDense/RankPercentile(agg, "desc")`, `INDEX()`→`RowNumber()`, `LOOKUP(±n)`→`Lag/Lead`, unbounded `WINDOW_MAX/MIN/SUM`/`TOTAL`→hidden two-level grouped helper. Cumulative/rank formulas follow the chart's `xAxis.sort` (Tableau `<computed-sort>` is carried via a hidden companion measure) and auto-partition by the chart color dim. **Full mapping table + the broadcast-down/week-anchor gotchas: `refs/window-functions.md`.** The design rule stands: never write window functions as DM or master calc columns.
 
-Any Tableau calc whose `requires_custom_sql: true` (from Phase 1e) — that is, any `WINDOW_*` / `RUNNING_*` / `RANK*` / `INDEX` / `FIRST` / `LAST` / `SIZE` / `TOTAL` / `LOOKUP` / `PREVIOUS_VALUE` table calc, or any `{FIXED/INCLUDE/EXCLUDE}` LOD — must be implemented as a **Sigma Custom SQL data-model element**:
+> **`{FIXED ...}` LODs are AUTO-TRANSLATED — no Custom SQL needed.** When a
+> `{FIXED [dims] : AGG([m])}` calc is plotted as a chart/KPI measure,
+> `build-charts-from-signals.rb` emits a hidden TWO-LEVEL grouped helper
+> element on the Data page (`visibleAsSource:false`; inner grouping = the
+> FIXED dims computing the LOD aggregate, outer grouping = the chart's dims
+> computing the 2nd-stage aggregate over the inner GROUP values) and the chart
+> sources the helper, `Max()`-ing the outer calc (a chart re-aggregates a
+> grouped source at BASE grain with group calcs replicated per row — Max over
+> identical replicas is exact; verified live 2026-06-12). ⚠ Carried chart dims
+> must be functionally dependent on the FIXED dims (e.g. Customer Segment per
+> Customer Id) — the build emits a per-chart verify warning. The same helper
+> machinery handles **grain-aware averages**: `Avg` of a dim-table column
+> (Tableau relationship semantics evaluate it at the dim table's NATIVE grain,
+> including entities with no fact rows) sources the DM dim element directly.
+> NEVER write these as `SumOver`/`CountOver` master or DM calc columns — they
+> silently error.
+
+Any Tableau calc whose `requires_custom_sql: true` (from Phase 1e) — that is, a **manual window residue** (`WINDOW_MEDIAN/PERCENTILE/CORR/COVAR(P)/VAR(P)/STDEVP`, `PREVIOUS_VALUE`, `SIZE`, `FIRST`, `LAST`, `RANK_UNIQUE/MODIFIED`, or a compute-using/addressing variant beyond Table(Across)/simple partitions) or an `{INCLUDE/EXCLUDE}` LOD (those need the chart-grouping context) — must be implemented as a **Sigma Custom SQL data-model element**. (The mainstream `WINDOW_*`/`RUNNING_*`/`RANK*`/`INDEX`/`LOOKUP`/`TOTAL` family no longer routes here — it is auto-emitted as Sigma-native chart formulas, `refs/window-functions.md`.)
 
 ```json
 {
@@ -869,11 +1016,9 @@ Key points:
 - Column formula prefix is `[Custom SQL/<ALIAS_FROM_SELECT_LIST>]`. The alias is whatever you wrote in the `SELECT ... AS NAME` clause. **Use UPPERCASE aliases** (matches Snowflake's default identifier casing); Sigma's column lookup is case-sensitive against the SQL output.
 - Every column you want to expose in the DM needs both a SELECT-list entry in the SQL AND a corresponding `columns[]` entry on the DM element.
 - Translation hints from `extract-calc-fields.rb`:
-  - `RUNNING_SUM(SUM([X]))` → `SUM(X) OVER (ORDER BY <time> ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)`
-  - `WINDOW_SUM(SUM([X]))` → `SUM(X) OVER (<partition / order>)`
-  - `RANK(SUM([X]))` → `RANK() OVER (PARTITION BY <p> ORDER BY <X> DESC)`
-  - `{FIXED [Dim] : SUM([X])}` → `SUM(X) OVER (PARTITION BY Dim)` or a pre-aggregated subquery joined back
-  - `LOOKUP(SUM([X]), -1)` → `LAG(X) OVER (ORDER BY <time>)`
+  - `RUNNING_*` / bounded `WINDOW_*` / `RANK*` / `INDEX` / `LOOKUP` / `TOTAL` — **do NOT route here anymore**: auto-emitted as Sigma-native chart viz formulas (`refs/window-functions.md`). The ANSI `OVER(...)` forms below are the fallback ONLY for the manual residues (`WINDOW_MEDIAN`/`WINDOW_PERCENTILE`/`PREVIOUS_VALUE`/`SIZE`/non-default addressing): e.g. `WINDOW_MEDIAN(SUM([X]))` → `MEDIAN(X) OVER (<partition>)`, `PREVIOUS_VALUE` → recursive logic in SQL.
+  - `{FIXED [Dim] : SUM([X])}` → `SUM(X) OVER (PARTITION BY Dim)` or a pre-aggregated subquery joined back — **fallback only**: when the LOD is plotted as a chart/KPI measure it is AUTO-TRANSLATED via the hidden two-level helper element (see the callout above), no Custom SQL needed
+  - **Nested LODs** (`{FIXED A : AVG({FIXED A, B : SUM([X])})}`) → a helper-element CHAIN, not one formula: innermost LOD = helper element 1 (grouped by its dims, aggregate as `Value`), each outer level consumes `[LOD Helper k/Value]` via a relationship on the shared dims. `build-charts-from-signals.rb` decomposes these automatically into `<out>-lod-chains.json` (innermost first) — build one grouped element (or Custom SQL `GROUP BY` subquery) per level. **Each outer level's source MUST carry `groupingId` pointing at the inner element's grouping** — a plain `{kind: table, elementId}` source reads BASE-grain rows with the aggregate repeated per row, so outer Avg/Median/Count silently come out row-weighted (caught live: 969.82 row-weighted vs 687.81 correct on CSA.TJ.ORDER_FACT). Live-verified pattern (exact parity vs warehouse SQL), 2026-06-11.
 
 When a workbook mixes plain calcs with window calcs, you can have BOTH kinds of DM elements in the same data model: one `warehouse-table` element for everything plain, plus one or more `sql` elements for the window/LOD calcs, related by key. Charts source from whichever element has the columns they need.
 
@@ -1046,7 +1191,7 @@ Spec skeleton (two pages, master on `Data`, all charts on `Orders Overview`):
           "kind": "kpi-chart",
           "source": { "kind": "table", "elementId": "master" },
           "columns": [{ "id": "k-sales", "formula": "Sum([Master/Sales])", "name": "Total Sales" }],
-          "value": { "id": "k-sales" }
+          "value": { "columnId": "k-sales" }
         }
       ]
     }
@@ -1084,8 +1229,8 @@ Rules:
 >   with NULL on the filtered column drop out of every chart whenever the
 >   control is unset.
 >
-> Full surface (range-slider, segmented options, top-n) in
-> `~/sigma-skills/sigma-workbooks/reference/specification/controls.md`.
+> Full surface (range-slider, segmented options, top-n) in the
+> `sigma-workbooks` skill's `reference/specification/controls.md`.
 
 > **Master-table column scope.** Default: pull every column you've already denormalized
 > in the DM into the master with passthrough formulas. The master is cheap; amending it
@@ -1102,7 +1247,7 @@ Rules:
     { "id": "k-sales", "formula": "Sum([Master/Sales])", "name": "Total Sales",
       "format": {"kind": "number", "formatString": "$,.0f"} }
   ],
-  "value": { "id": "k-sales" }
+  "value": { "columnId": "k-sales" }
 }
 ```
 
@@ -1146,6 +1291,11 @@ ruby scripts/build-dashboard-layout.rb \
   --layout /tmp/<name>/dashboard-layout.json \
   --wb-ids /tmp/<name>/wb-ids.json \
   --out /tmp/<name>/layout.xml
+# If any chart tile was renamed from its Tableau title, pass the same
+# --rename "Tableau name=Sigma name" pairs you give the parity scripts —
+# otherwise the renamed tile silently drops out of the layout (bead ddbq).
+# Row heights are scaled 1.5x by default (--row-scale) so Sigma doesn't
+# suppress axis/pie labels on short tiles (bead tkkv); proportions are kept.
 
 ruby scripts/put-layout.rb \
   --workbook <workbookId> \
@@ -1155,7 +1305,10 @@ ruby scripts/put-layout.rb \
 `build-dashboard-layout.rb` walks the dashboard's zones, converts each
 zone's `x_pct`/`y_pct`/`w_pct`/`h_pct` into Sigma 24-column grid spans,
 and stretches adjacent tiles to fill empty columns where Tableau had
-legend/filter shelves Sigma doesn't render. This is the dashboard-fidelity
+legend/filter shelves Sigma doesn't render. Band heights are multiplied by
+`--row-scale` (default 1.5 — Tableau zone ratios mapped 1:1 onto a 32-row
+page produce tiles short enough that Sigma suppresses axis and pie labels;
+1.43× was the empirically sufficient minimum, looker's builder uses 2×). This is the dashboard-fidelity
 path — chart positions mirror the source PNG.
 
 **Hand-rolled path — page-per-worksheet OR when zone parsing fails:**
@@ -1283,7 +1436,7 @@ ruby scripts/assert-phase6-ran.rb --tableau /tmp/<name>
 # add --allow-extract when running parity in extract-mode
 ```
 
-The gate checks four independent things and rejects on any failure:
+The gate checks five independent things and rejects on any failure:
 
 1. **Phase 6 ran** — `parity-final.json` exists with status=PASS at the
    required rate.
@@ -1303,6 +1456,15 @@ The gate checks four independent things and rejects on any failure:
    `<LayoutElement>` tags. Catches the CoCo regression where the agent
    forgot to PUT a layout and Sigma rendered every tile as a
    single-column stack instead of the dashboard grid.
+5. **Tile census** — reads `tile_census` from `parity-final.json`
+   (emitted by `phase6-parity.rb --finalize` when
+   `dashboard-layout.json` is present): "X zones, Y charts built,
+   Z unmatched". Rejects when any source dashboard zone has no
+   matching chart in the parity plan — the empty-view-CSV escape
+   where the builder silently emitted N-1 charts and every other
+   gate still passed (bead gjhe). Renamed tiles must be explained
+   via `--rename` on `phase6-parity.rb`; legitimately unbuildable
+   zones via `--allow-missing-tiles N` (name them in your report).
 
 Exit 0 means the conversion is allowed to declare GREEN. Any other exit
 code means downgrade to YELLOW (parity skipped or incomplete, orphans
@@ -1334,13 +1496,26 @@ ruby scripts/auto-parity-plan.rb \
   --out /tmp/<name>/parity-plan.json
 ```
 
+On `--finalize`, `phase6-parity.rb` also writes a `tile_census` field into `parity-final.json` (zones vs charts built vs unmatched, read from `dashboard-layout.json`) — gate 5 of `assert-phase6-ran.rb` fails on unmatched zones.
+
 The output is wrapped as `{ "extract": <bool>, "charts": [...] }` — the `extract` flag is set automatically from `get-workbook.json`'s `hasExtracts` field when the workbook itself is extract-backed. If a Sigma chart was renamed from its Tableau title (e.g., the pie tile renamed from "Order Channel vs Ship Method" → "Orders by Category"), pass `--rename "Order Channel vs Ship Method=Orders by Category"` so the auto-matcher pairs them.
 
 > **Extract status is also visible on the workbook's datasource.** `auto-parity-plan.rb` only reads workbook-level `hasExtracts`. If the underlying datasource has an extract but the workbook attribute is `false`, you'll have to flip the `extract` field by hand OR pass `--extract-mode` to verify-parity.rb.
 
 ### 6b. Fetch Sigma actuals
 
-For every chart in the plan that lacks an `actual` key, query Sigma via the MCP tool. **Fire all N chart queries in a SINGLE parallel tool-use batch** — one message with N `mcp__sigma-mcp-v2__query` tool blocks side-by-side. Each individual query takes ~5–20s; parallel cap is bounded by the slowest one, sequential is N × that.
+**Pooled collection first (the fast path).** `phase6-parity.rb` pass 1 runs
+`scripts/collect-parity-actuals.rb` automatically: it pools the element CSV
+exports (`POST /v2/workbooks/{wb}/export` → poll `GET /v2/query/{q}/download`,
+5-wide, with the discovery pool's backoff pattern, under `lib/sigma_rest`'s
+auto-refresh) and fills `parity-actuals.json` for every chart kind except
+pivot-tables — the export returns exactly the plotted channels with column
+display names as headers, in the long form the plan compares (verified on the
+40-chart fat workbook: grouped "level" tables included; pivot CSV export is
+the WIDE grid, so pivots stay agent-mediated). ~40 charts collect in well
+under a minute vs ~6 minutes of serial MCP queries.
+
+For every REMAINING chart (pass 1 prints exactly those), query Sigma via the MCP tool. **Fire all N chart queries in a SINGLE parallel tool-use batch** — one message with N `mcp__sigma-mcp-v2__query` tool blocks side-by-side. Each individual query takes ~5–20s; parallel cap is bounded by the slowest one, sequential is N × that.
 
 ```
 mcp__sigma-mcp-v2__query  type="workbook"  workbookId="<wbId>"
@@ -1393,18 +1568,7 @@ If the customer expects Tableau-extract numbers to match Sigma-live numbers exac
 | Empty result / column resolves as `error` | `mcp__sigma-mcp-v2__describe` on the element; type `error` means the formula failed to compile (often `IsIn`, unsupported window function, or missing-column ref) |
 | Numbers consistently within ±X% across all buckets | Extract drift — switch to `--extract-mode` if the source workbook has `hasExtracts: true` |
 
-### 6b. Triage divergences
-
-| Symptom | Likely cause |
-|---|---|
-| Numbers wrong by a constant factor | Aggregation mismatch (Sum vs Avg vs CountDistinct) |
-| Wrong dimension values | `[Master/...]` formula references the wrong column |
-| Date axis has 24 buckets where Tableau shows 12 | Cross-year month rollup — see `refs/column-gotchas.md` |
-| Sigma chart shows extra dim values Tableau never displays | Missed Phase 2.5 filter — apply the filter as `date-range`/`list`/`top-n` |
-| Bucket values differ but ratios match | Wrong source column — see Phase 3 "Translate Tableau calc fields here". A `Customer Value Tier` Tableau calc-derived from `Lifetime Revenue` must NOT be replaced by a warehouse `LOYALTY_TIER` column |
-| Empty result / column resolves as `error` | `mcp__sigma-mcp-v2__describe` on the element; type `error` means the formula failed to compile (often `IsIn`, unsupported window function, or missing-column ref) |
-
-### 6c. Trust the CSV, not the dashboard caption
+#### Trust the CSV, not the dashboard caption
 
 A Tableau dashboard's chart title is hardcoded text on the dashboard, not derived from
 the underlying view. When a Tableau author replaces a chart's data without updating the
@@ -1412,7 +1576,7 @@ title, the caption lies. **The view's `get-view-data` CSV is the source of truth
 build the Sigma chart against the CSV's actual columns and pick a truthful Sigma name,
 even if it disagrees with what's printed above the bars in Tableau.
 
-### 6d. Phantom `--metric-["..."]` columns
+#### Phantom `--metric-["..."]` columns
 
 `mcp__sigma-mcp-v2__query` with `type="workbook"` appends synthetic columns of the form
 `--metric-["<colId>"]` whose values look like `Column "X.--metric-[...]" does not exist.`.
@@ -1427,6 +1591,11 @@ After workbook PUT and before declaring GREEN you MUST:
 2. Poll `GET /v2/query/{q}/download` until content-type is `image/png` and save to `/tmp/<name>/sigma-render.png`.
 3. Read `sigma-render.png` via the Read tool and visually compare against the source dashboard PNG you read in Phase 1d (and any per-sheet PNGs).
 4. Record `screenshot_path` in your conversion result. Any visual divergence forces YELLOW (or RED if a tile is missing or unreadable).
+
+> **Visual QA is a mandatory gate — never skip, never declare done on HTTP 200.** A workbook that POSTs cleanly and passes CSV parity can still be visually broken (overlapping tiles, clipped titles, dead zones, floating filters; Sigma's grid has no z-order). After `export-chart-png.rb` renders the pages/elements:
+> 1. **Read each PNG** and check it against `refs/layout-visual-qa.md` (no overlaps/stacking, no dead zones, controls placed in-band, no clipped titles, even heights, right chart kind/format). Pair with the Tableau MCP `get-view-image` for source-vs-target.
+> 2. Fix any failure in the spec — for multi-page workbooks use `sigma-skills/sigma-workbooks/scripts/wb-rep.rb` (pull → edit → push) — then **re-render and re-read**.
+> 3. Loop until the render passes inspection.
 
 ```bash
 ruby scripts/export-chart-png.rb \
@@ -1446,11 +1615,132 @@ When to escalate to a visual check rather than just CSV parity:
 - The conversion uses dual-axis combo (`-d73`) — verify the right-hand series is line-shaped, not all bars
 - Any time you're uncertain whether a feature round-tripped — visual diff is the highest-confidence final check
 
-> **Cross-ref:** the orchestrator batch brief generated by `tableau-assessment/scripts/orchestrate-batch.rb` embeds Phase 6f verbatim (the >>>>>> CRITICAL — VISUAL FIDELITY REQUIREMENT <<<<<< block) and ties GREEN tier to non-null `screenshot_path`. Standalone (non-batch) conversions must apply Phase 6f by hand — there is no auto-runner.
+> **Cross-ref:** the orchestrator batch brief generated by `tableau-assessment/scripts/orchestrate-batch.rb` embeds Phase 6f verbatim (the >>>>>> CRITICAL — VISUAL FIDELITY REQUIREMENT <<<<<< block) and ties GREEN tier to non-null `screenshot_path`.
+>
+> **Machine-enforced (gate 8).** `assert-phase6-ran.rb` now fails (exit 10) unless a valid Sigma render PNG exists in the workdir (`sigma-render.png`, or a `screenshots/_manifest.json` entry) — you cannot declare GREEN on HTTP 200 + CSV parity alone. `migrate-tableau.rb --finalize` runs this gate automatically and, on exit 10, prints a **VISUAL STOP** block with the exact render+compare+re-run steps. The gate proves the render *exists* (so the comparison can run) and warns if `parity-final.json` carries no `screenshot_path`/`visual_checked` — it cannot prove you *read* the PNG, so the actual source-vs-target comparison is still on you. Escape hatch for genuinely un-renderable workbooks: `--skip-visual-gate "<reason>"`, named in the report.
 
 > **Known render-vs-spec drift on log-scale axes.** A `yAxis.format.scale: {type: "log"}` spec persists correctly via PUT/GET, and the interactive Sigma UI renders log-scaled. The Phase 6f PNG export endpoint, however, renders the y-axis linearly (verified 2026-05-24 on OCT v2's Monthly Trend export). This is a render-side limitation of the export endpoint, not a converter regression — confirm log behavior in the live workbook before downgrading parity. When the source Tableau chart had a log axis and the Sigma PNG shows linear, note YELLOW with `error_summary: "log-axis export-renders-linear"` and link the live workbook URL; do NOT re-emit the chart spec.
 
 ---
+
+### 6 (optional) — Control flip test
+
+When the workbook has controls (or you just repaired/hand-wired any), get
+runtime evidence that they actually filter — the lints above are static:
+
+```bash
+ruby scripts/probe-controls.rb --workbook-id <wb> --check-out-of-closure
+```
+
+Per control it exports one in-closure element CSV with and without
+`parameters:{<controlId>: <first non-default value>}` (must differ) and one
+out-of-closure element (must NOT differ). Optional Phase-6 step, not the
+mandatory inner loop — the mandatory static check is `assert-phase6-ran.rb`
+gate 7 (control lint). Auto-pick needs a list/segmented/switch control; pass
+`--value <controlId>=<value>` for date/range controls. See
+`refs/control-parity.md` for the lint/probe design and the MCP-vs-export
+answer (MCP applies saved control defaults and has NO parameter mechanism;
+only the export API's `parameters` map can flip a control programmatically).
+
+## Phase E (opt-in) — Enhance
+
+**OFF by default, everywhere.** Phase E never runs in batch/headless mode
+without the explicit `--enhance` flag, and it only ever starts from a
+**parity-verified** workbook (all Phase 6 gates green). It is powered by the
+shared engine vendored byte-identically into the covered plugins
+(`scripts/enhance-scan.rb` + `scripts/enhance-apply.rb` — md5 discipline,
+same as `escalate-gap.py`).
+
+```bash
+# at --finalize, after gates are green:
+ruby scripts/migrate-tableau.rb --workbook "<name>" --finalize \
+  --actuals <workdir>/parity-actuals.json \
+  --enhance                       # scan only → exit 14 with proposals
+# present each candidate to the user (one AskUserQuestion checklist), then:
+ruby scripts/migrate-tableau.rb --workbook "<name>" --finalize \
+  --actuals <workdir>/parity-actuals.json \
+  --enhance --enhance-accept all-low-risk    # or: id1,id2,...
+```
+
+The contract (trial-validated, 2026-06-10):
+
+1. **Clone-first.** `enhance-apply.rb` GETs the parity workbook's spec and
+   POSTs it as `"<name> — Enhanced"`. The 1:1 parity artifact is **never
+   written** (the report records its `updatedAt` before/after as proof).
+2. **Scan-then-propose.** `enhance-scan.rb` reads source signals (workdir
+   artifacts: `calc-fields.json`, `dashboard-layout.json`, `migrate-state.json`,
+   view CSVs) + the built spec + live element exports, and emits
+   `enhancements.json` — each candidate `{id, category, evidence, proposed,
+   risk, verdict_hint, patch}`. **Nothing applies without acceptance**:
+   interactive runs present a per-item checklist (AskUserQuestion); headless
+   runs pass `--enhance-accept id1,id2` or `--enhance-accept all-low-risk`.
+3. **Apply + parity-unchanged gate.** Accepted items apply **one at a time**
+   to the clone; after each, 2-3 untouched elements are spot-queried on the
+   clone AND the original at the same instant (live-drift-proof) — any shift
+   auto-reverts that item and flags it in `enhance-report.json`
+   (applied/skipped/reverted + evidence).
+
+Detector catalog (trial-validated; nothing speculative):
+
+- **comparison-enrichment** — date-grouped master + revenue-like measure →
+  latest-period KPI + delta-% KPI pair. KPI value columns INLINE the full
+  `Sum(If(D = Max(D), v, Null))` expression — cross-column aggregate refs
+  silently misevaluate in kpi-charts.
+- **interactivity-recovery** — (a) list **selection controls** on
+  reasonable-cardinality dims wired to the shared master (empty default =
+  identical render); (b) **grain switcher** — segmented control + DateTrunc
+  switch, default = parity grain; (c) **drill switcher** — segmented control +
+  `If()` dimension switch where a finer dim exists (medium risk: heuristic
+  hierarchy pairing); (d) **map restoration** (PBI signals) — point-map with
+  `Switch()` centroid synthesis (medium risk: centroids must be filled into
+  the patch before apply).
+- **fidelity-polish** — null-bucket labeling (`Coalesce → "No <Dim>"`),
+  month/date axis canonicalization (`MakeDate`; medium risk on multi-year
+  sources — intentionally un-pools), stale-source freshness note (time-boxed
+  wording), title corrections from source captions.
+
+**Descoped — emitted as propose-in-UI notes, never spec changes** (all
+trial-proven spec-unsupported): DM-metric promotion (metric refs don't resolve
+through a workbook table), chart-as-filter (`useAsFilter` silently dropped on
+readback), pie percent labels (`valueFormat:'percent'` silently dropped).
+
+### Phase E layout placement + HARD screenshot checklist
+
+Every applied item lands in the **container system** — never appended at the
+page foot (that was the "PHASEE PBI Employee Dashboard" regression):
+
+- selection controls → the **control band** (created under the header if the
+  clone lacks one);
+- comparison KPIs → the **KPI band**;
+- grain/drill switchers → a slim row **inside the container of the chart they
+  drive**;
+- migration/freshness notes → a **slim note band directly under the header**.
+
+If the cloned parity workbook predates container layouts (no `<GridContainer>`
+in its layout), `enhance-apply.rb` **regenerates a banded layout** for the
+clone first (builder machinery, `scripts/lib/layout.rb`), then applies items.
+The finalize runs the shared layout lint (`scripts/lib/layout_lint.rb`: no
+raw-id display names, no controls outside containers, no dead zones, no
+generic header-band title — "Page 1"/"Sheet N"/"Dashboard N" never titles a
+dashboard; the header carries the promoted source title → source display
+name → workbook name — and no band whose elements fill <60% of the grid
+columns, KPI bands of ≤4 tiles exempt) and
+**exits 4 on violations** — a lint-failing clone must be fixed and re-PUT
+before the run may be declared done.
+
+**HARD screenshot checklist (mandatory at finalize).** The lint is mechanical;
+your eyes are the last gate. Export the clone's **full-page PNG**
+(`scripts/sigma-export-png.py`) and verify EVERY item, listing each with
+pass/fail in your report:
+
+- [ ] every chart/control title is human-readable (no raw element ids)
+- [ ] the page has a header band (dark, full-width, carrying the SOURCE title
+      or display name — never a generic "Page 1")
+- [ ] selection controls sit together in a control band near the top
+- [ ] every control is adjacent to / inside the container of what it filters
+      (grain/drill switchers INSIDE their chart's container)
+- [ ] no orphan elements below the fold (nothing dumped at the page foot)
+- [ ] no dead zones; row heights look even across each band
 
 ## Troubleshooting
 
@@ -1485,3 +1775,25 @@ When to escalate to a visual check rather than just CSV parity:
 | Parity DIVERGE: bucket values differ but ratios match | Wrong source column for a Tableau calc | Calc-derived buckets must be re-derived from the same source the Tableau calc used (see `calc-fields.json` from Phase 1e), not from a same-named warehouse column |
 | Calc-extracted formula uses `IIF`/`COUNTD`/LOD | Tableau syntax that's not 1:1 with Sigma | `IIF(c,t,e)` → `If(c,t,e)`; `COUNTD(x)` → `CountDistinct(x)`; LOD expressions need a per-case Sigma equivalent (window, Lookup, or pre-aggregation) |
 | Ruby heredoc inside `bash -c '...'` fails with backslash errors | Bash's single-quoted block reaches into the heredoc | Write Ruby to a file with the `Write` tool and run `ruby /tmp/script.rb` |
+
+
+## Security: Row- & Column-Level Security (RLS/CLS)
+
+Row/column security is **never silently dropped and never silently ported** — and it is handled by the **skill**, not baked into the converted model. The converter (`convert_tableau_to_sigma`) only **detects and reports** security in `result.security[]`; it does **not** inject it into the data-model spec (a stateless converter can't create Sigma user attributes or assign members, so an injected `CurrentUserAttributeText` filter would fail-closed to 0 rows). This skill provisions + applies it after the model is posted.
+
+**What is detected for Tableau:** calculated fields using `USERNAME()`/`ISMEMBEROF('group')`/`USERATTRIBUTE('attr')` (translated to `CurrentUserEmail()` / `CurrentUserInTeam("group")` / `CurrentUserAttributeText("attr")`). Cross-element (dim-attribute) RLS is reported with a warning to apply on the owning element/derived view.
+
+**Flow (only runs when `result.security` is non-empty — zero overhead otherwise):**
+1. **Convert + post** the data model as usual. Capture the `dataModelId` and the converter's `result.security[]` (write it to `security.json`).
+2. **Gate (opt-in/out, default _Port_).** Show a plain-English summary of each detected rule + recommended Sigma mapping, then ask: **Port** (recommended) / **Customize** (review per-rule attribute/team mapping + username-to-email reconciliation) / **Skip** (migrated model shows ALL rows to everyone). Reuse-first: existing Sigma user attributes/teams are matched before creating new ones.
+3. **Provision + apply** with the shared engine:
+   ```bash
+   eval "$(scripts/get-token.sh)"
+   python3 scripts/apply_sigma_rls.py --from-security security.json --dm-id <dataModelId>            # plan only (default)
+   python3 scripts/apply_sigma_rls.py --from-security security.json --dm-id <dataModelId> --provision --apply
+   ```
+   `--provision` creates missing user attributes / teams; `--apply` PATCHes the boolean RLS calc column + fail-closed `filters` entry and the `columnSecurities` (CLS) onto the matching element.
+4. **Assign membership.** Assign per-user attribute values / team membership from the source tool's group/role membership (the converter reports the attribute/team names; the values come from the source's user mapping).
+
+**Skip is loud:** opting out leaves the migrated model with NO RLS — all rows visible to everyone. Confirm before skipping.
+

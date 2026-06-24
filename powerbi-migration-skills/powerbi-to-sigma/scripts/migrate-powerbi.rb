@@ -65,6 +65,8 @@ require 'set'
 
 HERE = __dir__
 $LOAD_PATH.unshift File.expand_path('lib', HERE)
+require 'scout_gate' # run-each-time gap-scout gate (bead beads-sigma-5l5e)
+require 'dax_gate'   # DAX warning → decision-question classifier (regression-tested)
 
 opts = { db: '', schema: '' }
 OptionParser.new do |o|
@@ -103,6 +105,13 @@ OptionParser.new do |o|
   # with --enhance-accept <id,id,...> or 'all-low-risk'.
   o.on('--enhance')            {     opts[:enhance] = true }
   o.on('--enhance-accept L')   { |v| opts[:enhance_accept] = v }
+  # DM-REUSE (reuse-first). The scan runs by DEFAULT (Phase 2.9) and auto-reuses
+  # an existing Sigma data model that already covers this model's warehouse
+  # table(s) + columns, instead of building a 4th near-identical DM. --reuse-dm
+  # forces a specific existing dataModelId (skips the scan); --no-reuse always
+  # builds a new DM.
+  o.on('--reuse-dm ID')        { |v| opts[:reuse_dm] = v }
+  o.on('--no-reuse')           {     opts[:no_reuse] = true }
 end.parse!
 
 abort 'missing --tmsl' unless opts[:tmsl]
@@ -354,26 +363,14 @@ puts "   #{conv_stats['elements'] || (dm_model['pages'] || []).flat_map { |p| p[
 questions = []
 
 # (a) + (b) DAX measures with no Sigma equivalent ((c)-tail) / DAX needing restructure.
-# The converter marks these in `warnings`: ⛔ = no/failed translation (drops to Null);
-# ⚠ = restructure-needed (RANKX/CALCULATE/iterator/scope/time-intel). ℹ = informational
-# (clean auto-handle) — NOT a decision.
-conv_warnings.each do |w|
-  ws = w.to_s.gsub(/\s+/, ' ').strip
-  next if ws.start_with?('ℹ') # informational; auto-handled, no human choice
-  if ws.start_with?('⛔')
-    questions << { 'id' => 'dax_no_equivalent', 'severity' => 'review',
-                   'detail' => ws,
-                   'options' => ['proceed (measure degrades to Null; original DAX kept in description)',
-                                 'abort and re-author the measure manually'],
-                   'default' => 'proceed (measure degrades to Null; original DAX kept in description)' }
-  else # ⚠ and any unmarked warning
-    questions << { 'id' => 'dax_needs_restructure', 'severity' => 'review',
-                   'detail' => ws,
-                   'options' => ['proceed (converter best-effort; verify in Sigma)',
-                                 'restructure manually via gap-scout (scripts/gap-scout.md)'],
-                   'default' => 'proceed (converter best-effort; verify in Sigma)' }
-  end
-end
+# Classification lives in lib/dax_gate.rb (pure + unit-tested in test-dax-gate.rb).
+# The converter marks each warning: ⛔ = no/failed translation (drops to Null);
+# ⚠ = restructure-needed; ✅ = SUCCESS (auto-translated — RANKX→SQL window helper,
+# USERELATIONSHIP→alternate join path); ℹ = informational. Only ⛔ and genuinely
+# DROPPED ⚠ become decisions — ✅/ℹ and any ⚠ the converter actually REALIZED in the
+# DM (e.g. time-intel → grouped element) are handled, NOT degradations. Regression fix:
+# the gate used to bucket ✅ and built restructures as "needs scout", stalling --yes.
+questions.concat(DaxGate.dax_questions(conv_warnings, dm_model))
 
 # (b) visuals with no NATIVE Sigma kind. extract-pbir maps unknown visualTypes to
 # "bar" as a fallback; flag any visualType that is NOT a recognized native PBI kind
@@ -412,6 +409,47 @@ unless opts[:conn]
   questions << { 'id' => 'connection', 'severity' => 'required',
                  'detail' => 'No Sigma --connection supplied; required to point the DM at the warehouse',
                  'options' => ['supply --connection <id>'], 'default' => nil }
+end
+
+# RUN-EACH-TIME GAP-SCOUT GATE (bead beads-sigma-5l5e). Flagged DAX measures
+# (⛔ no-equivalent → degrade to Null; ⚠ restructure-needed) are scout-eligible —
+# the gap-scout must ATTEMPT a Sigma translation for each before we accept the
+# degradation. --yes does NOT skip this; it only accepts gaps the scout already
+# tried (validated locally, or escalated). The scout records each to
+# <WORK>/scout-ledger.jsonl via scout-validate.py + lib/scout_gate.py.
+dax_gaps = questions.select { |q| %w[dax_no_equivalent dax_needs_restructure].include?(q['id']) }
+unless dax_gaps.empty?
+  gid = ->(q) { 'dax:' + q['detail'].to_s.gsub(/\s+/, ' ').strip[0, 80] }
+  gap_ids = dax_gaps.map { |q| gid.call(q) }.uniq
+  buckets = ScoutGate.classify(WORK, gap_ids)
+  if buckets[:unscouted].any?
+    unattended = opts[:yes] || opts[:answers]
+    if unattended
+      # Regression fix (gap-scout PR #153 made this a hard `exit 11` that overrode
+      # --yes, stalling the unattended/demo path even for measures the converter
+      # already handled). Under --yes/--answers the gate is ADVISORY: these gaps
+      # take their "proceed" default (already shown in the decisions list) and the
+      # run flows through. Record them as accepted so re-runs don't re-surface them,
+      # and recommend the gap-scout for anyone who wants a faithful translation.
+      warn "   gap-scout: #{buckets[:unscouted].size} flagged DAX measure(s) not scouted — proceeding (unattended); recording as accepted degradations."
+      warn '   (optional: run scripts/gap-scout.md on these to persist a faithful Sigma translation)'
+      buckets[:unscouted].each { |id| ScoutGate.record(WORK, gap_id: id, feature: 'dax', status: 'accepted') }
+    else
+      # Interactive: the same measures already appear as dax_* review questions and
+      # exit via the OPEN QUESTIONS block below (exit 10). Just nudge toward the scout.
+      puts
+      puts '-------------------- GAP-SCOUT RECOMMENDED --------------------'
+      puts "#{buckets[:unscouted].size} of #{gap_ids.size} flagged DAX measure(s) have no faithful translation yet:"
+      buckets[:unscouted].each { |id| puts "  --gap-id '#{id}'" }
+      puts ''
+      puts 'Optional: spawn a gap-scout per measure (scripts/gap-scout.md) with the --gap-id above'
+      puts "plus --workdir #{WORK} to persist a translation; or re-run with --yes to accept the"
+      puts 'degradation defaults. These also appear in OPEN QUESTIONS below.'
+      puts '---------------------------------------------------------------'
+    end
+  else
+    puts "   gap-scout: all #{gap_ids.size} flagged DAX measure(s) accounted for (validated or escalated)"
+  end
 end
 
 answers = nil
@@ -455,10 +493,95 @@ if chosen_all.any? { |c| c.to_s =~ /\babort\b/i }
 end
 
 # ---------------------------------------------------------------------------
-# Phase 3 — Build data model (fixups + validate + POST + readback)
+# Phase 2.9 — DM-REUSE scan (reuse-first). Runs by DEFAULT before the DM build:
+# score the existing Sigma DMs against this model's signature and AUTO-REUSE a
+# guaranteed-safe match (same warehouse table(s) + all referenced columns) so we
+# don't create a 4th near-identical DM and we skip the build + POST + validate.
+# Opt out with --no-reuse; force a specific id with --reuse-dm <id>. Best-effort:
+# any failure in the scan falls back to building a new DM — reuse never aborts.
+# ---------------------------------------------------------------------------
+reuse_dm_id = opts[:reuse_dm]
+if reuse_dm_id
+  puts
+  puts "── Phase 2.9 · DM-reuse (explicit --reuse-dm #{reuse_dm_id}) ──"
+elsif !opts[:no_reuse]
+  puts
+  puts '── Phase 2.9 · DM-reuse scan ──'
+  begin
+    sig_path   = File.join(WORK, 'dm-signature.json')
+    match_path = File.join(WORK, 'dm-match.json')
+    # Signature is parsed from the TMSL/model.bim (warehouse FQNs from the M
+    # partition expressions). Best-effort — tolerate a non-zero exit.
+    _so, _ss = Open3.capture2e(PY, File.join(HERE, 'pbi-dm-signature.py'),
+                               '--bim', opts[:tmsl], '--out', sig_path)
+    _so.each_line { |l| puts "   #{l.rstrip}" } unless _so.strip.empty?
+    if File.exist?(sig_path)
+      # find-or-pick-dm.rb exits non-zero when no candidate qualifies; that is
+      # NORMAL (build-new), so don't treat the exit code as fatal.
+      Open3.capture2e(ENV.to_h, 'ruby', File.join(HERE, 'find-or-pick-dm.rb'),
+                      '--workbook-signature', sig_path, '--out', match_path,
+                      '--auto-pick', '--auto-pick-threshold', '0.5')
+    end
+    match = (File.exist?(match_path) ? JSON.parse(File.read(match_path)) : {}) || {}
+    if match['auto_picked'] && match['recommended_dm_id']
+      reuse_dm_id = match['recommended_dm_id']
+      puts "   DM-REUSE (auto): #{match['rationale']}"
+      puts "   ⚠ #{match['warning']}" if match['warning']
+    else
+      top = (match['candidates'] || []).first(3)
+      if top.any?
+        puts "   no auto-safe match (#{match['rationale'] || 'below threshold'}) — building a new DM. Top candidate(s):"
+        top.each { |c| puts "     - #{c['dm_name']} [#{c['dm_id']}] score=#{c['score']}" }
+      else
+        puts "   no reuse candidate (#{match['rationale'] || 'none scored'}) — building a new DM"
+      end
+    end
+  rescue StandardError => e
+    puts "   [warn] DM-reuse scan skipped (#{e.message[0, 120]}) — building a new DM"
+    reuse_dm_id = nil
+  end
+end
+
+# ---------------------------------------------------------------------------
+# Phase 3 — Build data model (fixups + validate + POST + readback) — OR reuse an
+# existing DM (skip the build entirely; read its spec back instead).
 # ---------------------------------------------------------------------------
 hdr(3, TOTAL, 'Build data model')
 
+if reuse_dm_id
+  # REUSE PATH — skip convert-model.rb / validate / POST. GET the existing DM's
+  # spec once and derive the SAME downstream variables the build path produces:
+  #   dm_id    — the reused dataModelId
+  #   dm_spec  — full spec file (Phase 4 reads columns[].name + folderId from it)
+  #   dm_model — the spec itself (conv_elements is read from dm_model['pages'])
+  #   dm_rb    — readback-shaped {dataModelId, pages[].elements[]{id,name}}
+  # If anything here fails, fall back to building a new DM (reuse never aborts).
+  begin
+    require 'sigma_rest'
+    spec = Sigma.request(:get, "/v2/dataModels/#{reuse_dm_id}/spec")
+    spec = JSON.parse(spec) if spec.is_a?(String)
+    raise 'no pages in reused DM spec' unless spec.is_a?(Hash) && spec['pages']
+    dm_id   = reuse_dm_id
+    dm_spec = File.join(WORK, 'dm-spec.json')
+    File.write(dm_spec, JSON.pretty_generate(spec))
+    dm_model = spec                                   # conv_elements reads dm_model['pages']
+    dm_rb = {
+      'dataModelId' => dm_id,
+      'pages' => (spec['pages'] || []).map do |p|
+        { 'id' => p['id'], 'name' => p['name'], 'visibility' => p['visibility'],
+          'elements' => (p['elements'] || []).map { |e| { 'id' => e['id'], 'name' => e['name'] } } }
+      end
+    }
+    File.write(File.join(WORK, 'dm-readback.json'), JSON.pretty_generate(dm_rb))
+    n_el = dm_rb['pages'].flat_map { |p| p['elements'] || [] }.size
+    puts "   REUSING dataModelId = #{dm_id} (#{n_el} element(s)) — convert + POST skipped"
+  rescue StandardError => e
+    puts "   [warn] could not read reused DM #{reuse_dm_id} (#{e.message[0, 120]}) — building a new DM instead"
+    reuse_dm_id = nil
+  end
+end
+
+unless reuse_dm_id
 # Pre-fixup: the converter emits base warehouse-table columns with NO `name`
 # (Sigma derives the display name from the source column at POST time). But
 # validate-spec.rb resolves sibling refs by `name`, and a metric like
@@ -521,6 +644,7 @@ run!(['ruby', File.join(HERE, 'post-and-readback.rb'), '--type', 'datamodel',
 dm_rb = JSON.parse(File.read(dm_readback))
 dm_id = dm_rb['dataModelId']
 puts "   dataModelId = #{dm_id}"
+end # unless reuse_dm_id (build-new path)
 
 # ---------------------------------------------------------------------------
 # Phase 4 — Build workbook (auto master-map from converter + signals, then build+POST)
@@ -972,6 +1096,14 @@ build += ['--folder-id', wb_folder] if wb_folder
 # workbook against this DM (see SKILL.md). Never worse than the proven agent path.
 begin
   build_log = run_wb!(build)
+  # Validate the WORKBOOK spec before POST — previously only the DM spec was
+  # validated, so workbook-shape defects (source-less "[]" elements, dangling
+  # grouping refs, missing kind) went straight to the API. The DM readback gives
+  # the cross-ref context (master/DM element names + ids).
+  dm_ctx = File.join(WORK, 'dm-context.json')
+  File.write(dm_ctx, JSON.generate(dm_rb))
+  run_wb!(['ruby', File.join(HERE, 'validate-spec.rb'), '--type', 'workbook',
+           '--dm-context', dm_ctx, wb_spec])
   wb_readback = File.join(WORK, 'wb-readback.json')
   rb_log = run_wb!(['ruby', File.join(HERE, 'post-and-readback.rb'), '--type', 'workbook',
                     '--spec', wb_spec, '--out', wb_readback, '--workdir', WORK], env: ENV.to_h)
@@ -1005,12 +1137,47 @@ puts "   workbookId = #{wb_id}"
 hdr(5, TOTAL, 'Layout')
 run!(['ruby', File.join(HERE, 'put-layout.rb'), '--workbook', wb_id, '--layout', layout], env: ENV.to_h)
 puts "   layout applied to workbook #{wb_id}"
+require 'sigma_rest'
+
+# ---------------------------------------------------------------------------
+# Phase 5b — Visual QA: auto-render each content page to a FULL-PAGE PNG so the
+# layout can be reviewed against refs/layout-visual-qa.md AND compared to the
+# source PBI page captures (SKILL.md Phase 5e/5f gate). Matches qlik/tableau
+# Phase 5b. NON-FATAL — a transient export failure must not sink a green
+# migration; the REVIEW (reading each PNG) is the actual gate. Page ids come
+# from the LOCAL spec the builder wrote (deterministic; POST preserves them) —
+# the live GET /spec readback has proven flaky mid-pipeline.
+# ---------------------------------------------------------------------------
+begin
+  vqa = File.join(WORK, 'visual-qa')
+  FileUtils.mkdir_p(vqa)
+  local_spec = (JSON.parse(File.read(wb_spec)) rescue {})
+  content_pages_qa = (local_spec['pages'] || []).reject { |p| p['id'].to_s.downcase.include?('data') }
+  tok = (Sigma.auth_token rescue ENV['SIGMA_API_TOKEN'])
+  pngs = []
+  content_pages_qa.each do |pg|
+    out = File.join(vqa, "#{pg['id']}.png")
+    _o, st = Open3.capture2e({ 'SIGMA_API_TOKEN' => tok.to_s }, PY,
+                             File.join(HERE, 'sigma-export-png.py'),
+                             '--workbook', wb_id, '--page', pg['id'], '--out', out,
+                             '--w', '1800', '--h', '1000')
+    st.success? ? (pngs << out) : (puts "   [warn] visual-QA render failed for page #{pg['id']}")
+  end
+  puts "   rendered #{pngs.size}/#{content_pages_qa.size} full-page PNG(s) for visual QA -> #{vqa}"
+  if pngs.any?
+    puts '   VISUAL QA (mandatory review — do not skip): open each PNG and check vs'
+    puts '   refs/layout-visual-qa.md AND the source PBI page captures (export-pbi-pages.py) —'
+    puts '   no overlaps/stacking, no clipped titles, controls in their own band, right chart'
+    puts '   kinds/colors, even heights. See assert-visual-compare.rb for the source-vs-target gate.'
+  end
+rescue StandardError => e
+  puts "   [warn] visual-QA render skipped: #{e.message[0, 120]}"
+end
 
 # ---------------------------------------------------------------------------
 # Phase 6 — Parity (freshness banner FIRST, then formula guard + warehouse compare)
 # ---------------------------------------------------------------------------
 hdr(6, TOTAL, 'Parity')
-require 'sigma_rest'
 require 'date'
 
 # ---- join the NON-BLOCKING Phase-1.5 freshness lane (launched pre-Convert) --

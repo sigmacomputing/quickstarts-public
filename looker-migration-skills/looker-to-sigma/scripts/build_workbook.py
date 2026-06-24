@@ -166,10 +166,52 @@ def looker_cat_palette(color):
 
 
 # ── parse view files: classify fields as measure (agg + base col) or dimension ──
-def build_field_index(view_files):
+def parse_join_aliases(model_files):
+    """Map a Looker explore join's alias to its underlying view via `from:`.
+      explore: order_fact { join: order_date { from: date_dim ... } }
+    → {"order_date": "date_dim"}. A dashboard field references the join ALIAS
+    (order_date.order_month), but the view file defines the dim under the VIEW
+    name (date_dim). Without this map the field can't be resolved to a DM column
+    and the tile gets dropped (the `from:`-alias gap). Aliases without `from:`
+    (alias == view) are skipped — they already resolve."""
+    aliases = {}
+    for path in model_files:
+        try:
+            txt = re.sub(r"#[^\n]*", "", open(path).read())
+        except OSError:
+            continue
+        # join: <alias> { ... from: <view> ... }  (brace-bounded so a later
+        # join's from: can't bleed into an earlier alias)
+        for m in re.finditer(r"join:\s*(\w+)\s*\{(.*?)\}", txt, re.DOTALL):
+            alias, body = m.group(1), m.group(2)
+            fm = re.search(r"\bfrom:\s*(\w+)", body)
+            if fm and fm.group(1) != alias:
+                aliases[alias] = fm.group(1)
+        # explore: <alias> { from: <view> ... }  — an explore can ALIAS its BASE
+        # view via a top-level `from:` (e.g. `explore: orders_basic { from:
+        # order_fact }`). Tiles then reference the explore alias (orders_basic.x)
+        # while the converter names the DM element after the underlying VIEW
+        # (order_fact). Capture the explore's OWN base `from:` (the one before the
+        # first `join:`), brace-balanced so nested join/access_filter braces don't
+        # confuse the scan. Without this the whole base-view field set is dropped.
+        for em in re.finditer(r"explore:\s*(\w+)\s*\{", txt):
+            alias = em.group(1); start = em.end(); depth, i = 1, start
+            while i < len(txt) and depth:
+                depth += {"{": 1, "}": -1}.get(txt[i], 0); i += 1
+            body = txt[start:i]
+            head = body.split("join:", 1)[0]      # base `from:` precedes any join
+            fm = re.search(r"\bfrom:\s*(\w+)", head)
+            if fm and fm.group(1) != alias:
+                aliases[alias] = fm.group(1)
+    return aliases
+
+
+def build_field_index(view_files, aliases=None):
     measures = {}   # "view.field" -> (agg_type, base_display_or_None, sql, filters)
     formats = {}    # "view.field" -> Sigma format dict (or None)
     dims = set()    # "view.field"
+    labels = {}     # "view.field" -> LookML label (the converter names the column
+                    #   after the label, so a tile ref must use it, not the field name)
     view_pk = {}    # "view" -> primary-key dimension name
     yesno = set()   # "view.field" of type:yesno dims — the DM converter names
                     # their boolean calc column "<label> (T-F)"
@@ -212,6 +254,9 @@ def build_field_index(view_files):
                 view_pk[view] = name
             if re.search(r"type:\s*yesno\b", txt[start:i]):
                 yesno.add(f"{view}.{name}")
+            lm = re.search(r'label:\s*"([^"]*)"', txt[start:i])
+            if lm:
+                labels[f"{view}.{name}"] = lm.group(1)
         # measure blocks: measure: name { ... }
         for m in re.finditer(r"measure:\s*(\w+)\s*\{", txt):
             name = m.group(1); start = m.end()
@@ -254,7 +299,26 @@ def build_field_index(view_files):
                     measures[key] = (agg, disp(tc.group(2)),
                                      f"{tc.group(1)}(${{TABLE}}.{tc.group(2)})", mfilters)
                     formats.setdefault(key, tfmt)
-    return measures, dims, view_pk, formats, yesno, dim_groups
+    # Register every view's fields under its join ALIAS too, so dashboard refs
+    # that use the alias (order_date.order_month) resolve to the underlying view's
+    # columns (date_dim's `order` dim_group). The converter already emits the
+    # denorm columns under the alias, so this aligns the two sides.
+    for alias, view in (aliases or {}).items():
+        for f in [k for k in measures if k.startswith(view + ".")]:
+            measures.setdefault(f"{alias}.{f.split('.', 1)[1]}", measures[f])
+        for f in [k for k in dims if k.startswith(view + ".")]:
+            dims.add(f"{alias}.{f.split('.', 1)[1]}")
+        for f in [k for k in formats if k.startswith(view + ".")]:
+            formats.setdefault(f"{alias}.{f.split('.', 1)[1]}", formats[f])
+        for f in [k for k in yesno if k.startswith(view + ".")]:
+            yesno.add(f"{alias}.{f.split('.', 1)[1]}")
+        for g in [k for k in dim_groups if k.startswith(view + ".")]:
+            dim_groups.setdefault(f"{alias}.{g.split('.', 1)[1]}", dim_groups[g])
+        for f in [k for k in labels if k.startswith(view + ".")]:
+            labels.setdefault(f"{alias}.{f.split('.', 1)[1]}", labels[f])
+        if view in view_pk:
+            view_pk.setdefault(alias, view_pk[view])
+    return measures, dims, view_pk, formats, yesno, dim_groups, labels
 
 def main():
     ap = argparse.ArgumentParser()
@@ -279,7 +343,13 @@ def main():
     a = ap.parse_args()
 
     dash = json.load(open(a.contract))
-    measures, dims, view_pk, formats, yesno_dims, dim_groups = build_field_index(sorted(glob.glob(os.path.join(a.views, "*.view.lkml"))))
+    # Model files live alongside or one level above the views dir — read their
+    # join `from:` aliases so alias-qualified dashboard fields resolve.
+    model_files = (glob.glob(os.path.join(a.views, "*.model.lkml"))
+                   + glob.glob(os.path.join(a.views, "..", "*.model.lkml")))
+    aliases = parse_join_aliases(model_files)
+    measures, dims, view_pk, formats, yesno_dims, dim_groups, dim_labels = build_field_index(
+        sorted(glob.glob(os.path.join(a.views, "*.view.lkml"))), aliases)
     warnings = []
 
     # ── per-explore masters ────────────────────────────────────────────────────
@@ -400,11 +470,23 @@ def main():
         if is_measure(f):
             if is_ratio(f): return None           # composite — components needed separately
             base = measures[f][1]                 # base column (None for plain count)
-            return (base + suf) if base else None
+            if not base: return None
+            # A count/count_distinct on a JOINED view keyed on that view's PK
+            # references the join key — which the denorm element OMITS (a
+            # cross-element passthrough of a join key compiles to type "error").
+            # The base side of the relationship carries the same value under the
+            # plain (un-suffixed) column, so reference that instead of the absent
+            # alias-suffixed one.
+            if suf and measures[f][0] in ("count", "count_distinct") and base == disp(view_pk.get(view) or ""):
+                return base
+            return base + suf
         dg = dimgroup_display(f)
         if dg is not None:
             return dg + suf
-        return disp(leaf(f)) + suf
+        # The converter names a dimension column after its LookML `label:` when one
+        # is set (e.g. dimension full_name { label: "Customer Name" } → column
+        # "Customer Name", not "Full Name"), so a tile ref must use the label.
+        return dim_labels.get(f, disp(leaf(f))) + suf
     def pk_display(view, explore):
         """Display name of a view's primary-key column in the denorm element."""
         pk = view_pk.get(view)
@@ -549,6 +631,46 @@ def main():
                 rm["label"] = {"visibility": "shown", "text": rl["label"]}
             out.append(rm)
         return out
+
+    # ── Drop tile fields that don't map to any DM column ─────────────────────
+    # A dashboard can reference a field that the --lookml-dir checkout doesn't
+    # define (e.g. the dashboard was built against newer LookML — live dashboard
+    # 11 referenced order_fact.gross_margin_pct / distinct_order_count that aren't
+    # in the local views). The converter never emits such a column, so emitting a
+    # workbook ref to it POSTs 400 "Dependency not found" and sinks the WHOLE
+    # workbook. Drop these fields with a loud warning instead — same philosophy as
+    # the sort-field skip below and post_dm's join-key drop (never crash on one
+    # dangling ref). Resolvable = a known measure / dimension / dimension_group /
+    # primary key in the view files (the converter's own source of truth).
+    def field_resolvable(f):
+        if not f or "." not in f:
+            return True                      # synthetic/unqualified — leave alone
+        if is_measure(f) or f in dims:
+            return True
+        if dimgroup_display(f) is not None:
+            return True
+        view, lf = f.split(".")[0], leaf(f)
+        return bool(view_pk.get(view)) and lf == view_pk[view]
+
+    for el in dash["elements"]:
+        if el.get("tileType") == "text":
+            continue
+        for key in ("fields", "pivots"):
+            vals = el.get(key)
+            if not vals:
+                continue
+            kept = [f for f in vals if field_resolvable(f)]
+            for f in vals:
+                if f not in kept:
+                    warnings.append(
+                        f"tile '{el.get('name')}': field '{f}' has no matching DM column "
+                        "(not defined in the --lookml-dir views) — dropped to avoid a "
+                        "dangling workbook ref. If the dashboard expects it, the LookML "
+                        "checkout is stale vs. the live dashboard (try --project).")
+            el[key] = kept
+        # tile-level hard-filters on an absent field can't bind either — drop them.
+        if el.get("filters"):
+            el["filters"] = {fld: v for fld, v in el["filters"].items() if field_resolvable(fld)}
 
     # ── master columns: every dim col used + every measure base col + filter cols ──
     def need(display, explore):
@@ -893,6 +1015,12 @@ def main():
                 yid = sid("y"); cols.append({"id": yid, "formula": "Count()", "name": "Count"}); ymids.append(yid)
             base["columns"] = cols
             base["xAxis"] = {"columnId": xid}; base["yAxis"] = {"columnIds": ymids}
+            # Looker `looker_bar` renders HORIZONTAL bars, `looker_column` vertical —
+            # both map to a Sigma bar-chart, so carry the orientation through (Sigma's
+            # default is vertical, so only set it for looker_bar; omit otherwise).
+            # Verified field: sigma-workbooks charts.md ("orientation: horizontal").
+            if el["tileType"] == "looker_bar":
+                base["orientation"] = "horizontal"
             # Looker pivot → Sigma series via the color channel (split/stack by the
             # pivot dimension). One color channel; extra pivots → UI. Reproduce the
             # categorical palette Looker declared (series_colors / colors) when present.
@@ -966,6 +1094,37 @@ def main():
             # col ids]}].
             if gids and cids:
                 base["groupings"] = [{"id": sid("g"), "groupBy": gids, "calculations": cids}]
+            # Looker grid cell visualizations (vis_config.series_cell_visualizations) →
+            # Sigma element-level conditionalFormats on the measure's calc column.
+            # KEY (verified live 2026-06-24): Sigma `dataBars` are SIGN-colored — one fill
+            # for positive, one for negative — they CANNOT vary the bar color by value.
+            # So when Looker colored the bars BY VALUE (a custom_colors palette), the
+            # faithful reproduction is a Color scale (`backgroundScale`) that tints the
+            # cell low→high, NOT a `dataBars` with a multi-stop `scheme` (Sigma collapses
+            # that to a single positive color). A plain Looker bar (no value palette) →
+            # `dataBars` (magnitude). Shapes verified: sigma-workbooks tables.md.
+            # NOTE: Looker often does NOT expose series_cell_visualizations via the
+            # dashboard/query API even when the render shows bars — that render-only case
+            # can't be auto-detected here; the Phase-4 visual-QA gate flags it for a
+            # manual add (see SKILL.md Phase 3b).
+            cviz = el.get("cellVisualizations") or {}
+            cfmts = []
+            for f in el["fields"]:
+                if f in cviz and field2cid.get(f) in cids:
+                    scheme = (cviz[f] or {}).get("scheme")
+                    if scheme:   # Looker colored the bars by value → Sigma Color scale
+                        cfmts.append({"type": "backgroundScale",
+                                      "columnIds": [field2cid[f]], "scheme": scheme})
+                        warnings.append(
+                            f"tile '{el['name']}': Looker value-colored data bars on "
+                            f"'{leaf(f)}' → Sigma Color scale (cell tint by value). Sigma "
+                            "data bars are sign-colored only, so a value-colored bar isn't "
+                            "reproducible; switch this rule to dataBars if you prefer a "
+                            "magnitude bar over the value tint.")
+                    else:        # plain magnitude bar (no value palette)
+                        cfmts.append({"type": "dataBars", "columnIds": [field2cid[f]]})
+            if cfmts:
+                base["conditionalFormats"] = cfmts
             if el.get("pivots"):
                 warnings.append(f"tile '{el['name']}': pivot {el['pivots']} flattened to columns — "
                                 f"rebuild as a Sigma pivot-table for true cross-tab")
@@ -1113,7 +1272,15 @@ def main():
     controls, control_scope, dropped_controls = [], [], []
     for flt in dash["filters"]:
         fld = flt.get("dimension") or flt.get("field") or flt.get("_resolvedField")
-        ctype = "date-range" if flt["type"] == "date_filter" else "list"
+        # A `list` control targeting a DATETIME column is silently DROPPED by
+        # Sigma on POST (its `filters` come back empty → dead control). A filter
+        # bound to a date/time dimension_group must be a date control regardless
+        # of the Looker filter `type` (a Looker field_filter on a date renders a
+        # list in LookML but must become a date control in Sigma).
+        _fld = flt.get("dimension") or flt.get("field") or flt.get("_resolvedField")
+        is_date_field = (flt["type"] == "date_filter"
+                         or (_fld is not None and dimgroup_display(_fld) is not None))
+        ctype = "date-range" if is_date_field else "list"
         cid = flt["name"].lower().replace(" ", "-")
         entry = {"controlId": cid, "name": flt["title"], "controlType": ctype,
                  "source_signal": f"looker dashboard filter '{flt['name']}' (per-tile listen: scope)",

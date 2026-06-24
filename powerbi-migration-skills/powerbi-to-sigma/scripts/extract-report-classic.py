@@ -18,7 +18,7 @@ Usage:
   python3 extract-report-classic.py --report-json /tmp/pbir-orders/report.json \
       --out /tmp/pbir-orders/signals.json
 """
-import argparse, json, sys
+import argparse, json, re, sys
 
 # Same visualType -> Sigma element kind table as extract-pbir.py.
 VISUAL_KIND = {
@@ -32,11 +32,24 @@ VISUAL_KIND = {
     "pieChart": "pie", "donutChart": "donut", "scatterChart": "scatter",
     "tableEx": "table", "pivotTable": "pivot-table", "matrix": "pivot-table",
     "slicer": "control",
-    "map": "bar", "filledMap": "bar", "shapeMap": "bar", "azureMap": "bar",
+    "map": "map", "filledMap": "map", "shapeMap": "map", "azureMap": "map",
 }
 
 # *Bar* = horizontal, *Column* = vertical (Sigma default). Sigma's bar-chart
 # `orientation` accepts only "horizontal"; vertical = omit the field.
+# PBI visualType -> Sigma `stacking` enum (none|stacked|normalized). Classic
+# files encode it in the TYPE NAME; without an explicit value Sigma defaults
+# multi-series bars to STACKED, corrupting clustered PBI charts (customer
+# catch on the Retail sample's clustered variance chart).
+def _stacking(vtype):
+    v = (vtype or "")
+    if v.startswith("hundredPercentStacked"):
+        return "normalized"
+    if v.startswith("stacked"):
+        return "stacked"
+    return "none"
+
+
 HBAR_TYPES = {"barChart", "clusteredBarChart", "stackedBarChart",
               "hundredPercentStackedBarChart"}
 
@@ -45,10 +58,8 @@ HBAR_TYPES = {"barChart", "clusteredBarChart", "stackedBarChart",
 # but ONLY for map visuals (bead ry0n): on a scatterChart, Size is the real
 # bubble-size role and Series the legend; remapping them corrupts the scatter.
 ROLE_REMAP = {
-    "Series": "Category",
     "Size": "Y",
     "Location": "Category",
-    "Latitude": "Category",
 }
 MAP_TYPES = {"map", "filledMap", "shapeMap", "azureMap"}
 
@@ -181,11 +192,28 @@ def extract(report):
             cfg = json.loads(vc.get("config", "{}"))
             sv = cfg.get("singleVisual", {})
             vt = sv.get("visualType", "unknown")
-            # bead a1cv: image visuals are static assets (StaticResources) — the
-            # 'bar' fallback would emit a junk empty chart. Skip with a note.
+            # bead a1cv: image visuals are static assets (StaticResources). Emit a
+            # kind='image' record carrying the registered-resource name — the
+            # builder turns it into a Sigma image element when --image-map
+            # supplies a hosted URL for it, and skips it (with a note) otherwise.
             if vt == "image":
-                print(f"[classic] skipping image visual on page '{s.get('displayName')}'"
-                      " (static asset; not portable)", file=sys.stderr)
+                # resource name lives at objects.general[].properties.imageUrl
+                # .expr.ResourcePackageItem.ItemName (classic) — regex fallback
+                # for any RegisteredResources path form.
+                m = re.search(r'"ItemName":\s*"([^"]+)"', json.dumps(cfg)) \
+                    or re.search(r"RegisteredResources/([\w.\-]+)", json.dumps(cfg))
+                ipos = (cfg.get("layouts", [{}])[0] or {}).get("position", {})
+                rec = {
+                    "visual_id": f"p{len(out_pages)}v{len(visuals)}image",
+                    "visual_type": vt, "title": None, "sigma_kind": "image",
+                    "orientation": None,
+                    "x": vc.get("x") or ipos.get("x", 0), "y": vc.get("y") or ipos.get("y", 0),
+                    "w": vc.get("width") or ipos.get("width", 0), "h": vc.get("height") or ipos.get("height", 0),
+                    "z": vc.get("z") or ipos.get("z", 0), "parent_group": None, "bindings": {},
+                    "sort": None, "formats": {}, "data_labels": None, "legend": None,
+                    "resource": m.group(1) if m else None,
+                }
+                visuals.append((cfg.get("name"), rec))
                 continue
             # position: prefer vc top-level x/y/w/h, fall back to config layouts
             x = vc.get("x"); y = vc.get("y"); w = vc.get("width"); h = vc.get("height")
@@ -208,6 +236,7 @@ def extract(report):
                 "bindings": _projections(sv, vt),
                 # bead f972: visual sort ({queryRef, direction asc|desc}) or None
                 "sort": _sort_signal(sv),
+                "stacking": _stacking(vt) if VISUAL_KIND.get(vt) in ("bar", "area") else None,
                 "formats": {},
                 # bead n9u9: PBI data-label toggle (objects.labels show) — true/false/None
                 "data_labels": _obj_flag(sv, "labels"),

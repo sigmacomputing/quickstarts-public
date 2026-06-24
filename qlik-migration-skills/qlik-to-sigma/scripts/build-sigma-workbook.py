@@ -45,6 +45,7 @@ Env (live mode): SIGMA_BASE_URL + SIGMA_API_TOKEN.
 import json, os, re, sys, time, argparse, urllib.request
 
 MASTER_ID, MASTER = "m-master", "Master"
+_SCATTER_SRC = []   # hidden grouped source tables emitted for scatter-charts (added to the Data page)
 KEEP_UNMATCHED = os.environ.get("QLIK_KEEP_UNMATCHED", "") == "1"
 ROW_SCALE = 2          # min row-scale; Qlik rows are ~3x shorter than Sigma's
 KPI_MIN_ROWS = 5       # Sigma kpi-chart clips its title below ~5 grid rows
@@ -258,6 +259,58 @@ def qlik_sort(c, dim_ids, meas_ids):
                 return meas_ids[idx - ndims], "ascending" if mb["qSortByNumeric"] == 1 else "descending"
     return None
 
+# Qlik measure color schemes -> Sigma `scheme` arrays (low->high). 'dg'/'dc' are
+# Qlik's diverging palettes, 'sg'/'sc' the sequential ones; reverseScheme flips.
+QLIK_MSCHEME = {
+    "dg": ["#a50026", "#f46d43", "#fee090", "#74add1", "#313695"],  # diverging red->blue
+    "dc": ["#a50026", "#f46d43", "#fee090", "#74add1", "#313695"],
+    "sg": ["#ffffcc", "#fd8d3c", "#bd0026"],                        # sequential
+    "sc": ["#ffffcc", "#fd8d3c", "#bd0026"],
+}
+
+def qlik_color(color, dim_ids, mids, el):
+    """Map a Qlik chart color encoding to a Sigma `color` channel, or None.
+    byMeasure -> color:{by:scale} on a DUPLICATE measure column (a column can't
+    be on both yAxis and color); byDimension -> color:{by:category} on the dim."""
+    c = color or {}
+    mode = c.get("mode")
+    if mode == "byMeasure" and mids:
+        scheme = list(QLIK_MSCHEME.get(c.get("measureScheme"), QLIK_MSCHEME["sg"]))
+        if c.get("reverseScheme"): scheme.reverse()
+        base = next((col for col in el["columns"] if col["id"] == mids[0]), None)
+        if not base: return None
+        cid = nid("clr")
+        dup = {"id": cid, "formula": base["formula"], "name": base["name"] + " (color)"}
+        if base.get("format"): dup["format"] = base["format"]
+        el["columns"].append(dup)
+        return {"by": "scale", "column": cid, "scheme": scheme}
+    if mode in ("byDimension", "byExpression") and dim_ids:
+        return {"by": "category", "column": dim_ids[0]}
+    return None
+
+def qlik_refmarks(c):
+    """Qlik reference lines -> Sigma refMarks. X-axis lines -> axis 'axis',
+    measure/Y lines -> 'series'. value MUST be the wrapped {type:formula,...}
+    form (a bare number 400s); label.visibility must be 'shown'. Verified
+    2026-06-15."""
+    rl = c.get("refLines") or {}
+    out = []
+    for axis, key in (("axis", "x"), ("series", "y")):
+        for r in (rl.get(key) or []):
+            if r.get("show") is False:
+                continue
+            val = r.get("value")
+            formula = str(val) if isinstance(val, (int, float)) else (r.get("expr") or "")
+            if not formula:
+                continue
+            rm = {"type": "line", "axis": axis,
+                  "value": {"type": "formula", "formula": formula},
+                  "line": {"color": r.get("color") or "#ef4444", "width": 2}}
+            if r.get("label"):
+                rm["label"] = {"visibility": "shown", "text": r["label"]}
+            out.append(rm)
+    return out
+
 def build_element(c, resolve, warnings):
     """One Qlik chart object -> one Sigma element (or None + warning)."""
     title = c.get("title") or c.get("vizType")
@@ -366,11 +419,55 @@ def build_element(c, resolve, warnings):
         y = [mids[0]] + [{"columnId": m, "type": "line"} for m in mids[1:]]
         el["xAxis"] = {"columnId": dim_ids[0]}; el["yAxis"] = {"columnIds": y}
         return el
-    # bar / line / scatter
+    if kind == "scatter-chart":
+        # A Qlik scatterplot is measure-vs-measure with the dimension as the POINT
+        # identity (Qlik measure order = x, y, size). Sigma's scatter axis is a
+        # GROUPING axis: putting an aggregate (Sum(...)) directly on xAxis makes it
+        # evaluate per-row and every point collapses to one x — the spec POSTs but
+        # renders wrong (bead ry0n; verified 2026-06-15 — 64 rep points vs 1).
+        # Correct, UI-verified shape: bind the scatter to a hidden grouped SOURCE
+        # table (one row per point dim) and reference the grouped columns with raw
+        # refs; the dim stays on color:{by:category} so points don't merge.
+        if len(mids) >= 2 and dim_ids:
+            cname = {col["id"]: col["name"] for col in el["columns"]}
+            src_id = el["id"] + "-src"
+            src_name = "Scatter Source " + re.sub(r"[^A-Za-z0-9]", "", str(c["id"]))[-6:]
+            grp_id = src_id + "-g"
+            src = {"id": src_id, "kind": "table", "name": src_name,
+                   "source": {"elementId": MASTER_ID, "kind": "table"},
+                   "columns": el["columns"],
+                   "groupings": [{"id": grp_id, "groupBy": dim_ids, "calculations": mids}],
+                   "visibleAsSource": False}
+            if el.get("filters"): src["filters"] = el["filters"]   # carry null-suppression
+            _SCATTER_SRC.append(src)
+            def _raw(colid):
+                return {"id": el["id"] + "-" + colid, "formula": f"[{src_name}/{cname[colid]}]",
+                        "name": cname[colid]}
+            s_dim, s_x, s_y = _raw(dim_ids[0]), _raw(mids[0]), _raw(mids[1])
+            scols = [s_dim, s_x, s_y]
+            sc = {"id": el["id"], "kind": "scatter-chart", "name": title,
+                  "source": {"elementId": src_id, "kind": "table", "groupingId": grp_id},
+                  "xAxis": {"columnId": s_x["id"]}, "yAxis": {"columnIds": [s_y["id"]]},
+                  "color": {"by": "category", "column": s_dim["id"]}}
+            if len(mids) >= 3:
+                s_sz = _raw(mids[2]); scols.append(s_sz); sc["size"] = {"id": s_sz["id"]}
+            sc["columns"] = scols
+            rm = qlik_refmarks(c)
+            if rm: sc["refMarks"] = rm   # e.g. a Margin Target line at x=0.45
+            return sc
+        # <2 measures or no dim: fall back to a plain dim-on-x cartesian
+        el["xAxis"] = {"columnId": dim_ids[0] if dim_ids else mids[0]}
+        el["yAxis"] = {"columnIds": mids}
+        return el
+    # bar / line
     el["xAxis"] = {"columnId": dim_ids[0]}
     el["yAxis"] = {"columnIds": mids}
     if sort: el["xAxis"]["sort"] = {"by": sort[0], "direction": sort[1]}
     if kind == "bar-chart": el["dataLabel"] = {"labels": "shown"}
+    cc = qlik_color(c.get("color"), dim_ids, mids, el)
+    if cc: el["color"] = cc
+    rm = qlik_refmarks(c)
+    if rm: el["refMarks"] = rm
     return el
 
 # ---- container-banded layout (layout-playbook.md, verified 2026-06-10) -----
@@ -658,6 +755,13 @@ def main():
         xml, extra = auto_layout(pid, [{"id": e["id"], "kind": e["kind"]} for e in elems])
         pages.append({"id": pid, "name": "Overview", "elements": elems + extra})
         layout_pages.append(xml)
+
+    # Scatter charts emit a hidden grouped SOURCE table (one row per point dim);
+    # park them on the Data page next to the master (visibleAsSource:False, so
+    # they need no layout slot). build_element appended them to _SCATTER_SRC.
+    if _SCATTER_SRC:
+        data_page = next((p for p in pages if p["id"] == "page-data"), pages[0])
+        data_page["elements"].extend(_SCATTER_SRC)
 
     spec = {"name": a.name, "schemaVersion": 1, "pages": pages}
     if a.folder: spec["folderId"] = a.folder

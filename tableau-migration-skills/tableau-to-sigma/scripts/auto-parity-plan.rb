@@ -100,9 +100,20 @@ abort("auto-parity-plan.rb: no master element(s) detected; pass --master-id expl
 warn "matching charts that source from master element(s): #{master_ids.join(', ')}"
 
 master_id_set = master_ids.to_set
+# Transitive: hidden helper tables that THEMSELVES source a master (e.g. the
+# scatter grouped-source tables, bead z1d0) count as masters for chart
+# matching — the scatter chart sources the helper, not the master.
+spec['pages'].each do |pg|
+  pg['elements'].each do |e|
+    next unless e['kind'] == 'table' && e['visibleAsSource'] == false
+    next unless e['source'] && master_id_set.include?(e['source']['elementId'])
+    master_id_set << e['id']
+  end
+end
 sigma_charts = []
 spec['pages'].each do |pg|
   pg['elements'].each do |e|
+    next if master_id_set.include?(e['id'])
     next unless e['source'] && master_id_set.include?(e['source']['elementId'])
     sigma_charts << e
   end
@@ -138,24 +149,104 @@ sigma_charts.each do |el|
   rows = CSV.read(csv_path)
   next if rows.empty?
   header = rows.shift
+
+  # Measure Names / Measure Values long-format CSV → pivot WIDE so it compares
+  # against the dissolved multi-measure Sigma chart (build-charts emits one
+  # yAxis column per measure, NAMED with the verbatim Tableau measure label —
+  # the pivoted header below therefore matches by display name).
+  mn_i = header.index { |h| h.to_s.strip.casecmp?('Measure Names') }
+  mv_i = header.index { |h| h.to_s.strip.casecmp?('Measure Values') }
+  if mn_i && mv_i && header.length == 3
+    dim_i  = ([0, 1, 2] - [mn_i, mv_i]).first
+    labels = rows.map { |r| r[mn_i] }.compact.map(&:strip).reject(&:empty?).uniq
+    wide   = {}
+    order  = []
+    rows.each do |r|
+      k = r[dim_i]
+      unless wide.key?(k)
+        wide[k] = {}
+        order << k
+      end
+      wide[k][r[mn_i].to_s.strip] = r[mv_i]
+    end
+    header = [header[dim_i]] + labels
+    rows   = order.map { |k| [k] + labels.map { |l| wide[k][l] } }
+    warn "#{sigma_name.inspect}: Measure Names/Values long CSV pivoted to wide (#{labels.size} measure(s)) for the multi-measure chart"
+  end
+
+  n_fields = header.length
+
+  # Parse a Tableau CSV cell to a comparable value. Measures arrive as
+  # formatted strings ("110,788.35" / "$1,234" / "12.3%") — KPI expecteds MUST
+  # become floats or the strict compare fails on representation (bead s6fo).
+  parse_cell = lambda do |v|
+    return nil if v.nil? || v.to_s.strip.empty?
+    s = v.to_s.strip
+    pct = s.end_with?('%')
+    f = (Float(s.gsub(/[,$%]/, '')) rescue nil)
+    return v if f.nil?
+    pct ? f / 100.0 : f
+  end
   expected_rows = rows.map do |r|
     r.map.with_index do |v, i|
-      next nil if v.nil? || v.to_s.strip.empty?
-      i == 0 ? v : (begin Float(v.to_s.gsub(',', '')) rescue v end)
+      if n_fields == 1 || i.positive?
+        parse_cell.call(v)
+      else
+        v.nil? || v.to_s.strip.empty? ? nil : v
+      end
     end
   end
 
-  cols = (el['columns'] || []).map { |c| c['id'] }
+  # Column selection (bead s6fo): align the Sigma SELECT to the Tableau CSV's
+  # column order by NAME so 3-channel charts (stacked color / pivot / scatter)
+  # compare every channel — not an arbitrary first-2-columns slice.
+  all_cols = (el['columns'] || [])
+  header_base = lambda do |h|
+    h.to_s.strip
+     .sub(/^(?:sum|avg|average|min|max|median|distinct count|count) of /i, '')
+     .sub(/^(?:avg|sum|min|max|med|cnt|ctd)\.\s*/i, '')
+     .sub(/^(?:second|minute|hour|day|week|month|quarter|year) of /i, '')
+     .strip
+  end
+  pick = lambda do |h|
+    base = header_base.call(h)
+    cands = all_cols.select do |c|
+      nm = c['name'].to_s.strip
+      nm.casecmp?(h.to_s.strip) || nm.casecmp?(base)
+    end
+    # Prefer plotted channel columns over hidden filter passthroughs.
+    pref = %w[x- c- y- y2- k- p- calc-]
+    cands.min_by { |c| pref.index { |px| c['id'].to_s.start_with?(px) } || 99 }
+  end
+  matched = header.map { |h| pick.call(h) }
+  cols =
+    if matched.all? && matched.map { |c| c['id'] }.uniq.length == header.length
+      matched.map { |c| c['id'] }
+    elsif el['kind'] == 'kpi-chart' && all_cols.length >= 1
+      [all_cols.first['id']]
+    else
+      # Axis-channel fallback: x, color, y in CSV order (color-first when the
+      # CSV has 3 fields — Tableau exports the inner/color dim first).
+      x_id = el.dig('xAxis', 'columnId')
+      y_id = (el.dig('yAxis', 'columnIds') || []).map { |y| y.is_a?(Hash) ? y['columnId'] : y }.first
+      c_id = el.dig('color', 'column')
+      guess = n_fields >= 3 && c_id ? [c_id, x_id, y_id] : [x_id, y_id]
+      guess = all_cols.map { |c| c['id'] }.first(2) unless guess.all?
+      warn "#{sigma_name.inspect}: CSV headers #{header.inspect} did not all match Sigma column names — falling back to #{guess.inspect}"
+      guess.compact
+    end
+
   entry = {
     'chart'       => sigma_name,
     'tableau_view' => tableau_name,
     'sigma_element_id' => el['id'],
     'sigma_kind'  => el['kind'],
-    'sigma_columns' => cols.first(2),       # most charts: dim + measure
+    'sigma_columns' => cols,
     'expected'    => expected_rows
   }
-  if opts[:wb_id] && cols.size >= 2
-    entry['sql_template'] = %(SELECT "#{cols[0]}", "#{cols[1]}" FROM "workbook"."#{el['id']}" ORDER BY 1)
+  if opts[:wb_id] && cols.size >= 1
+    sel = cols.each_with_index.map { |c, i| %("#{c}" AS f#{i}) }.join(', ')
+    entry['sql_template'] = %(SELECT #{sel} FROM "workbook"."#{el['id']}" ORDER BY 1)
     entry['workbookId'] = opts[:wb_id]
   end
   plan_entries << entry

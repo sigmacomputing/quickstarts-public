@@ -28,6 +28,7 @@ views_path      = File.join(opts[:out], 'views.json')
 perf_path       = File.join(opts[:out], 'performance.json')
 ds_usage_path   = File.join(opts[:out], 'datasource-usage.json')
 wb_users_path   = File.join(opts[:out], 'workbook-users.json')
+consol_path     = File.join(opts[:out], 'consolidation-candidates.json')
 abort("inventory.json not found in #{opts[:out]}") unless File.exist?(inv_path)
 
 def load_json(path); File.exist?(path) ? JSON.parse(File.read(path)) : nil; end
@@ -40,11 +41,13 @@ views_analysis  = load_json(views_path)
 perf_analysis   = load_json(perf_path)
 ds_usage        = load_json(ds_usage_path)
 workbook_users  = load_json(wb_users_path)
+consolidation   = load_json(consol_path)
 has_shortlist  = !shortlist.nil? && !shortlist.empty?
 has_ds_deep    = !ds_analysis.nil?
 has_users_deep = !users_analysis.nil?
 has_views      = !views_analysis.nil?
 has_perf       = !perf_analysis.nil? && !(perf_analysis['views'] || []).empty?
+has_consol     = has_shortlist && !consolidation.nil? && !(consolidation['groups'] || []).empty?
 
 def h(s); CGI.escapeHTML(s.to_s); end
 def num(n); n.to_i.to_s.reverse.scan(/.{1,3}/).join(',').reverse; end
@@ -211,7 +214,7 @@ if has_shortlist
 
     %(<tr>
       <td>#{name_cell}</td>
-      <td class="al-right">#{bar_cell(r['accesses'], max_acc)}</td>
+      <td>#{bar_cell(r['accesses'], max_acc)}</td>
       <td class="al-right num">#{r['actors']}</td>
       <td><span class="risk-chip #{risk_cls}"><span class="risk-dot"></span>#{h(risk_txt)}</span></td>
       <td class="al-right num">#{format('%.1f', r['score'])}</td>
@@ -223,7 +226,7 @@ if has_shortlist
       <thead>
         <tr>
           <th>Workbook</th>
-          <th class="al-right">Usage</th>
+          <th>Usage</th>
           <th class="al-right">Viewers</th>
           <th>Conversion risk</th>
           <th class="al-right">Score</th>
@@ -306,7 +309,7 @@ if !usage_source.empty?
       <td class="rank">#{i + 1}</td>
       <td>#{name_cell}</td>
       <td class="muted">#{h((info['owner'] || '—').sub(/@.*/, ''))}</td>
-      <td class="al-right">#{bar_cell(w['accesses'], max_acc)}</td>
+      <td>#{bar_cell(w['accesses'], max_acc)}</td>
       <td>#{top_users_cell}</td>
       <td>#{top_view_cell}</td>
     </tr>)
@@ -318,7 +321,7 @@ if !usage_source.empty?
           <th class="al-right">#</th>
           <th>Workbook</th>
           <th>Owner</th>
-          <th class="al-right">Accesses</th>
+          <th>Accesses</th>
           <th>Top users</th>
           <th>Most-used view</th>
         </tr>
@@ -336,7 +339,7 @@ if inventory['content_ownership']
   rows = rows_data.map do |o|
     %(<tr>
       <td>#{h(o['owner'])}</td>
-      <td class="al-right">#{bar_cell(o['workbooks'], max_wb)}</td>
+      <td>#{bar_cell(o['workbooks'], max_wb)}</td>
       <td class="al-right num muted">#{num(o['datasources'])}</td>
       <td class="al-right num muted">#{num(o['views'])}</td>
       <td class="al-right num muted">#{num(o['flows'])}</td>
@@ -347,7 +350,7 @@ if inventory['content_ownership']
       <thead>
         <tr>
           <th>Owner</th>
-          <th class="al-right">Workbooks</th>
+          <th>Workbooks</th>
           <th class="al-right">Data sources</th>
           <th class="al-right">Views</th>
           <th class="al-right">Flows</th>
@@ -372,7 +375,7 @@ if inventory['datasource_types']
     %(<tr>
       <td><span class="ds-bucket #{badge_cls}">#{h(bucket)}</span></td>
       <td><code>#{h(db)}</code></td>
-      <td class="al-right">#{bar_cell(n, max_n)}</td>
+      <td>#{bar_cell(n, max_n)}</td>
     </tr>)
   end.join
   ds_html = <<~HTML
@@ -381,7 +384,7 @@ if inventory['datasource_types']
         <tr>
           <th>Type</th>
           <th>Connection class</th>
-          <th class="al-right">Count</th>
+          <th>Count</th>
         </tr>
       </thead>
       <tbody>#{rows}</tbody>
@@ -426,22 +429,33 @@ html = <<~HTML
 <meta charset="utf-8">
 <title>Tableau Environment Report — #{h(site_name)}</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
   :root {
-    --bg:#fafafa; --card:#ffffff; --ink:#0a0a0a; --ink-2:#525252;
+    /* Sigma brand palette — Shadow/Nimbus/White neutrals, Insight (CTA only), brand accents */
+    --bg:#fafafa; --card:#ffffff; --ink:#292929; --ink-2:#3d3d3d;
     --line:#e5e5e5; --line-soft:#f5f5f5;
-    --accent:#0f766e; --accent-soft:#f0fdfa;
-    --go:#15803d; --go-soft:#dcfce7;
-    --warn:#c2410c; --warn-soft:#fff7ed;
-    --blue:#1d4ed8; --blue-soft:#dbeafe;
-    --mute:#737373; --mute-soft:#f5f5f5;
+    --accent:#292929; --accent-soft:#f0f0f0;
+    --insight:#f0ff45;
+    --go:#1f9d57; --go-soft:#e6fbef;
+    --warn:#c2562a; --warn-soft:#fff1ea;
+    --blue:#2b8ca6; --blue-soft:#eaf8fc;
+    --mute:#6e7877; --mute-soft:#f0f0f0;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
   body {
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+    font-family: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased;
   }
   main { max-width: 1120px; margin: 0 auto; padding: 48px 48px 80px; }
+
+  /* Brand masthead */
+  .brand-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+  .brand-mark { font-weight: 700; font-size: 21px; letter-spacing: -0.02em; color: var(--ink); }
+  .brand-dot  { width: 9px; height: 9px; border-radius: 2px; background: var(--blue);
+                -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .brand-tag  { font-size: 12px; color: var(--mute); font-weight: 500;
+                text-transform: uppercase; letter-spacing: 0.08em; }
 
   /* Header */
   .doc-header { margin-bottom: 40px; }
@@ -455,8 +469,8 @@ html = <<~HTML
 
   /* Hero finding banner */
   .hero {
-    background: var(--accent-soft); border: 1px solid #99f6e4;
-    border-left: 4px solid var(--accent);
+    background: var(--accent-soft); border: 1px solid var(--line);
+    border-left: 4px solid var(--blue);
     border-radius: 8px;
     padding: 18px 22px; margin-bottom: 40px;
     display: flex; align-items: center; gap: 16px;
@@ -465,8 +479,8 @@ html = <<~HTML
   .hero-label { font-size: 11px; font-weight: 700; color: var(--accent);
                 text-transform: uppercase; letter-spacing: 0.08em;
                 white-space: nowrap; padding-right: 16px;
-                border-right: 1px solid #99f6e4; }
-  .hero-text { font-size: 15px; color: #134e4a; font-weight: 500; line-height: 1.4; }
+                border-right: 1px solid var(--line); }
+  .hero-text { font-size: 15px; color: var(--ink); font-weight: 500; line-height: 1.4; }
 
   /* Section */
   section { margin-bottom: 56px; }
@@ -527,6 +541,11 @@ html = <<~HTML
   table.data tbody tr:hover td { background: #fafafa; }
   .al-right { text-align: right; }
   .al-left  { text-align: left; }
+  /* Pin numeric + bar columns to content width so the text column absorbs the
+     slack — keeps a short value tight against its header instead of stranding it
+     across an over-wide column. */
+  table.data td.al-right, table.data th.al-right,
+  table.data td:has(.bar-cell) { width: 1%; white-space: nowrap; }
   .num { font-variant-numeric: tabular-nums; }
   .muted { color: var(--mute); }
   .warn { color: var(--warn); }
@@ -550,11 +569,11 @@ html = <<~HTML
 
   /* Bar cells (in tables) */
   .bar-cell { display: flex; align-items: center; gap: 10px;
-              justify-content: flex-end; min-width: 120px; }
-  .bar-track { flex: 1; height: 6px; background: #f5f5f5; border-radius: 4px;
-               overflow: hidden; max-width: 80px; }
+              justify-content: flex-start; }
+  .bar-track { flex: none; width: 84px; height: 6px; background: #f5f5f5; border-radius: 4px;
+               overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 4px; }
-  .bar-blue { background: linear-gradient(90deg, #14b8a6, #0d9488); }
+  .bar-blue { background: linear-gradient(90deg, #4cec8c, #2fb874); }
   .bar-num { font-variant-numeric: tabular-nums; font-weight: 600;
              min-width: 36px; text-align: right; }
 
@@ -623,7 +642,7 @@ html = <<~HTML
   .callout code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px;
                   font-size: 12px; }
 
-  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px;
+  code { font-family: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px;
          background: var(--line-soft); padding: 1px 6px; border-radius: 4px; }
 
   /* Next steps */
@@ -707,6 +726,11 @@ html = <<~HTML
 <body>
 <main>
 
+<div class="brand-bar">
+  <span class="brand-dot"></span>
+  <span class="brand-mark">sigma</span>
+  <span class="brand-tag">Migration Assessment</span>
+</div>
 <div class="doc-header">
   <div class="doc-eyebrow">Tableau Environment Report</div>
   <h1 class="doc-title">#{h(site_name)}</h1>
@@ -999,7 +1023,7 @@ if has_ds_deep
     'verify-db'         => ['risk-amber', 'Verify connector',   'Confirm Sigma supports this database; plan additional setup.'],
     'verify-modeling'   => ['risk-amber', 'Verify modeling',    'Federated cross-source join — review whether Sigma model relationships replicate it.'],
     'resolve-published' => ['risk-amber', 'Resolve published',  'References another published datasource — resolve recursively to the underlying connection.'],
-    'land-in-warehouse' => ['risk-red',   'Land in warehouse',  'File-based. Land in your warehouse first. Use the <code>tableau-vds-to-snowflake</code> skill to auto-generate Snowflake DDL + Sigma data model from the .tds.'],
+    'land-in-warehouse' => ['risk-red',   'Land in warehouse',  'File-based. Land in your warehouse first. Use the <code>tableau-vds-to-cdw</code> skill to auto-generate warehouse DDL (Snowflake or Databricks) + Sigma data model from the .tds.'],
     'other'             => ['risk-mute',  'Inspect',            'Mixed or unrecognized connection types — review individually.'],
     'unknown'           => ['risk-mute',  'Inspect',            'No connection metadata exposed (often Tableau Virtual Connections or Admin Insights internals) — review individually.']
   }
@@ -1271,9 +1295,69 @@ html += <<~HTML
 HTML
 
 next_sec += 1
-migration_num = format('%02d', next_sec)
-priv_num      = format('%02d', has_shortlist ? next_sec + 1 : next_sec)
-next_num      = format('%02d', has_shortlist ? next_sec + 2 : next_sec + 1)
+consol_offset     = has_consol ? 1 : 0
+migration_num     = format('%02d', next_sec)
+consolidation_num = format('%02d', next_sec + 1)
+priv_num      = format('%02d', has_shortlist ? next_sec + 2 + consol_offset : next_sec)
+next_num      = format('%02d', has_shortlist ? next_sec + 3 + consol_offset : next_sec + 1)
+
+# ---------- estimated migration effort (token model) ----------
+effort_html = ''
+token_model_path = File.join(__dir__, '..', 'refs', 'token-model.json')
+if has_shortlist && File.exist?(token_model_path)
+  tm = JSON.parse(File.read(token_model_path)) rescue nil
+  if tm
+    bucket  = 'tableau'
+    n_dash  = shortlist.size
+    n_rev   = n_with_unhandled
+    pd      = (tm['per_dashboard'] || {})[bucket] || {}
+    pr      = tm['per_review_item'] || {}
+    cal     = tm['calibration'] || {}
+    est = lambda { |m| (pd["#{m}_usd"].to_f * n_dash) + (pr["#{m}_usd"].to_f * n_rev) }
+    opus_usd   = est.call('opus')
+    sonnet_usd = est.call('sonnet')
+    fmt = lambda { |v| '$' + format('%.2f', v) }
+    effort_num = format('%02d', next_sec + 1 + consol_offset)
+    effort_html = <<~HTML
+      <section>
+        <div class="section-head">
+          <span class="section-num">#{effort_num}</span>
+          <h2 class="section-title">Estimated migration effort (tokens / $)</h2>
+          <span class="section-aside">one-shot orchestrator path</span>
+        </div>
+        <p class="section-lede">A planning estimate of the LLM cost to migrate the shortlisted workbooks via the <code>tableau-to-sigma</code> one-shot orchestrator. Tableau has no mechanical converter — the data-model and workbook specs are agent-authored — so per-workbook cost is higher and scales with calc / LOD / custom-SQL complexity. Each workbook flagged for review adds one human-decision round.</p>
+        <div class="stat-row">
+          <div class="stat stat-go">
+            <div class="stat-l">Estimated cost · Opus</div>
+            <div class="stat-v go">#{fmt.call(opus_usd)}</div>
+            <div class="stat-sub">#{n_dash} workbooks + #{n_rev} review</div>
+          </div>
+          <div class="stat">
+            <div class="stat-l">Estimated cost · Sonnet</div>
+            <div class="stat-v">#{fmt.call(sonnet_usd)}</div>
+            <div class="stat-sub">same scope, Sonnet pricing</div>
+          </div>
+          <div class="stat">
+            <div class="stat-l">Basis</div>
+            <div class="stat-v" style="font-size:20px;">#{n_dash}<span style="font-size:14px;color:var(--mute);font-weight:600;"> × per-dashboard</span></div>
+            <div class="stat-sub">+ #{n_rev} item#{n_rev == 1 ? '' : 's'} need review</div>
+          </div>
+        </div>
+        <table class="data">
+          <thead>
+            <tr><th>Component</th><th class="al-right">Opus</th><th class="al-right">Sonnet</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>#{n_dash} workbooks × per-dashboard</td><td class="al-right num">#{fmt.call(pd['opus_usd'].to_f * n_dash)}</td><td class="al-right num">#{fmt.call(pd['sonnet_usd'].to_f * n_dash)}</td></tr>
+            <tr><td>+ #{n_rev} item#{n_rev == 1 ? '' : 's'} need review</td><td class="al-right num">#{fmt.call(pr['opus_usd'].to_f * n_rev)}</td><td class="al-right num">#{fmt.call(pr['sonnet_usd'].to_f * n_rev)}</td></tr>
+            <tr><td><strong>Total estimated</strong></td><td class="al-right num"><strong>#{fmt.call(opus_usd)}</strong></td><td class="al-right num"><strong>#{fmt.call(sonnet_usd)}</strong></td></tr>
+          </tbody>
+        </table>
+        <p class="note">Calibrated #{h(cal['date'])}, one-shot orchestrator path — LLM cost only; rescale $ by your coding agent's pricing. A naive agent-driven migration is ~12–20× more expensive. The Tableau number is an estimate (specs are agent-authored, not yet benchmarked on the orchestrator path).</p>
+      </section>
+    HTML
+  end
+end
 
 if has_shortlist
   html += <<~HTML
@@ -1311,6 +1395,87 @@ if has_shortlist
 
   HTML
 end
+
+# ---------- consolidation candidates ----------
+if has_consol
+  cs = consolidation['summary'] || {}
+  n_consol  = cs['consolidate'] || 0
+  n_review  = cs['review'] || 0
+  n_avoid   = cs['conversions_avoidable'] || 0
+
+  consol_stat_row = <<~ROW
+    <div class="stat-row">
+      <div class="stat #{n_consol.positive? ? 'stat-go' : ''}">
+        <div class="stat-l">Consolidate now</div>
+        <div class="stat-v #{n_consol.positive? ? 'go' : ''}">#{n_consol}</div>
+        <div class="stat-sub">variant groups that collapse into one Sigma workbook</div>
+      </div>
+      <div class="stat">
+        <div class="stat-l">Review side-by-side</div>
+        <div class="stat-v">#{n_review}</div>
+        <div class="stat-sub">similar enough to compare before deciding</div>
+      </div>
+      <div class="stat #{n_avoid.positive? ? 'stat-go' : ''}">
+        <div class="stat-l">Conversions avoidable</div>
+        <div class="stat-v #{n_avoid.positive? ? 'go' : ''}">#{n_avoid}</div>
+        <div class="stat-sub">fewer workbook migrations if consolidated</div>
+      </div>
+    </div>
+  ROW
+
+  consol_reco_meta = {
+    'consolidate'   => ['tag-go',   'Consolidate'],
+    'review'        => ['tag-warn', 'Review side-by-side'],
+    'keep-separate' => ['tag-mute', 'Keep separate']
+  }
+  group_rows = (consolidation['groups'] || []).map do |g|
+    cls, label = consol_reco_meta[g['recommendation']] || ['tag-gray', g['recommendation']]
+    members_html = g['workbooks'].map do |w|
+      primary = w['workbookId'] == g.dig('primary', 'workbookId')
+      %(<div class="cluster-member"><strong>#{h(w['name'])}</strong>#{primary ? ' <span class="tag tag-blue">primary</span>' : ''} <span class="muted">#{w['sheets']} sheet#{w['sheets'] == 1 ? '' : 's'} · #{num(w['accesses'])} access#{w['accesses'] == 1 ? '' : 'es'}</span></div>)
+    end.join
+    proposal_html =
+      if g['recommendation'] == 'consolidate'
+        controls = g['proposed_controls'] || []
+        ctl_txt = controls.any? ? controls.map { |c| "#{c['kind']} on <code>#{h(c['column'])}</code>" }.join(', ') : 'no control needed — variants are near-identical, keep the primary'
+        %(<div class="top-view-cell"><strong>#{g['workbooks'].size} workbooks → 1 Sigma workbook</strong><div class="muted top-view-pct">#{ctl_txt}</div></div>)
+      else
+        %(<span class="muted">—</span>)
+      end
+    evidence_html = (g['similarity_drivers'] || []).first(3).map { |d| %(<div class="cluster-member muted">#{h(d)}</div>) }.join +
+                    (g['differences'] || []).reject { |d| d == 'no structural differences detected' }.first(2).map { |d| %(<div class="cluster-member" style="color:var(--warn);">#{h(d)}</div>) }.join
+    [
+      members_html,
+      bar_cell(g['field_overlap_pct'], 100),
+      evidence_html,
+      proposal_html,
+      %(<span class="tag #{cls}">#{h(label)}</span>)
+    ]
+  end
+  consol_table_html = table(
+    ['Workbook variants', 'Field overlap', 'Evidence', 'Proposed consolidation', 'Recommendation'],
+    group_rows,
+    align: %w[left left left left left]
+  )
+
+  html += <<~HTML
+  <section>
+    <div class="section-head">
+      <span class="section-num">#{consolidation_num}</span>
+      <h2 class="section-title">Consolidation candidates</h2>
+      <span class="section-aside">#{(consolidation['groups'] || []).size} group#{(consolidation['groups'] || []).size == 1 ? '' : 's'} · #{n_avoid} conversion#{n_avoid == 1 ? '' : 's'} avoidable</span>
+    </div>
+    <p class="section-lede">Workbooks that are variants of the same dashboard — copies that differ only by a filter value, a year, or a test/republish suffix. In Sigma those collapse into <strong>one workbook plus a control</strong>, so each consolidated group saves its extra conversions and leaves one asset to govern instead of several. Recommendations are conservative: a group is only marked "Consolidate" when the variants overlap heavily in the fields they actually use and the differences map to a control.</p>
+
+    #{consol_stat_row}
+    #{consol_table_html}
+    <p class="note">During migration you'll be asked per group: <strong>consolidate into one workbook with controls</strong> (recommended where marked) or <strong>migrate as-is</strong>. Decisions are recorded in <code>migration-plan.json</code> so the conversion step builds the consolidated workbook automatically. Full evidence per group in <code>consolidation-candidates.json</code>.</p>
+  </section>
+
+  HTML
+end
+
+html += effort_html
 
 html += <<~HTML
 <section class="section-tight">
