@@ -1,0 +1,213 @@
+{
+  "orders-overview": {
+    "name": "Orders Overview",
+    "sheets": 1,
+    "visuals": 5,
+    "visual_kinds": {
+      "KPIVisual": 2,
+      "BarChartVisual": 1,
+      "LineChartVisual": 1,
+      "PieChartVisual": 1
+    },
+    "calc_field_count": 3,
+    "window_calc_count": 0,
+    "parameter_count": 1,
+    "filter_group_count": 0,
+    "dataset_count": 1,
+    "dataset_source_types": [
+      "CustomSql"
+    ],
+    "has_custom_sql": true,
+    "has_joins": false,
+    "rls_role_count": 0,
+    "cls_count": 0,
+    "calc_buckets": {
+      "a": 3,
+      "b": 0,
+      "c": 0
+    },
+    "twb_size_kb": 0,
+    "n_features": 10,
+    "n_auto": 8,
+    "n_hint": 0,
+    "n_manual": 2,
+    "n_unhandled": 0,
+    "features": [
+      {
+        "name": "calc_mechanical",
+        "status": "auto",
+        "count": 3
+      },
+      {
+        "name": "visuals_built",
+        "status": "auto",
+        "count": 5
+      },
+      {
+        "name": "dataset_transforms",
+        "status": "manual",
+        "count": 2
+      },
+      {
+        "name": "parameters",
+        "status": "manual",
+        "count": 1
+      }
+    ]
+  },
+  "sales-deep-dive": {
+    "name": "Sales Deep Dive",
+    "sheets": 2,
+    "visuals": 8,
+    "visual_kinds": {
+      "KPIVisual": 1,
+      "BarChartVisual": 2,
+      "TableVisual": 1,
+      "PivotTableVisual": 1,
+      "ComboChartVisual": 1,
+      "LineChartVisual": 2
+    },
+    "calc_field_count": 6,
+    "window_calc_count": 1,
+    "parameter_count": 2,
+    "filter_group_count": 1,
+    "dataset_count": 2,
+    "dataset_source_types": [
+      "CustomSql",
+      "RelationalTable"
+    ],
+    "has_custom_sql": true,
+    "has_joins": true,
+    "rls_role_count": 1,
+    "cls_count": 0,
+    "calc_buckets": {
+      "a": 4,
+      "b": 1,
+      "c": 1
+    },
+    "twb_size_kb": 0,
+    "n_features": 19,
+    "n_auto": 9,
+    "n_hint": 0,
+    "n_manual": 8,
+    "n_unhandled": 2,
+    "features": [
+      {
+        "name": "calc_mechanical",
+        "status": "auto",
+        "count": 4
+      },
+      {
+        "name": "calc_restructure",
+        "status": "manual",
+        "count": 1
+      },
+      {
+        "name": "calc_window",
+        "status": "unhandled",
+        "count": 1
+      },
+      {
+        "name": "visuals_built",
+        "status": "auto",
+        "count": 5
+      },
+      {
+        "name": "visuals_rebuild",
+        "status": "manual",
+        "count": 3
+      },
+      {
+        "name": "dataset_joins",
+        "status": "manual",
+        "count": 1
+      },
+      {
+        "name": "dataset_transforms",
+        "status": "manual",
+        "count": 3
+      },
+      {
+        "name": "parameters",
+        "status": "manual",
+        "count": 2
+      },
+      {
+        "name": "filter_groups",
+        "status": "unhandled",
+        "count": 1
+      },
+      {
+        "name": "rls_cls",
+        "status": "manual",
+        "count": 1
+      }
+    ]
+  },
+  "exec-ml-board": {
+    "name": "Exec ML Board",
+    "sheets": 1,
+    "visuals": 4,
+    "visual_kinds": {
+      "InsightVisual": 1,
+      "GeospatialMapVisual": 1,
+      "SankeyDiagramVisual": 1,
+      "KPIVisual": 1
+    },
+    "calc_field_count": 4,
+    "window_calc_count": 3,
+    "parameter_count": 0,
+    "filter_group_count": 0,
+    "dataset_count": 1,
+    "dataset_source_types": [
+      "CustomSql"
+    ],
+    "has_custom_sql": true,
+    "has_joins": false,
+    "rls_role_count": 0,
+    "cls_count": 0,
+    "calc_buckets": {
+      "a": 1,
+      "b": 0,
+      "c": 3
+    },
+    "twb_size_kb": 0,
+    "n_features": 10,
+    "n_auto": 2,
+    "n_hint": 0,
+    "n_manual": 1,
+    "n_unhandled": 7,
+    "features": [
+      {
+        "name": "calc_mechanical",
+        "status": "auto",
+        "count": 1
+      },
+      {
+        "name": "calc_window",
+        "status": "unhandled",
+        "count": 3
+      },
+      {
+        "name": "visuals_built",
+        "status": "auto",
+        "count": 1
+      },
+      {
+        "name": "visuals_exotic",
+        "status": "unhandled",
+        "count": 3
+      },
+      {
+        "name": "dataset_transforms",
+        "status": "manual",
+        "count": 2
+      },
+      {
+        "name": "free_form_layout",
+        "status": "unhandled",
+        "count": 1
+      }
+    ]
+  }
+}

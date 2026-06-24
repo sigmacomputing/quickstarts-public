@@ -1,0 +1,8 @@
+# QuickSight assessment — Python deps.
+# The inventory script shells out to the AWS CLI via subprocess (NO boto3), so
+# the only hard requirement is the AWS CLI v2 on PATH, configured for the
+# target account. The standard library covers JSON/argparse/subprocess.
+#
+# (No third-party Python packages are required. The AWS CLI itself is installed
+# separately — see https://docs.aws.amazon.com/cli/ — and authenticated via
+# `aws configure`, `aws sso login`, or gimme-aws-creds for Okta orgs.)

@@ -1,0 +1,218 @@
+{
+    "Status": 200,
+    "DataSet": {
+        "Arn": "arn:aws:quicksight:us-east-1:153722385948:dataset/orders-enriched",
+        "DataSetId": "orders-enriched",
+        "Name": "Orders Enriched",
+        "CreatedTime": "2026-06-06T07:54:15.422000-04:00",
+        "LastUpdatedTime": "2026-06-06T08:01:57.035000-04:00",
+        "PhysicalTableMap": {
+            "ordersSql": {
+                "CustomSql": {
+                    "DataSourceArn": "arn:aws:quicksight:us-east-1:153722385948:datasource/snowflake-csa-tj",
+                    "Name": "orders_enriched",
+                    "SqlQuery": "select f.ORDER_ID, f.ORDER_CHANNEL, f.ORDER_STATUS, f.QUANTITY_ORDERED, f.NET_REVENUE, f.GROSS_REVENUE, f.NET_PROFIT, f.DISCOUNT_AMOUNT, p.CATEGORY, p.SUBCATEGORY, p.BRAND, c.REGION, c.STATE, c.CUSTOMER_SEGMENT, c.LOYALTY_TIER, d.FULL_DATE, d.YEAR, d.QUARTER, d.MONTH_NUMBER, d.MONTH_NAME from CSA.TJ.ORDER_FACT f left join CSA.TJ.PRODUCT_DIM p on f.PRODUCT_KEY=p.PRODUCT_KEY left join CSA.TJ.CUSTOMER_DIM c on f.CUSTOMER_KEY=c.CUSTOMER_KEY left join CSA.TJ.DATE_DIM d on f.ORDER_DATE_KEY=d.DATE_KEY",
+                    "Columns": [
+                        {
+                            "Name": "ORDER_ID",
+                            "Type": "STRING"
+                        },
+                        {
+                            "Name": "ORDER_CHANNEL",
+                            "Type": "STRING"
+                        },
+                        {
+                            "Name": "ORDER_STATUS",
+                            "Type": "STRING"
+                        },
+                        {
+                            "Name": "QUANTITY_ORDERED",
+                            "Type": "INTEGER"
+                        },
+                        {
+                            "Name": "NET_REVENUE",
+                            "Type": "DECIMAL"
+                        },
+                        {
+                            "Name": "GROSS_REVENUE",
+                            "Type": "DECIMAL"
+                        },
+                        {
+                            "Name": "NET_PROFIT",
+                            "Type": "DECIMAL"
+                        },
+                        {
+                            "Name": "DISCOUNT_AMOUNT",
+                            "Type": "DECIMAL"
+                        },
+                        {
+                            "Name": "CATEGORY",
+                            "Type": "STRING"
+                        },
+                        {
+                            "Name": "SUBCATEGORY",
+                            "Type": "STRING"
+                        },
+                        {
+                            "Name": "BRAND",
+                            "Type": "STRING"
+                        },
+                        {
+                            "Name": "REGION",
+                            "Type": "STRING"
+                        },
+                        {
+                            "Name": "STATE",
+                            "Type": "STRING"
+                        },
+                        {
+                            "Name": "CUSTOMER_SEGMENT",
+                            "Type": "STRING"
+                        },
+                        {
+                            "Name": "LOYALTY_TIER",
+                            "Type": "STRING"
+                        },
+                        {
+                            "Name": "FULL_DATE",
+                            "Type": "DATETIME"
+                        },
+                        {
+                            "Name": "YEAR",
+                            "Type": "INTEGER"
+                        },
+                        {
+                            "Name": "QUARTER",
+                            "Type": "INTEGER"
+                        },
+                        {
+                            "Name": "MONTH_NUMBER",
+                            "Type": "INTEGER"
+                        },
+                        {
+                            "Name": "MONTH_NAME",
+                            "Type": "STRING"
+                        }
+                    ]
+                }
+            }
+        },
+        "LogicalTableMap": {
+            "ordersLogical": {
+                "Alias": "orders_enriched",
+                "Source": {
+                    "PhysicalTableId": "ordersSql"
+                }
+            }
+        },
+        "OutputColumns": [
+            {
+                "Name": "ORDER_ID",
+                "Id": "ordersLogical.ORDER_ID",
+                "Type": "STRING"
+            },
+            {
+                "Name": "ORDER_CHANNEL",
+                "Id": "ordersLogical.ORDER_CHANNEL",
+                "Type": "STRING"
+            },
+            {
+                "Name": "ORDER_STATUS",
+                "Id": "ordersLogical.ORDER_STATUS",
+                "Type": "STRING"
+            },
+            {
+                "Name": "QUANTITY_ORDERED",
+                "Id": "ordersLogical.QUANTITY_ORDERED",
+                "Type": "INTEGER"
+            },
+            {
+                "Name": "NET_REVENUE",
+                "Id": "ordersLogical.NET_REVENUE",
+                "Type": "DECIMAL"
+            },
+            {
+                "Name": "GROSS_REVENUE",
+                "Id": "ordersLogical.GROSS_REVENUE",
+                "Type": "DECIMAL"
+            },
+            {
+                "Name": "NET_PROFIT",
+                "Id": "ordersLogical.NET_PROFIT",
+                "Type": "DECIMAL"
+            },
+            {
+                "Name": "DISCOUNT_AMOUNT",
+                "Id": "ordersLogical.DISCOUNT_AMOUNT",
+                "Type": "DECIMAL"
+            },
+            {
+                "Name": "CATEGORY",
+                "Id": "ordersLogical.CATEGORY",
+                "Type": "STRING"
+            },
+            {
+                "Name": "SUBCATEGORY",
+                "Id": "ordersLogical.SUBCATEGORY",
+                "Type": "STRING"
+            },
+            {
+                "Name": "BRAND",
+                "Id": "ordersLogical.BRAND",
+                "Type": "STRING"
+            },
+            {
+                "Name": "REGION",
+                "Id": "ordersLogical.REGION",
+                "Type": "STRING"
+            },
+            {
+                "Name": "STATE",
+                "Id": "ordersLogical.STATE",
+                "Type": "STRING"
+            },
+            {
+                "Name": "CUSTOMER_SEGMENT",
+                "Id": "ordersLogical.CUSTOMER_SEGMENT",
+                "Type": "STRING"
+            },
+            {
+                "Name": "LOYALTY_TIER",
+                "Id": "ordersLogical.LOYALTY_TIER",
+                "Type": "STRING"
+            },
+            {
+                "Name": "FULL_DATE",
+                "Id": "ordersLogical.FULL_DATE",
+                "Type": "DATETIME"
+            },
+            {
+                "Name": "YEAR",
+                "Id": "ordersLogical.YEAR",
+                "Type": "INTEGER"
+            },
+            {
+                "Name": "QUARTER",
+                "Id": "ordersLogical.QUARTER",
+                "Type": "INTEGER"
+            },
+            {
+                "Name": "MONTH_NUMBER",
+                "Id": "ordersLogical.MONTH_NUMBER",
+                "Type": "INTEGER"
+            },
+            {
+                "Name": "MONTH_NAME",
+                "Id": "ordersLogical.MONTH_NAME",
+                "Type": "STRING"
+            }
+        ],
+        "ImportMode": "DIRECT_QUERY",
+        "ConsumedSpiceCapacityInBytes": 0,
+        "DataSetUsageConfiguration": {
+            "DisableUseAsDirectQuerySource": false,
+            "DisableUseAsImportedSource": false
+        }
+    },
+    "RequestId": "8ae2a6a3-e4b2-46cb-856b-39259276e5c7"
+}

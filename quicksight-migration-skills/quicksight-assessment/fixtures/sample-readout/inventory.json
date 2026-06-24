@@ -1,0 +1,83 @@
+{
+  "account": {
+    "account_id": "153722385948",
+    "region": "us-east-1",
+    "generated_at": "2026-06-06",
+    "edition": "Enterprise",
+    "enterprise": true
+  },
+  "analyses": [
+    {
+      "id": "orders-overview",
+      "name": "Orders Overview",
+      "last_updated": "2026-05-20T00:00:00Z",
+      "sheet_count": 1,
+      "visual_count": 5,
+      "visual_kinds": { "KPIVisual": 2, "BarChartVisual": 1, "LineChartVisual": 1, "PieChartVisual": 1 },
+      "visuals_built": 5, "visuals_mid": 0, "visuals_unhandled": 0,
+      "calc_field_count": 3,
+      "calc_buckets": { "a": 3, "b": 0, "c": 0 },
+      "window_calc_count": 0,
+      "parameter_count": 1, "filter_group_count": 0,
+      "free_form_sheets": 0, "section_based_sheets": 0,
+      "dataset_identifiers": ["orders"],
+      "dataset_ids": ["ds-orders-enriched"]
+    },
+    {
+      "id": "sales-deep-dive",
+      "name": "Sales Deep Dive",
+      "last_updated": "2026-05-18T00:00:00Z",
+      "sheet_count": 2,
+      "visual_count": 8,
+      "visual_kinds": { "KPIVisual": 1, "BarChartVisual": 2, "TableVisual": 1, "PivotTableVisual": 1, "ComboChartVisual": 1, "LineChartVisual": 2 },
+      "visuals_built": 5, "visuals_mid": 3, "visuals_unhandled": 0,
+      "calc_field_count": 6,
+      "calc_buckets": { "a": 4, "b": 1, "c": 1 },
+      "window_calc_count": 1,
+      "parameter_count": 2, "filter_group_count": 1,
+      "free_form_sheets": 0, "section_based_sheets": 0,
+      "dataset_identifiers": ["orders", "customers"],
+      "dataset_ids": ["ds-orders-enriched", "ds-customers"]
+    },
+    {
+      "id": "exec-ml-board",
+      "name": "Exec ML Board",
+      "last_updated": "2026-05-10T00:00:00Z",
+      "sheet_count": 1,
+      "visual_count": 4,
+      "visual_kinds": { "InsightVisual": 1, "GeospatialMapVisual": 1, "SankeyDiagramVisual": 1, "KPIVisual": 1 },
+      "visuals_built": 1, "visuals_mid": 0, "visuals_unhandled": 3,
+      "calc_field_count": 4,
+      "calc_buckets": { "a": 1, "b": 0, "c": 3 },
+      "window_calc_count": 3,
+      "parameter_count": 0, "filter_group_count": 0,
+      "free_form_sheets": 1, "section_based_sheets": 0,
+      "dataset_identifiers": ["orders"],
+      "dataset_ids": ["ds-orders-enriched"]
+    }
+  ],
+  "datasets": [
+    {
+      "id": "ds-orders-enriched",
+      "name": "Orders Enriched",
+      "import_mode": "DIRECT_QUERY",
+      "physical_kinds": ["CustomSql"],
+      "has_custom_sql": true, "has_joins": false, "transform_count": 2,
+      "rls_enabled": false, "cls_enabled": false, "column_count": 14
+    },
+    {
+      "id": "ds-customers",
+      "name": "Customers",
+      "import_mode": "SPICE",
+      "physical_kinds": ["RelationalTable"],
+      "has_custom_sql": false, "has_joins": true, "transform_count": 1,
+      "rls_enabled": true, "cls_enabled": false, "column_count": 9
+    }
+  ],
+  "data_sources": [
+    { "id": "src-snow", "name": "Snowflake Prod", "type": "SNOWFLAKE" }
+  ],
+  "environment_overview": {
+    "analyses": 3, "dashboards": 2, "datasets": 2, "data_sources": 1
+  }
+}
