@@ -1,0 +1,16 @@
+{
+  "name": "metabase-to-sigma-converter",
+  "version": "0.1.0",
+  "description": "Metabase → Sigma converter (cards/models JSON → data model; dashboard JSON → workbook). Zero runtime dependencies — every input is plain REST JSON.",
+  "type": "module",
+  "license": "MIT",
+  "bin": { "metabase-to-sigma": "cli.ts" },
+  "scripts": {
+    "convert": "node --import tsx/esm cli.ts",
+    "test": "node --import tsx/esm test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
