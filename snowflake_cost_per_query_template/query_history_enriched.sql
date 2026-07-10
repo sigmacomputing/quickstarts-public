@@ -1,5 +1,3 @@
-create schema dev.cost_per_query;
-
 -- query_history_enriched
 -- One row per query, enriched with allocated cost/credits (compute, cloud services,
 -- query acceleration, Cortex functions) plus Sigma query-tag attribution.
@@ -439,130 +437,6 @@ BEGIN
             and start_time >= DATEADD('day', -:lookback_days, current_timestamp())
         )
 
-        , hours_list as (
-            select
-                dateadd(
-                    'hour',
-                    '-' || row_number() over (order by seq4() asc),
-                    dateadd('day', '+1', current_date::timestamp_tz)
-                ) as hour_start,
-                dateadd('hour', '+1', hour_start) as hour_end
-            from table(generator(rowcount => (24 * 730)))
-        )
-
-        , query_hours as (
-            select
-                hours_list.hour_start,
-                hours_list.hour_end,
-                queries.*
-            from hours_list
-            inner join filtered_queries as queries
-                on hours_list.hour_start >= date_trunc('hour', queries.execution_start_time)
-                    and hours_list.hour_start < queries.end_time
-                    and queries.ran_on_warehouse
-        )
-
-        , query_seconds_per_hour as (
-            select
-                *,
-                datediff('millisecond', greatest(execution_start_time, hour_start), least(end_time, hour_end)) as num_milliseconds_query_ran,
-                sum(num_milliseconds_query_ran) over (partition by warehouse_id, hour_start) as total_query_milliseconds_in_hour,
-                div0(num_milliseconds_query_ran, total_query_milliseconds_in_hour) as fraction_of_total_query_time_in_hour,
-                sum(query_acceleration_bytes_scanned) over (partition by warehouse_id, hour_start) as total_query_acceleration_bytes_scanned_in_hour,
-                div0(query_acceleration_bytes_scanned, total_query_acceleration_bytes_scanned_in_hour) as fraction_of_total_query_acceleration_bytes_scanned_in_hour,
-                hour_start as hour
-            from query_hours
-        )
-
-        , credits_billed_hourly as (
-            select
-                start_time as hour,
-                entity_id as warehouse_id,
-                sum(iff(service_type = 'WAREHOUSE_METERING', credits_used_compute, 0)) as credits_used_compute,
-                sum(iff(service_type = 'WAREHOUSE_METERING', credits_used_cloud_services, 0)) as credits_used_cloud_services,
-                sum(iff(service_type = 'QUERY_ACCELERATION', credits_used_compute, 0)) as credits_used_query_acceleration
-            from snowflake.account_usage.metering_history
-            where true
-                and service_type in ('QUERY_ACCELERATION', 'WAREHOUSE_METERING')
-            group by 1, 2
-        )
-
-        , query_cost as (
-            select
-                query_seconds_per_hour.*,
-                credits_billed_hourly.credits_used_compute * daily_rates.effective_rate as actual_warehouse_cost,
-                credits_billed_hourly.credits_used_compute * query_seconds_per_hour.fraction_of_total_query_time_in_hour * daily_rates.effective_rate as allocated_compute_cost_in_hour,
-                credits_billed_hourly.credits_used_compute * query_seconds_per_hour.fraction_of_total_query_time_in_hour as allocated_compute_credits_in_hour,
-                credits_billed_hourly.credits_used_query_acceleration * query_seconds_per_hour.fraction_of_total_query_acceleration_bytes_scanned_in_hour as allocated_query_acceleration_credits_in_hour,
-                allocated_query_acceleration_credits_in_hour * daily_rates.effective_rate as allocated_query_acceleration_cost_in_hour
-            from query_seconds_per_hour
-            inner join credits_billed_hourly
-                on query_seconds_per_hour.warehouse_id = credits_billed_hourly.warehouse_id
-                    and query_seconds_per_hour.hour = credits_billed_hourly.hour
-            inner join daily_rates
-                on date(query_seconds_per_hour.start_time) = daily_rates.date
-                    and daily_rates.service_type = 'WAREHOUSE_METERING'
-                    and daily_rates.usage_type = 'compute'
-        )
-
-        , cost_per_query as (
-            select
-                query_id,
-                any_value(start_time) as start_time,
-                any_value(end_time) as end_time,
-                any_value(execution_start_time) as execution_start_time,
-                sum(allocated_compute_cost_in_hour) as compute_cost,
-                sum(allocated_compute_credits_in_hour) as compute_credits,
-                sum(allocated_query_acceleration_cost_in_hour) as query_acceleration_cost,
-                sum(allocated_query_acceleration_credits_in_hour) as query_acceleration_credits,
-                any_value(credits_used_cloud_services) as credits_used_cloud_services,
-                any_value(ran_on_warehouse) as ran_on_warehouse
-            from query_cost
-            group by 1
-        )
-
-        , credits_billed_daily as (
-            select
-                date(hour) as date,
-                sum(credits_used_compute) as daily_credits_used_compute,
-                sum(credits_used_cloud_services) as daily_credits_used_cloud_services,
-                greatest(daily_credits_used_cloud_services - daily_credits_used_compute * 0.1, 0) as daily_billable_cloud_services
-            from credits_billed_hourly
-            group by 1
-        )
-
-        , all_queries as (
-            select
-                query_id,
-                start_time,
-                end_time,
-                execution_start_time,
-                compute_cost,
-                compute_credits,
-                query_acceleration_cost,
-                query_acceleration_credits,
-                credits_used_cloud_services,
-                ran_on_warehouse
-            from cost_per_query
-
-            union all
-
-            select
-                query_id,
-                start_time,
-                end_time,
-                execution_start_time,
-                0 as compute_cost,
-                0 as compute_credits,
-                0 as query_acceleration_cost,
-                0 as query_acceleration_credits,
-                credits_used_cloud_services,
-                ran_on_warehouse
-            from filtered_queries
-            where
-                not ran_on_warehouse
-        )
-
         , cortex_consumption_by_function as (
             select query_id
             , function_name
@@ -595,56 +469,67 @@ BEGIN
             left join cortex_function_usage_by_query
                 on cortex_function_usage_by_query.query_id = cortex_function_usage_details.query_id
         )
-
-        , stg__cost_per_query as (
-            select
-                all_queries.query_id,
-                all_queries.start_time,
-                all_queries.end_time,
-                all_queries.execution_start_time,
-                all_queries.compute_cost,
-                all_queries.compute_credits,
-                all_queries.query_acceleration_cost,
-                all_queries.query_acceleration_credits,
-                -- For the most recent day, which is not yet complete, this calculation won't be perfect.
-                -- So, we don't look at any queries from the most recent day t, just t-1 and before.
-                (div0(all_queries.credits_used_cloud_services, credits_billed_daily.daily_credits_used_cloud_services) * credits_billed_daily.daily_billable_cloud_services) * coalesce(daily_rates.effective_rate, current_rates.effective_rate) as cloud_services_cost,
-                div0(all_queries.credits_used_cloud_services, credits_billed_daily.daily_credits_used_cloud_services) * credits_billed_daily.daily_billable_cloud_services as cloud_services_credits,
-                zeroifnull(cortex_function_cost_and_usage_by_query.cortex_credits * coalesce(ai_services_daily_rates.effective_rate, ai_services_current_rates.effective_rate)) as cortex_functions_cost,
-                zeroifnull(cortex_function_cost_and_usage_by_query.cortex_credits) as cortex_functions_credits,
-                all_queries.compute_cost + all_queries.query_acceleration_cost + cloud_services_cost + cortex_functions_cost as query_cost,
-                all_queries.compute_credits + all_queries.query_acceleration_credits + cloud_services_credits + cortex_functions_credits as query_credits,
-                all_queries.ran_on_warehouse,
-                coalesce(daily_rates.currency, current_rates.currency) as currency
-            from all_queries
-            inner join credits_billed_daily
-                on date(all_queries.start_time) = credits_billed_daily.date
-            left join daily_rates
-                on date(all_queries.start_time) = daily_rates.date
-                    and daily_rates.service_type = 'CLOUD_SERVICES'
-                    and daily_rates.usage_type = 'cloud services'
-            inner join daily_rates as current_rates
-                on current_rates.is_latest_rate
-                    and current_rates.service_type = 'CLOUD_SERVICES'
-                    and current_rates.usage_type = 'cloud services'
-            left join daily_rates as ai_services_daily_rates
-                on date(all_queries.start_time) = ai_services_daily_rates.date
-                    and ai_services_daily_rates.service_type = 'AI_SERVICES'
-                    and ai_services_daily_rates.usage_type = 'ai services'
-            inner join daily_rates as ai_services_current_rates
-                on ai_services_current_rates.is_latest_rate
-                    and ai_services_current_rates.service_type = 'AI_SERVICES'
-                    and ai_services_current_rates.usage_type = 'ai services'
-            left join cortex_function_cost_and_usage_by_query
-                on all_queries.query_id = cortex_function_cost_and_usage_by_query.query_id
-            order by all_queries.start_time asc
-        )
-
+        
         , query_attribution_history as (
             select *
             from snowflake.account_usage.query_attribution_history
             where end_time < date_trunc(day, getdate())
             and start_time >= DATEADD('day', -:lookback_days, current_timestamp())
+        )
+
+        , stg__cost_per_query as (
+            select
+                filtered_queries.query_id,
+                filtered_queries.start_time,
+                filtered_queries.end_time,
+                filtered_queries.execution_start_time,
+
+                filtered_queries.credits_used_cloud_services as cloud_services_credits,
+                filtered_queries.credits_used_cloud_services * coalesce(daily_rates_cloud_services.effective_rate, current_rates_cloud_services.effective_rate) as cloud_services_cost,
+                query_attribution_history.credits_attributed_compute as compute_credits,
+                query_attribution_history.credits_attributed_compute * coalesce(daily_rates_compute.effective_rate, current_rates_compute.effective_rate) as compute_cost,
+                query_attribution_history.credits_used_query_acceleration as query_acceleration_credits,
+                query_attribution_history.credits_used_query_acceleration * coalesce(daily_rates_compute.effective_rate, current_rates_compute.effective_rate) as query_acceleration_cost,
+                cortex_function_cost_and_usage_by_query.cortex_credits as cortex_functions_credits,
+                cortex_function_cost_and_usage_by_query.cortex_credits * coalesce(daily_rates_ai_services.effective_rate, current_rates_ai_services.effective_rate) as cortex_functions_cost,
+
+                zeroifnull(compute_cost) + zeroifnull(query_acceleration_cost) + zeroifnull(cloud_services_cost) + zeroifnull(cortex_functions_cost) as query_cost,
+                zeroifnull(compute_credits) + zeroifnull(query_acceleration_credits) + zeroifnull(cloud_services_credits) + zeroifnull(cortex_functions_credits) as query_credits
+
+            from filtered_queries
+            left join query_attribution_history
+                on filtered_queries.query_id = query_attribution_history.query_id
+            left join cortex_function_cost_and_usage_by_query
+                on filtered_queries.query_id = cortex_function_cost_and_usage_by_query.query_id
+            
+            left join daily_rates as daily_rates_compute
+                 on date(filtered_queries.start_time) = daily_rates_compute.date
+                     and daily_rates_compute.service_type = 'WAREHOUSE_METERING'
+                     and daily_rates_compute.usage_type = 'compute'
+            left join daily_rates as current_rates_compute
+                on current_rates_compute.is_latest_rate
+                    and current_rates_compute.service_type = 'WAREHOUSE_METERING'
+                     and current_rates_compute.usage_type = 'compute'
+
+            left join daily_rates as daily_rates_cloud_services
+                on date(filtered_queries.start_time) = daily_rates_cloud_services.date
+                    and daily_rates_cloud_services.service_type = 'CLOUD_SERVICES'
+                    and daily_rates_cloud_services.usage_type = 'cloud services'
+            inner join daily_rates as current_rates_cloud_services
+                on current_rates_cloud_services.is_latest_rate
+                    and current_rates_cloud_services.service_type = 'CLOUD_SERVICES'
+                    and current_rates_cloud_services.usage_type = 'cloud services'
+            
+            left join daily_rates as daily_rates_ai_services
+                on date(filtered_queries.start_time) = daily_rates_ai_services.date
+                    and daily_rates_ai_services.service_type = 'AI_SERVICES'
+                    and daily_rates_ai_services.usage_type = 'ai services'
+            inner join daily_rates as current_rates_ai_services
+                on current_rates_ai_services.is_latest_rate
+                    and current_rates_ai_services.service_type = 'AI_SERVICES'
+                    and current_rates_ai_services.usage_type = 'ai services'
+            
+            order by filtered_queries.start_time asc
         )
 
         , final as (
@@ -736,7 +621,7 @@ BEGIN
             , cortex_function_cost_and_usage_by_query.cortex_credits_by_function
             , cortex_function_cost_and_usage_by_query.cortex_usage_details
             from query_history
-            left join stg__cost_per_query cost_per_query
+            left join stg__cost_per_query as cost_per_query
                 on query_history.query_id = cost_per_query.query_id
             left join query_attribution_history
                 on query_attribution_history.query_id = query_history.query_id
@@ -1029,7 +914,7 @@ AS CALL sp_query_history_enriched_refresh(3);
 ALTER TASK task_query_history_enriched_refresh RESUME;
 
 -- ------------------------------------------------------------
--- 6. Initial load (backfills the last 365 days)
+-- 6. Initial load (backfills the last 180 days)
 --    ACCOUNT_USAGE.QUERY_HISTORY retains up to 1 year; adjust as needed.
 -- ------------------------------------------------------------
 CALL sp_query_history_enriched_refresh(180);
