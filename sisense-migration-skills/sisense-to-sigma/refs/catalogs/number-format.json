@@ -1,0 +1,11 @@
+{
+  "dimension": "number-format",
+  "source_tool": "sisense",
+  "authoritative_doc": "https://docs.sisense.com/main/SisenseLinux/formatting-numbers-in-widgets.htm",
+  "sigma_target_doc": "https://help.sigmacomputing.com/docs/data-types-and-formats",
+  "on_unmapped_default": "warn+ship-unformatted (NEVER a title-substring currency/percent guess)",
+  "description": "Sisense widget JAQL number-format signal -> Sigma column `format` object. The ONLY documentation-grounded numeric-format signal convert.py ports is the currency mask (JAQL `format.mask.currency: true`), which maps to a Sigma currency number format. IMPORTANT (beads-sigma-kvza): the previous `_money_fmt` ALSO returned a $ format when the widget TITLE contained the substring 'Revenue' or 'Cost' — a name-guessing heuristic that mis-formatted any non-currency measure with those words in its title. That title-substring guess has been REMOVED. A JAQL `format.mask` that is present but is NOT a currency signal (e.g. a percent/number mask) is a formatting intent this converter does not yet port -> it now LOUDLY warns and ships the column unformatted, rather than silently dropping it or wrong-guessing. Sisense's default currency symbol is USD '$' per the cited doc.",
+  "rows": [
+    {"source": "mask.currency", "sigma": "$,.0f", "doc_ref": "https://docs.sisense.com/main/SisenseLinux/formatting-numbers-in-widgets.htm", "sigma_target_ref": "https://help.sigmacomputing.com/docs/data-types-and-formats", "sigma_verified": {"status": "n"}, "on_unmapped": "warn+ship-unformatted", "notes": "JAQL `format.mask.currency: true` -> Sigma format {kind:number, formatString:'$,.0f', currencySymbol:'$'} (the MONEY object). This is the sole signal that yields a currency format; the removed title-substring heuristic is documented in the dimension description above."}
+  ]
+}
