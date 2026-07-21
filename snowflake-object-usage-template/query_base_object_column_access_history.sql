@@ -1,12 +1,14 @@
 -- query_base_object_column_access_history
--- One row per column accessed per object per query.
+-- One row per column accessed per base object per query.
 -- Incrementally materialized nightly via Snowflake Task + Stored Procedure using MERGE.
 --
--- Configuration: replace the three variables below before running.
---   target_database  : database where the table and task will be created
---   target_schema    : schema where the table and task will be created
---   task_warehouse   : warehouse the task will use when it runs
---
+-- Configuration: replace the variables below before running.
+--   materialization_role_name    : role used to create/own the table, procedure and task
+--   target_database              : database where the table and task will be created
+--   target_schema                : schema where the table and task will be created
+--   sigma_role_name              : role used in your Sigma connection (granted SELECT on the table)
+--   task_warehouse               : warehouse the procedure/task will use when it runs
+-- 
 -- On first run this script will:
 --   1. Create the table (if it doesn't exist)
 --   2. Create (or replace) the stored procedure containing the transformation logic
@@ -14,13 +16,16 @@
 --   4. Resume the task
 --   5. Execute the stored procedure immediately to backfill the last 180 days
 
+SET materialization_role_name = 'role to use while running this job that will own the table, stored procedure and task';
 SET target_database = 'target database';
 SET target_schema   = 'target schema';
-SET task_warehouse  = 'demo_eng_wh';
+SET sigma_role_name  = 'role used in Sigma connection';
+SET task_warehouse  = 'warehouse to use for incremental materialization';
 
 -- ------------------------------------------------------------
 -- 1. Create the table
 -- ------------------------------------------------------------
+USE role identifier($materialization_role_name);
 USE database identifier($target_database);
 USE schema identifier($target_schema);
 
@@ -53,15 +58,17 @@ CREATE TABLE IF NOT EXISTS query_base_object_column_access_history (
     sigma_user_email            VARCHAR                     COMMENT 'Sigma user who executed the query',
     sigma_user_id               VARCHAR                     COMMENT '',
     sigma_user_email_domain     VARCHAR                     COMMENT ''
-);
+)
+CLUSTER BY (to_date(query_start_time));
 
--- ------------------------------------------------------------
--- 2. Stored procedure that contains the MERGE logic
--- ------------------------------------------------------------
+-- ------------------------------------------------------------------------------
+-- 2. Stored procedure that contains the MERGE logic. Runs with owner's rights
+-- ------------------------------------------------------------------------------
 
 CREATE OR REPLACE PROCEDURE sp_query_base_object_column_access_history_refresh(lookback_days FLOAT)
 RETURNS STRING
 LANGUAGE SQL
+EXECUTE AS OWNER
 AS
 BEGIN
     MERGE INTO query_base_object_column_access_history AS target
@@ -243,7 +250,9 @@ BEGIN
     );
 END;
 
-
+GRANT usage  ON database identifier($target_database)            TO role identifier($sigma_role_name);
+GRANT usage  ON schema   identifier($target_schema)              TO role identifier($sigma_role_name);
+GRANT select ON table    query_base_object_column_access_history TO role identifier($sigma_role_name);
 -- ------------------------------------------------------------
 -- 3. Nightly task
 -- ------------------------------------------------------------
@@ -254,7 +263,7 @@ CREATE OR REPLACE TASK task_query_base_object_column_access_history_refresh
 AS CALL sp_query_base_object_column_access_history_refresh(3);
 
 -- ------------------------------------------------------------
--- 4. Resume the task
+-- 4. Resume the task so it runs nightly
 -- ------------------------------------------------------------
 
 ALTER TASK task_query_base_object_column_access_history_refresh RESUME;
