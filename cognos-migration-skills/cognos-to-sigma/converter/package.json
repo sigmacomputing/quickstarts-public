@@ -1,0 +1,19 @@
+{
+  "name": "cognos-to-sigma-converter",
+  "version": "0.1.0",
+  "description": "IBM Cognos Analytics → Sigma converter (Data Module JSON → data model; report-spec XML → workbook). Destined to vendor into sigma-data-model-mcp as convert_cognos_to_sigma tools.",
+  "type": "module",
+  "license": "MIT",
+  "bin": { "cognos-to-sigma": "cli.ts" },
+  "scripts": {
+    "convert": "node --import tsx/esm cli.ts",
+    "test": "node --import tsx/esm test.ts"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.5.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
