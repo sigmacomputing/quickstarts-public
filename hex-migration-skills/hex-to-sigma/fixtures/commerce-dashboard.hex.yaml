@@ -1,0 +1,752 @@
+schemaVersion: 3
+meta:
+  sourceVersionId: 019fb495-15bf-705b-a820-f61c73de934b # DO NOT CHANGE - Hex uses this to match up project versions when reimporting the file
+  description: ""
+  projectId: 019fb3c3-5308-754d-b066-112f66f7cb84 # DO NOT CHANGE - Unique ID of the project from which this file was generated
+  title: Commerce Dashboard
+  timezone: null
+  appTheme: LIGHT
+  codeLanguage: PYTHON
+  status: null
+  categories: []
+  castDecimalsDefault: true
+  hexType: PROJECT
+  allowExecutionReordering: true
+  prerunApp: false
+  autoRerunApp: true
+  cachePublishedAppState: true
+  logicQueryCacheTimeout: null
+  publishedQueryCacheTimeout: null
+  refreshStalePublishedApp: true
+  kernelImage: python312
+  kernelSize: medium
+projectAssets:
+  dataConnections: []
+  envVars: []
+  secrets: []
+sharedAssets:
+  secrets: []
+  vcsPackages: []
+  dataConnections:
+    - dataConnectionId: 019fb3c2-ba1b-7496-9eef-ee57befd47fe # Snowflake-PB (snowflake)
+  externalFileIntegrations: []
+cells:
+  - cellType: SQL
+    cellId: 019fb3d4-b153-7775-897a-c66d881fb735 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: commerce_joined
+    config:
+      source: |-
+        SELECT
+          c."Visit ID",
+          c."Date",
+          YEAR(c."Date") AS "Year",
+          c."Revenue",
+          c."Quantity",
+          b."Brand",
+          cat."Category",
+          ctry."Country"
+        FROM QUICKSTARTS.HEX_ECOMMERCE.COMMERCE c
+        JOIN QUICKSTARTS.HEX_ECOMMERCE.BRAND b ON c."Brand ID" = b."Brand ID"
+        JOIN QUICKSTARTS.HEX_ECOMMERCE.CATEGORY cat ON c."Category ID" = cat."Category ID"
+        JOIN QUICKSTARTS.HEX_ECOMMERCE.COUNTRY ctry ON c."Country ID" = ctry."Country ID";
+      dataFrameCell: false
+      dataConnectionId: 019fb3c2-ba1b-7496-9eef-ee57befd47fe
+      resultVariableName: commerce_joined
+      useRichDisplay: true
+      enablePreview: true
+      sqlCellOutputType: PANDAS
+      useQueryMode: false
+      castDecimals: true
+      useNativeDates: true
+      outputFilteredResult: true
+      allowDuplicateColumns: false
+      tableDisplayConfig:
+        pageSize: 50
+        height: 100
+        hideIcons: false
+        defaultColumnWidth: null
+        hideIndex: false
+        defaultSortColumn: null
+        defaultSortIndexColumn: null
+        defaultSortDirection: ASC
+        conditionalFormatting: null
+        calcs: null
+        filters: null
+        columnProperties:
+          - originalName: Brand
+            renameTo: null
+            size: 220
+            wrapText: null
+            displayFormat: null
+          - originalName: Brand ID
+            renameTo: null
+            size: 101
+            wrapText: null
+            displayFormat: null
+          - originalName: Category
+            renameTo: null
+            size: 182
+            wrapText: null
+            displayFormat: null
+          - originalName: Country
+            renameTo: null
+            size: 118
+            wrapText: null
+            displayFormat: null
+          - originalName: Date
+            renameTo: null
+            size: 99
+            wrapText: null
+            displayFormat: null
+          - originalName: Quantity
+            renameTo: null
+            size: 98
+            wrapText: null
+            displayFormat: null
+          - originalName: Revenue
+            renameTo: null
+            size: 129
+            wrapText: null
+            displayFormat: null
+          - originalName: Visit ID
+            renameTo: null
+            size: 92
+            wrapText: null
+            displayFormat: null
+          - originalName: Year
+            renameTo: null
+            size: 76
+            wrapText: null
+            displayFormat: null
+          - originalName: row-index-0
+            renameTo: null
+            size: 46
+            wrapText: null
+            displayFormat: null
+        columnOrdering: null
+        customColumnOrdering: null
+        pinnedColumns: null
+        hiddenColumns: null
+        pinIndexColumns: false
+        showAggregations: false
+        columnAggregations: null
+  - cellType: METRIC
+    cellId: 019fb3c3-ce62-7338-bffd-674597c2a276 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: Value 1
+    config:
+      title: Total Revenue
+      valueVariableName: commerce_joined
+      showComparison: false
+      comparisonType: VALUE
+      comparisonVariableName: null
+      comparisonFormat: null
+      comparisonLabel: ""
+      displayFormat:
+        format: CURRENCY
+        currency: USD
+        columnType: NUMBER
+        showSeparators: false
+        numDecimalDigits: -1
+        abbreviateLargeNumbers: true
+      valueColumn: Revenue
+      valueRowIndex: null
+      valueAggregate: Sum
+      comparisonColumn: null
+      comparisonRowIndex: null
+      comparisonAggregate: null
+      valueResultVariable: value
+      comparisonResultVariable: comparison_value
+      outputResult: true
+  - cellType: METRIC
+    cellId: 019fb3da-207e-7553-ae96-9a7a6b7fcad4 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      title: Total Quantity
+      valueVariableName: commerce_joined
+      showComparison: false
+      comparisonType: VALUE
+      comparisonVariableName: null
+      comparisonFormat: null
+      comparisonLabel: ""
+      displayFormat:
+        format: NUMBER
+        currency: USD
+        columnType: NUMBER
+        showSeparators: true
+        numDecimalDigits: -1
+        abbreviateLargeNumbers: false
+      valueColumn: Quantity
+      valueRowIndex: null
+      valueAggregate: Sum
+      comparisonColumn: null
+      comparisonRowIndex: null
+      comparisonAggregate: null
+      valueResultVariable: value_2
+      comparisonResultVariable: comparison_value_2
+      outputResult: true
+  - cellType: EXPLORE
+    cellId: 019fb3e3-0dc7-74a9-baf3-7e9af85a588e # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: Revenue by Country - Top 10
+    config:
+      semanticProjectId: null
+      dataframe: commerce_joined
+      colorMappings: {}
+      spec:
+        fields:
+          - id: 019fb3e3-8af3-767b-93e7-41044b6514ea
+            value: Revenue
+            channel: cross-axis
+            dataType: FLOAT
+            seriesId: 019fb3e3-0dc5-76da-9778-cd6b64d51c21
+            fieldType: COLUMN
+            queryPath: []
+            aggregation: Sum
+          - id: 019fb3e3-d59d-7243-85d0-caf0f6fa9d0f
+            title: Count of Records
+            value: _HEX_COUNT_STAR_ARG_
+            channel: tooltip
+            dataType: FLOAT
+            seriesId: 019fb3e3-0dc5-76da-9778-cd6b64d51c21
+            fieldType: MEASURE
+            queryPath: []
+            scaleType: number
+          - id: 019fb3e7-ef62-718f-9229-9dc6418568a3
+            lump:
+              predicate:
+                op: LTE
+                arg: 10
+              otherLabel: Other
+              orderDirection: desc
+              windowFunction: row_number
+            sort:
+              mode: cross-axis-descending
+            value: Country
+            channel: base-axis
+            dataType: VARCHAR
+            seriesId: 019fb3e3-0dc5-76da-9778-cd6b64d51c21
+            fieldType: COLUMN
+            queryPath: []
+        details:
+          fields:
+            - value: Visit ID
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Date
+              dataType: DATE
+              fieldType: COLUMN
+              queryPath: []
+            - value: Year
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Revenue
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Quantity
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Brand
+              dataType: VARCHAR
+              fieldType: COLUMN
+              queryPath: []
+            - value: Category
+              dataType: VARCHAR
+              fieldType: COLUMN
+              queryPath: []
+            - value: Country
+              dataType: VARCHAR
+              fieldType: COLUMN
+              queryPath: []
+          enabled: false
+          showAllBaseTableDetailFields: true
+        viewType: visualization
+        rowTotals: true
+        chartConfig:
+          series:
+            - id: 019fb3e3-0dc5-76da-9778-cd6b64d51c21
+              type: bar
+              color:
+                source: color
+                staticValue: "#4C78A8"
+              tooltip:
+                includeAuto: false
+              barGrouped: true
+          settings:
+            legend:
+              position: right
+            baseAxisSize: container
+          orientation: horizontal
+          seriesGroups:
+            - - 019fb3e3-0dc5-76da-9778-cd6b64d51c21
+        columnTotals: true
+        visualizationType: chart
+      displayTableConfig:
+        pageSize: 50
+        height: null
+        hideIcons: false
+        defaultColumnWidth: null
+        hideIndex: false
+        defaultSortColumn: null
+        defaultSortIndexColumn: null
+        defaultSortDirection: ASC
+        conditionalFormatting: null
+        calcs: null
+        filters: []
+        columnProperties:
+          - originalName: Country
+            renameTo: null
+            size: 219
+            wrapText: null
+            displayFormat: null
+          - originalName: Revenue_sum
+            renameTo: null
+            size: 158
+            wrapText: null
+            displayFormat: null
+          - originalName: _HEX_COUNT_STAR_ARG_
+            renameTo: null
+            size: 144
+            wrapText: null
+            displayFormat: null
+        columnOrdering: null
+        customColumnOrdering: null
+        pinnedColumns: null
+        hiddenColumns: null
+        pinIndexColumns: false
+        showAggregations: false
+        columnAggregations: null
+      resultVariables: []
+      resultIncludeDetailColumns: false
+      height: 530
+  - cellType: EXPLORE
+    cellId: 019fb3f1-d890-74cd-8a05-6b281fa60afc # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: Quantity by Category
+    config:
+      semanticProjectId: null
+      dataframe: commerce_joined
+      colorMappings:
+        PDAs: "#BAB0AC"
+        Routers: "#72B7B2"
+        Monitors: "#FF9DA6"
+        Printers: "#4C78A8"
+        Scanners: "#54A24B"
+        Camcorders: "#72B7B2"
+        Tablet PCs: "#EECA3B"
+        Calculators: "#E45756"
+        Cell Phones: "#FF9DA6"
+        DVD Players: "#9D755D"
+        GPS Devices: "#F58518"
+        Hard Drives: "#E45756"
+        Televisions: "#B279A2"
+        Film Cameras: "#4C78A8"
+        Rangefinders: "#E45756"
+        Camera Flashes: "#54A24B"
+        Car Amplifiers: "#EECA3B"
+        Digital Cameras: "#BAB0AC"
+        Apple Mac Laptops: "#F58518"
+        Apple Mac Desktops: "#4C78A8"
+        Processor Upgrades: "#F58518"
+        Video Games Systems: "#FF9DA6"
+        Home Audio Receivers: "#72B7B2"
+        Home Theater Systems: "#EECA3B"
+        Multimedia Projectors: "#9D755D"
+        Car Speakers and Subwoofers: "#B279A2"
+        MP3 & Digital Media Players: "#B279A2"
+        Home Theater Speakers and Subwoofers: "#54A24B"
+      spec:
+        fields:
+          - id: 019fb3f2-e450-73d2-adb1-fc4c7fa18d16
+            value: Quantity
+            channel: cross-axis
+            dataType: FLOAT
+            seriesId: 019fb3f1-d88e-760c-8a52-69911f3ed697
+            fieldType: COLUMN
+            queryPath: []
+            aggregation: Sum
+          - id: 019fb3f3-3c13-75a3-b1a1-34689cb49a2e
+            axis:
+              hideTitle: true
+            lump:
+              predicate:
+                op: LTE
+                arg: 10
+              otherLabel: Other
+              orderDirection: desc
+              windowFunction: row_number
+            sort:
+              mode: cross-axis-descending
+            value: Category
+            channel: color
+            dataType: VARCHAR
+            seriesId: 019fb3f1-d88e-760c-8a52-69911f3ed697
+            fieldType: COLUMN
+            queryPath: []
+        details:
+          fields:
+            - value: Visit ID
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Date
+              dataType: DATE
+              fieldType: COLUMN
+              queryPath: []
+            - value: Year
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Revenue
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Quantity
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Brand
+              dataType: VARCHAR
+              fieldType: COLUMN
+              queryPath: []
+            - value: Category
+              dataType: VARCHAR
+              fieldType: COLUMN
+              queryPath: []
+            - value: Country
+              dataType: VARCHAR
+              fieldType: COLUMN
+              queryPath: []
+          enabled: false
+          showAllBaseTableDetailFields: false
+        viewType: visualization
+        rowTotals: true
+        chartConfig:
+          series:
+            - id: 019fb3f1-d88e-760c-8a52-69911f3ed697
+              text:
+                source: cross-axis
+                dataLabels:
+                  position: outside-end
+              type: pie
+              normalize: facet
+          settings:
+            legend:
+              position: none
+          orientation: vertical
+          seriesGroups:
+            - - 019fb3f1-d88e-760c-8a52-69911f3ed697
+        columnTotals: true
+        visualizationType: chart
+      displayTableConfig:
+        pageSize: 50
+        height: null
+        hideIcons: false
+        defaultColumnWidth: null
+        hideIndex: false
+        defaultSortColumn: null
+        defaultSortIndexColumn: null
+        defaultSortDirection: ASC
+        conditionalFormatting: null
+        calcs: null
+        filters: []
+        columnProperties: []
+        columnOrdering: null
+        customColumnOrdering: null
+        pinnedColumns: null
+        hiddenColumns: null
+        pinIndexColumns: false
+        showAggregations: false
+        columnAggregations: null
+      resultVariables: []
+      resultIncludeDetailColumns: false
+      height: 400
+  - cellType: EXPLORE
+    cellId: 019fb3f8-3f1b-700e-9da8-2701508fdb0a # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: Revenue by Category
+    config:
+      semanticProjectId: null
+      dataframe: commerce_joined
+      colorMappings: {}
+      spec:
+        fields:
+          - id: 019fb3f8-bdcc-716f-9e59-8bf52ea84aa7
+            sort:
+              mode: cross-axis-descending
+            value: Category
+            channel: base-axis
+            dataType: VARCHAR
+            seriesId: 019fb3f8-3f1a-77c9-9da3-a839ead59236
+            fieldType: COLUMN
+            queryPath: []
+          - id: 019fb3f8-c626-7389-afd0-7e2750e6790e
+            value: Revenue
+            channel: cross-axis
+            dataType: FLOAT
+            seriesId: 019fb3f8-3f1a-77c9-9da3-a839ead59236
+            fieldType: COLUMN
+            queryPath: []
+            aggregation: Sum
+        details:
+          fields:
+            - value: Visit ID
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Date
+              dataType: DATE
+              fieldType: COLUMN
+              queryPath: []
+            - value: Year
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Revenue
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Quantity
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Brand
+              dataType: VARCHAR
+              fieldType: COLUMN
+              queryPath: []
+            - value: Category
+              dataType: VARCHAR
+              fieldType: COLUMN
+              queryPath: []
+            - value: Country
+              dataType: VARCHAR
+              fieldType: COLUMN
+              queryPath: []
+          enabled: false
+          showAllBaseTableDetailFields: false
+        viewType: visualization
+        rowTotals: true
+        chartConfig:
+          series:
+            - id: 019fb3f8-3f1a-77c9-9da3-a839ead59236
+              type: bar
+              barGrouped: true
+          settings:
+            legend:
+              position: right
+          orientation: horizontal
+          seriesGroups:
+            - - 019fb3f8-3f1a-77c9-9da3-a839ead59236
+        columnTotals: true
+        visualizationType: chart
+      displayTableConfig:
+        pageSize: 50
+        height: null
+        hideIcons: false
+        defaultColumnWidth: null
+        hideIndex: false
+        defaultSortColumn: null
+        defaultSortIndexColumn: null
+        defaultSortDirection: ASC
+        conditionalFormatting: null
+        calcs: null
+        filters: null
+        columnProperties: []
+        columnOrdering: null
+        customColumnOrdering: null
+        pinnedColumns: null
+        hiddenColumns: null
+        pinIndexColumns: false
+        showAggregations: false
+        columnAggregations: null
+      resultVariables: []
+      resultIncludeDetailColumns: false
+      height: null
+  - cellType: EXPLORE
+    cellId: 019fb3f9-961b-723e-a649-83d2fb4972c6 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: Revenue by Year
+    config:
+      semanticProjectId: null
+      dataframe: commerce_joined
+      colorMappings: {}
+      spec:
+        fields:
+          - id: 019fb3f9-d658-7769-81be-bf004142364f
+            sort:
+              mode: value-ascending
+            value: Year
+            channel: base-axis
+            dataType: FLOAT
+            seriesId: 019fb3f9-961b-723e-a649-70ce9fc391b4
+            fieldType: COLUMN
+            queryPath: []
+            displayFormat:
+              format: NUMBER
+              currency: USD
+              columnType: NUMBER
+              showSeparators: false
+              numDecimalDigits: -1
+              abbreviateLargeNumbers: false
+          - id: 019fb3f9-e8c5-76aa-a0bd-cd1359c967ff
+            value: Revenue
+            channel: cross-axis
+            dataType: FLOAT
+            seriesId: 019fb3f9-961b-723e-a649-70ce9fc391b4
+            fieldType: COLUMN
+            queryPath: []
+            aggregation: Sum
+            displayFormat:
+              format: CURRENCY
+              currency: USD
+              columnType: NUMBER
+              showSeparators: false
+              numDecimalDigits: -1
+              abbreviateLargeNumbers: true
+        details:
+          fields:
+            - value: Visit ID
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Date
+              dataType: DATE
+              fieldType: COLUMN
+              queryPath: []
+            - value: Year
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Revenue
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Quantity
+              dataType: FLOAT
+              fieldType: COLUMN
+              queryPath: []
+            - value: Brand
+              dataType: VARCHAR
+              fieldType: COLUMN
+              queryPath: []
+            - value: Category
+              dataType: VARCHAR
+              fieldType: COLUMN
+              queryPath: []
+            - value: Country
+              dataType: VARCHAR
+              fieldType: COLUMN
+              queryPath: []
+          enabled: false
+          showAllBaseTableDetailFields: false
+        viewType: visualization
+        rowTotals: true
+        chartConfig:
+          series:
+            - id: 019fb3f9-961b-723e-a649-70ce9fc391b4
+              type: bar
+          settings:
+            legend:
+              position: right
+          orientation: vertical
+          seriesGroups:
+            - - 019fb3f9-961b-723e-a649-70ce9fc391b4
+        columnTotals: true
+        visualizationType: chart
+      displayTableConfig:
+        pageSize: 50
+        height: null
+        hideIcons: false
+        defaultColumnWidth: null
+        hideIndex: false
+        defaultSortColumn: null
+        defaultSortIndexColumn: null
+        defaultSortDirection: ASC
+        conditionalFormatting: null
+        calcs: null
+        filters: null
+        columnProperties: []
+        columnOrdering: null
+        customColumnOrdering: null
+        pinnedColumns: null
+        hiddenColumns: null
+        pinIndexColumns: false
+        showAggregations: false
+        columnAggregations: null
+      resultVariables: []
+      resultIncludeDetailColumns: false
+      height: null
+appLayout:
+  visibleMetadataFields:
+    - NAME
+    - AUTHOR
+    - LAST_EDITED
+  fullWidth: false
+  tabs:
+    - name: Tab 1
+      rows:
+        - columns:
+            - start: 0
+              end: 30
+              elements:
+                - showSource: false
+                  hideOutput: false
+                  type: CELL
+                  cellId: 019fb3c3-ce62-7338-bffd-674597c2a276
+                  sharedFilterId: null
+                  height: null
+                  showLabel: false
+                  explorable: null
+                - showSource: false
+                  hideOutput: false
+                  type: CELL
+                  cellId: 019fb3da-207e-7553-ae96-9a7a6b7fcad4
+                  sharedFilterId: null
+                  height: 150
+                  showLabel: true
+                  explorable: null
+            - start: 30
+              end: 75
+              elements:
+                - showSource: false
+                  hideOutput: false
+                  type: CELL
+                  cellId: 019fb3e3-0dc7-74a9-baf3-7e9af85a588e
+                  sharedFilterId: null
+                  height: 300
+                  showLabel: true
+                  explorable: null
+            - start: 75
+              end: 120
+              elements:
+                - showSource: false
+                  hideOutput: false
+                  type: CELL
+                  cellId: 019fb3f1-d890-74cd-8a05-6b281fa60afc
+                  sharedFilterId: null
+                  height: 300
+                  showLabel: true
+                  explorable: null
+        - columns:
+            - start: 0
+              end: 65
+              elements:
+                - showSource: false
+                  hideOutput: false
+                  type: CELL
+                  cellId: 019fb3f8-3f1b-700e-9da8-2701508fdb0a
+                  sharedFilterId: null
+                  height: 400
+                  showLabel: true
+                  explorable: null
+            - start: 65
+              end: 120
+              elements:
+                - showSource: false
+                  hideOutput: false
+                  type: CELL
+                  cellId: 019fb3f9-961b-723e-a649-83d2fb4972c6
+                  sharedFilterId: null
+                  height: 400
+                  showLabel: true
+                  explorable: null
+sharedFilters: []
