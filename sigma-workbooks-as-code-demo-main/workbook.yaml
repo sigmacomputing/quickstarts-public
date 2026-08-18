@@ -8,378 +8,395 @@ document:
     - id: page-data
       name: Data
       visibility: hidden
-      elements:
-        - id: sales-source
-          kind: table
-          name: Sales Data
-          source:
-            kind: sql
-            connectionId: "YOUR-CONNECTION-ID-HERE"
-            statement: |
-              WITH sales AS (
-                SELECT DATEADD('day', -170, CURRENT_DATE()) AS order_date, 'West' AS store_region, 'SF Downtown' AS store_name, 'Phones' AS product_type, 'Electronics' AS product_family, 1001 AS order_number, 899.99 AS revenue, 314.99 AS profit, 585.00 AS cogs, 1 AS quantity
-                UNION ALL SELECT DATEADD('day', -167, CURRENT_DATE()), 'West', 'SF Downtown', 'Laptops', 'Computers', 1002, 1249.00, 437.15, 811.85, 1
-                UNION ALL SELECT DATEADD('day', -163, CURRENT_DATE()), 'East', 'NYC Midtown', 'Phones', 'Electronics', 1003, 1799.98, 630.00, 1169.98, 2
-                UNION ALL SELECT DATEADD('day', -160, CURRENT_DATE()), 'East', 'NYC Midtown', 'Tablets', 'Electronics', 1004, 499.99, 175.00, 324.99, 1
-                UNION ALL SELECT DATEADD('day', -156, CURRENT_DATE()), 'South', 'Atlanta Central', 'Laptops', 'Computers', 1005, 2498.00, 874.30, 1623.70, 2
-                UNION ALL SELECT DATEADD('day', -153, CURRENT_DATE()), 'Midwest', 'Chicago Loop', 'Phones', 'Electronics', 1006, 899.99, 314.99, 585.00, 1
-                UNION ALL SELECT DATEADD('day', -150, CURRENT_DATE()), 'West', 'LA Venice', 'Accessories', 'Electronics', 1007, 149.97, 82.49, 67.48, 3
-                UNION ALL SELECT DATEADD('day', -147, CURRENT_DATE()), 'South', 'Miami Beach', 'Tablets', 'Electronics', 1008, 999.98, 350.00, 649.98, 2
-                UNION ALL SELECT DATEADD('day', -143, CURRENT_DATE()), 'East', 'Boston Back Bay', 'Laptops', 'Computers', 1009, 1249.00, 437.15, 811.85, 1
-                UNION ALL SELECT DATEADD('day', -140, CURRENT_DATE()), 'West', 'SF Downtown', 'Phones', 'Electronics', 1010, 2699.97, 944.99, 1754.98, 3
-                UNION ALL SELECT DATEADD('day', -136, CURRENT_DATE()), 'Midwest', 'Chicago Loop', 'Desktops', 'Computers', 1011, 1899.00, 664.65, 1234.35, 1
-                UNION ALL SELECT DATEADD('day', -133, CURRENT_DATE()), 'South', 'Atlanta Central', 'Accessories', 'Electronics', 1012, 249.95, 137.47, 112.48, 5
-                UNION ALL SELECT DATEADD('day', -130, CURRENT_DATE()), 'East', 'NYC Midtown', 'Laptops', 'Computers', 1013, 3747.00, 1311.45, 2435.55, 3
-                UNION ALL SELECT DATEADD('day', -127, CURRENT_DATE()), 'West', 'LA Venice', 'Phones', 'Electronics', 1014, 899.99, 314.99, 585.00, 1
-                UNION ALL SELECT DATEADD('day', -123, CURRENT_DATE()), 'Midwest', 'Detroit Center', 'Tablets', 'Electronics', 1015, 1499.97, 525.00, 974.97, 3
-                UNION ALL SELECT DATEADD('day', -120, CURRENT_DATE()), 'South', 'Miami Beach', 'Laptops', 'Computers', 1016, 1249.00, 437.15, 811.85, 1
-                UNION ALL SELECT DATEADD('day', -116, CURRENT_DATE()), 'East', 'Boston Back Bay', 'Phones', 'Electronics', 1017, 1799.98, 630.00, 1169.98, 2
-                UNION ALL SELECT DATEADD('day', -113, CURRENT_DATE()), 'West', 'SF Downtown', 'Desktops', 'Computers', 1018, 3798.00, 1329.30, 2468.70, 2
-                UNION ALL SELECT DATEADD('day', -109, CURRENT_DATE()), 'South', 'Atlanta Central', 'Phones', 'Electronics', 1019, 899.99, 314.99, 585.00, 1
-                UNION ALL SELECT DATEADD('day', -106, CURRENT_DATE()), 'Midwest', 'Chicago Loop', 'Laptops', 'Computers', 1020, 2498.00, 874.30, 1623.70, 2
-                UNION ALL SELECT DATEADD('day', -102, CURRENT_DATE()), 'East', 'NYC Midtown', 'Accessories', 'Electronics', 1021, 399.92, 219.96, 179.96, 8
-                UNION ALL SELECT DATEADD('day', -99, CURRENT_DATE()), 'West', 'LA Venice', 'Tablets', 'Electronics', 1022, 999.98, 350.00, 649.98, 2
-                UNION ALL SELECT DATEADD('day', -95, CURRENT_DATE()), 'South', 'Miami Beach', 'Phones', 'Electronics', 1023, 2699.97, 944.99, 1754.98, 3
-                UNION ALL SELECT DATEADD('day', -92, CURRENT_DATE()), 'Midwest', 'Detroit Center', 'Laptops', 'Computers', 1024, 1249.00, 437.15, 811.85, 1
-                UNION ALL SELECT DATEADD('day', -85, CURRENT_DATE()), 'East', 'NYC Midtown', 'Phones', 'Electronics', 1025, 899.99, 314.99, 585.00, 1
-                UNION ALL SELECT DATEADD('day', -82, CURRENT_DATE()), 'West', 'SF Downtown', 'Laptops', 'Computers', 1026, 3747.00, 1311.45, 2435.55, 3
-                UNION ALL SELECT DATEADD('day', -78, CURRENT_DATE()), 'South', 'Atlanta Central', 'Desktops', 'Computers', 1027, 1899.00, 664.65, 1234.35, 1
-                UNION ALL SELECT DATEADD('day', -75, CURRENT_DATE()), 'Midwest', 'Chicago Loop', 'Accessories', 'Electronics', 1028, 199.96, 109.98, 89.98, 4
-                UNION ALL SELECT DATEADD('day', -71, CURRENT_DATE()), 'East', 'Boston Back Bay', 'Tablets', 'Electronics', 1029, 1999.96, 700.00, 1299.96, 4
-                UNION ALL SELECT DATEADD('day', -68, CURRENT_DATE()), 'West', 'LA Venice', 'Phones', 'Electronics', 1030, 1799.98, 630.00, 1169.98, 2
-                UNION ALL SELECT DATEADD('day', -64, CURRENT_DATE()), 'South', 'Miami Beach', 'Laptops', 'Computers', 1031, 1249.00, 437.15, 811.85, 1
-                UNION ALL SELECT DATEADD('day', -61, CURRENT_DATE()), 'Midwest', 'Detroit Center', 'Phones', 'Electronics', 1032, 899.99, 314.99, 585.00, 1
-                UNION ALL SELECT DATEADD('day', -54, CURRENT_DATE()), 'East', 'NYC Midtown', 'Laptops', 'Computers', 1033, 2498.00, 874.30, 1623.70, 2
-                UNION ALL SELECT DATEADD('day', -51, CURRENT_DATE()), 'West', 'SF Downtown', 'Phones', 'Electronics', 1034, 2699.97, 944.99, 1754.98, 3
-                UNION ALL SELECT DATEADD('day', -47, CURRENT_DATE()), 'South', 'Atlanta Central', 'Tablets', 'Electronics', 1035, 499.99, 175.00, 324.99, 1
-                UNION ALL SELECT DATEADD('day', -44, CURRENT_DATE()), 'Midwest', 'Chicago Loop', 'Desktops', 'Computers', 1036, 3798.00, 1329.30, 2468.70, 2
-                UNION ALL SELECT DATEADD('day', -40, CURRENT_DATE()), 'East', 'Boston Back Bay', 'Accessories', 'Electronics', 1037, 349.93, 192.46, 157.47, 7
-                UNION ALL SELECT DATEADD('day', -37, CURRENT_DATE()), 'West', 'LA Venice', 'Laptops', 'Computers', 1038, 1249.00, 437.15, 811.85, 1
-                UNION ALL SELECT DATEADD('day', -33, CURRENT_DATE()), 'South', 'Miami Beach', 'Phones', 'Electronics', 1039, 899.99, 314.99, 585.00, 1
-                UNION ALL SELECT DATEADD('day', -30, CURRENT_DATE()), 'Midwest', 'Detroit Center', 'Laptops', 'Computers', 1040, 2498.00, 874.30, 1623.70, 2
-                UNION ALL SELECT DATEADD('day', -23, CURRENT_DATE()), 'East', 'NYC Midtown', 'Phones', 'Electronics', 1041, 3599.96, 1260.00, 2339.96, 4
-                UNION ALL SELECT DATEADD('day', -20, CURRENT_DATE()), 'West', 'SF Downtown', 'Tablets', 'Electronics', 1042, 1499.97, 525.00, 974.97, 3
-                UNION ALL SELECT DATEADD('day', -16, CURRENT_DATE()), 'South', 'Atlanta Central', 'Laptops', 'Computers', 1043, 1249.00, 437.15, 811.85, 1
-                UNION ALL SELECT DATEADD('day', -13, CURRENT_DATE()), 'Midwest', 'Chicago Loop', 'Phones', 'Electronics', 1044, 1799.98, 630.00, 1169.98, 2
-                UNION ALL SELECT DATEADD('day', -9, CURRENT_DATE()), 'East', 'Boston Back Bay', 'Desktops', 'Computers', 1045, 1899.00, 664.65, 1234.35, 1
-                UNION ALL SELECT DATEADD('day', -6, CURRENT_DATE()), 'West', 'LA Venice', 'Accessories', 'Electronics', 1046, 299.94, 164.97, 134.97, 6
-                UNION ALL SELECT DATEADD('day', -3, CURRENT_DATE()), 'South', 'Miami Beach', 'Phones', 'Electronics', 1047, 899.99, 314.99, 585.00, 1
-                UNION ALL SELECT DATEADD('day', -1, CURRENT_DATE()), 'Midwest', 'Detroit Center', 'Tablets', 'Electronics', 1048, 999.98, 350.00, 649.98, 2
-              )
-              SELECT
-                order_date AS "Date",
-                revenue AS "Revenue",
-                profit AS "Profit",
-                cogs AS "Cost of Goods Sold",
-                quantity AS "Quantity",
-                product_type AS "Product Type",
-                product_family AS "Product Family",
-                store_region AS "Store Region",
-                store_name AS "Store Name",
-                order_number AS "Order Number"
-              FROM sales
-          columns:
-            - id: col-date
-              name: Date
-              formula: '[Custom SQL/Date]'
-            - id: col-revenue
-              name: Revenue
-              formula: '[Custom SQL/Revenue]'
-            - id: col-profit
-              name: Profit
-              formula: '[Custom SQL/Profit]'
-            - id: col-cogs
-              name: Cost of Goods Sold
-              formula: '[Custom SQL/Cost of Goods Sold]'
-            - id: col-quantity
-              name: Quantity
-              formula: '[Custom SQL/Quantity]'
-            - id: col-product-type
-              name: Product Type
-              formula: '[Custom SQL/Product Type]'
-            - id: col-product-family
-              name: Product Family
-              formula: '[Custom SQL/Product Family]'
-            - id: col-store-region
-              name: Store Region
-              formula: '[Custom SQL/Store Region]'
-            - id: col-store-name
-              name: Store Name
-              formula: '[Custom SQL/Store Name]'
-            - id: col-order-number
-              name: Order Number
-              formula: '[Custom SQL/Order Number]'
 
     - id: page-overview
       name: Sales Overview
-      elements:
-        - id: header-container
-          kind: container
-        - id: title-text
-          kind: text
-          body: |
-            # **Plugs Electronics — Sales Overview**
-
-            <span style="color: #64748B">Managed via GitHub · Workbooks as Code</span>
-
-        - id: ctrl-date
-          kind: control
-          controlId: DateFilter
-          name: Date Range
-          controlType: date-range
-          mode: last
-          unit: month
-          value: 6
-          includeToday: true
-          includeNulls: when-no-value-is-selected
-          filters:
-            - source: { kind: table, elementId: sales-source }
-              columnId: col-date
-
-        - id: ctrl-region
-          kind: control
-          controlId: RegionFilter
+  elements:
+    - id: sales-source
+      pageId: page-data
+      kind: table
+      name: Sales Data
+      source:
+        kind: sql
+        connectionId: "YOUR-CONNECTION-ID-HERE"
+        statement: |
+          WITH sales AS (
+            SELECT DATEADD('day', -170, CURRENT_DATE()) AS order_date, 'West' AS store_region, 'SF Downtown' AS store_name, 'Phones' AS product_type, 'Electronics' AS product_family, 1001 AS order_number, 899.99 AS revenue, 314.99 AS profit, 585.00 AS cogs, 1 AS quantity
+            UNION ALL SELECT DATEADD('day', -167, CURRENT_DATE()), 'West', 'SF Downtown', 'Laptops', 'Computers', 1002, 1249.00, 437.15, 811.85, 1
+            UNION ALL SELECT DATEADD('day', -163, CURRENT_DATE()), 'East', 'NYC Midtown', 'Phones', 'Electronics', 1003, 1799.98, 630.00, 1169.98, 2
+            UNION ALL SELECT DATEADD('day', -160, CURRENT_DATE()), 'East', 'NYC Midtown', 'Tablets', 'Electronics', 1004, 499.99, 175.00, 324.99, 1
+            UNION ALL SELECT DATEADD('day', -156, CURRENT_DATE()), 'South', 'Atlanta Central', 'Laptops', 'Computers', 1005, 2498.00, 874.30, 1623.70, 2
+            UNION ALL SELECT DATEADD('day', -153, CURRENT_DATE()), 'Midwest', 'Chicago Loop', 'Phones', 'Electronics', 1006, 899.99, 314.99, 585.00, 1
+            UNION ALL SELECT DATEADD('day', -150, CURRENT_DATE()), 'West', 'LA Venice', 'Accessories', 'Electronics', 1007, 149.97, 82.49, 67.48, 3
+            UNION ALL SELECT DATEADD('day', -147, CURRENT_DATE()), 'South', 'Miami Beach', 'Tablets', 'Electronics', 1008, 999.98, 350.00, 649.98, 2
+            UNION ALL SELECT DATEADD('day', -143, CURRENT_DATE()), 'East', 'Boston Back Bay', 'Laptops', 'Computers', 1009, 1249.00, 437.15, 811.85, 1
+            UNION ALL SELECT DATEADD('day', -140, CURRENT_DATE()), 'West', 'SF Downtown', 'Phones', 'Electronics', 1010, 2699.97, 944.99, 1754.98, 3
+            UNION ALL SELECT DATEADD('day', -136, CURRENT_DATE()), 'Midwest', 'Chicago Loop', 'Desktops', 'Computers', 1011, 1899.00, 664.65, 1234.35, 1
+            UNION ALL SELECT DATEADD('day', -133, CURRENT_DATE()), 'South', 'Atlanta Central', 'Accessories', 'Electronics', 1012, 249.95, 137.47, 112.48, 5
+            UNION ALL SELECT DATEADD('day', -130, CURRENT_DATE()), 'East', 'NYC Midtown', 'Laptops', 'Computers', 1013, 3747.00, 1311.45, 2435.55, 3
+            UNION ALL SELECT DATEADD('day', -127, CURRENT_DATE()), 'West', 'LA Venice', 'Phones', 'Electronics', 1014, 899.99, 314.99, 585.00, 1
+            UNION ALL SELECT DATEADD('day', -123, CURRENT_DATE()), 'Midwest', 'Detroit Center', 'Tablets', 'Electronics', 1015, 1499.97, 525.00, 974.97, 3
+            UNION ALL SELECT DATEADD('day', -120, CURRENT_DATE()), 'South', 'Miami Beach', 'Laptops', 'Computers', 1016, 1249.00, 437.15, 811.85, 1
+            UNION ALL SELECT DATEADD('day', -116, CURRENT_DATE()), 'East', 'Boston Back Bay', 'Phones', 'Electronics', 1017, 1799.98, 630.00, 1169.98, 2
+            UNION ALL SELECT DATEADD('day', -113, CURRENT_DATE()), 'West', 'SF Downtown', 'Desktops', 'Computers', 1018, 3798.00, 1329.30, 2468.70, 2
+            UNION ALL SELECT DATEADD('day', -109, CURRENT_DATE()), 'South', 'Atlanta Central', 'Phones', 'Electronics', 1019, 899.99, 314.99, 585.00, 1
+            UNION ALL SELECT DATEADD('day', -106, CURRENT_DATE()), 'Midwest', 'Chicago Loop', 'Laptops', 'Computers', 1020, 2498.00, 874.30, 1623.70, 2
+            UNION ALL SELECT DATEADD('day', -102, CURRENT_DATE()), 'East', 'NYC Midtown', 'Accessories', 'Electronics', 1021, 399.92, 219.96, 179.96, 8
+            UNION ALL SELECT DATEADD('day', -99, CURRENT_DATE()), 'West', 'LA Venice', 'Tablets', 'Electronics', 1022, 999.98, 350.00, 649.98, 2
+            UNION ALL SELECT DATEADD('day', -95, CURRENT_DATE()), 'South', 'Miami Beach', 'Phones', 'Electronics', 1023, 2699.97, 944.99, 1754.98, 3
+            UNION ALL SELECT DATEADD('day', -92, CURRENT_DATE()), 'Midwest', 'Detroit Center', 'Laptops', 'Computers', 1024, 1249.00, 437.15, 811.85, 1
+            UNION ALL SELECT DATEADD('day', -85, CURRENT_DATE()), 'East', 'NYC Midtown', 'Phones', 'Electronics', 1025, 899.99, 314.99, 585.00, 1
+            UNION ALL SELECT DATEADD('day', -82, CURRENT_DATE()), 'West', 'SF Downtown', 'Laptops', 'Computers', 1026, 3747.00, 1311.45, 2435.55, 3
+            UNION ALL SELECT DATEADD('day', -78, CURRENT_DATE()), 'South', 'Atlanta Central', 'Desktops', 'Computers', 1027, 1899.00, 664.65, 1234.35, 1
+            UNION ALL SELECT DATEADD('day', -75, CURRENT_DATE()), 'Midwest', 'Chicago Loop', 'Accessories', 'Electronics', 1028, 199.96, 109.98, 89.98, 4
+            UNION ALL SELECT DATEADD('day', -71, CURRENT_DATE()), 'East', 'Boston Back Bay', 'Tablets', 'Electronics', 1029, 1999.96, 700.00, 1299.96, 4
+            UNION ALL SELECT DATEADD('day', -68, CURRENT_DATE()), 'West', 'LA Venice', 'Phones', 'Electronics', 1030, 1799.98, 630.00, 1169.98, 2
+            UNION ALL SELECT DATEADD('day', -64, CURRENT_DATE()), 'South', 'Miami Beach', 'Laptops', 'Computers', 1031, 1249.00, 437.15, 811.85, 1
+            UNION ALL SELECT DATEADD('day', -61, CURRENT_DATE()), 'Midwest', 'Detroit Center', 'Phones', 'Electronics', 1032, 899.99, 314.99, 585.00, 1
+            UNION ALL SELECT DATEADD('day', -54, CURRENT_DATE()), 'East', 'NYC Midtown', 'Laptops', 'Computers', 1033, 2498.00, 874.30, 1623.70, 2
+            UNION ALL SELECT DATEADD('day', -51, CURRENT_DATE()), 'West', 'SF Downtown', 'Phones', 'Electronics', 1034, 2699.97, 944.99, 1754.98, 3
+            UNION ALL SELECT DATEADD('day', -47, CURRENT_DATE()), 'South', 'Atlanta Central', 'Tablets', 'Electronics', 1035, 499.99, 175.00, 324.99, 1
+            UNION ALL SELECT DATEADD('day', -44, CURRENT_DATE()), 'Midwest', 'Chicago Loop', 'Desktops', 'Computers', 1036, 3798.00, 1329.30, 2468.70, 2
+            UNION ALL SELECT DATEADD('day', -40, CURRENT_DATE()), 'East', 'Boston Back Bay', 'Accessories', 'Electronics', 1037, 349.93, 192.46, 157.47, 7
+            UNION ALL SELECT DATEADD('day', -37, CURRENT_DATE()), 'West', 'LA Venice', 'Laptops', 'Computers', 1038, 1249.00, 437.15, 811.85, 1
+            UNION ALL SELECT DATEADD('day', -33, CURRENT_DATE()), 'South', 'Miami Beach', 'Phones', 'Electronics', 1039, 899.99, 314.99, 585.00, 1
+            UNION ALL SELECT DATEADD('day', -30, CURRENT_DATE()), 'Midwest', 'Detroit Center', 'Laptops', 'Computers', 1040, 2498.00, 874.30, 1623.70, 2
+            UNION ALL SELECT DATEADD('day', -23, CURRENT_DATE()), 'East', 'NYC Midtown', 'Phones', 'Electronics', 1041, 3599.96, 1260.00, 2339.96, 4
+            UNION ALL SELECT DATEADD('day', -20, CURRENT_DATE()), 'West', 'SF Downtown', 'Tablets', 'Electronics', 1042, 1499.97, 525.00, 974.97, 3
+            UNION ALL SELECT DATEADD('day', -16, CURRENT_DATE()), 'South', 'Atlanta Central', 'Laptops', 'Computers', 1043, 1249.00, 437.15, 811.85, 1
+            UNION ALL SELECT DATEADD('day', -13, CURRENT_DATE()), 'Midwest', 'Chicago Loop', 'Phones', 'Electronics', 1044, 1799.98, 630.00, 1169.98, 2
+            UNION ALL SELECT DATEADD('day', -9, CURRENT_DATE()), 'East', 'Boston Back Bay', 'Desktops', 'Computers', 1045, 1899.00, 664.65, 1234.35, 1
+            UNION ALL SELECT DATEADD('day', -6, CURRENT_DATE()), 'West', 'LA Venice', 'Accessories', 'Electronics', 1046, 299.94, 164.97, 134.97, 6
+            UNION ALL SELECT DATEADD('day', -3, CURRENT_DATE()), 'South', 'Miami Beach', 'Phones', 'Electronics', 1047, 899.99, 314.99, 585.00, 1
+            UNION ALL SELECT DATEADD('day', -1, CURRENT_DATE()), 'Midwest', 'Detroit Center', 'Tablets', 'Electronics', 1048, 999.98, 350.00, 649.98, 2
+          )
+          SELECT
+            order_date AS "Date",
+            revenue AS "Revenue",
+            profit AS "Profit",
+            cogs AS "Cost of Goods Sold",
+            quantity AS "Quantity",
+            product_type AS "Product Type",
+            product_family AS "Product Family",
+            store_region AS "Store Region",
+            store_name AS "Store Name",
+            order_number AS "Order Number"
+          FROM sales
+      columns:
+        - id: col-date
+          name: Date
+          formula: '[Custom SQL/Date]'
+        - id: col-revenue
+          name: Revenue
+          formula: '[Custom SQL/Revenue]'
+        - id: col-profit
+          name: Profit
+          formula: '[Custom SQL/Profit]'
+        - id: col-cogs
+          name: Cost of Goods Sold
+          formula: '[Custom SQL/Cost of Goods Sold]'
+        - id: col-quantity
+          name: Quantity
+          formula: '[Custom SQL/Quantity]'
+        - id: col-product-type
+          name: Product Type
+          formula: '[Custom SQL/Product Type]'
+        - id: col-product-family
+          name: Product Family
+          formula: '[Custom SQL/Product Family]'
+        - id: col-store-region
           name: Store Region
-          controlType: list
-          mode: include
-          selectionMode: multiple
-          filters:
-            - source: { kind: table, elementId: sales-source }
-              columnId: col-store-region
+          formula: '[Custom SQL/Store Region]'
+        - id: col-store-name
+          name: Store Name
+          formula: '[Custom SQL/Store Name]'
+        - id: col-order-number
+          name: Order Number
+          formula: '[Custom SQL/Order Number]'
 
-        - id: kpi-row
-          kind: container
+    - id: header-container
+      pageId: page-overview
+      kind: container
+    - id: title-text
+      pageId: page-overview
+      kind: text
+      body: |
+        # **Plugs Electronics — Sales Overview**
 
-        - id: kpi-revenue
-          kind: kpi-chart
-          name: Total Revenue
-          source:
-            kind: table
-            elementId: sales-source
-          columns:
-            - id: kr-month
-              name: Month
-              formula: 'DateTrunc("month", [Sales Data/Date])'
-            - id: kr-val
-              name: Revenue
-              formula: "Sum([Sales Data/Revenue])"
-              format:
-                kind: number
-                formatString: "$,.0f"
-          value: { columnId: kr-val }
-          timeline: { columnId: kr-month }
-          periodComparison: month
-          trend: { shape: area, areaStyle: gradient }
-          comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
+        <span style="color: #64748B">Managed via GitHub · Workbooks as Code</span>
 
-        - id: kpi-profit
-          kind: kpi-chart
-          name: Total Profit
-          source:
-            kind: table
-            elementId: sales-source
-          columns:
-            - id: kp-month
-              name: Month
-              formula: 'DateTrunc("month", [Sales Data/Date])'
-            - id: kp-val
-              name: Profit
-              formula: "Sum([Sales Data/Profit])"
-              format:
-                kind: number
-                formatString: "$,.0f"
-          value: { columnId: kp-val }
-          timeline: { columnId: kp-month }
-          periodComparison: month
-          trend: { shape: area, areaStyle: gradient }
-          comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
+    - id: ctrl-date
+      pageId: page-overview
+      kind: control
+      controlId: DateFilter
+      name: Date Range
+      controlType: date-range
+      mode: last
+      unit: month
+      value: 6
+      includeToday: true
+      includeNulls: when-no-value-is-selected
+      filters:
+        - source: { kind: table, elementId: sales-source }
+          columnId: col-date
 
-        - id: kpi-orders
-          kind: kpi-chart
-          name: Total Orders
-          source:
-            kind: table
-            elementId: sales-source
-          columns:
-            - id: ko-month
-              name: Month
-              formula: 'DateTrunc("month", [Sales Data/Date])'
-            - id: ko-val
-              name: Orders
-              formula: "CountDistinct([Sales Data/Order Number])"
-              format:
-                kind: number
-                formatString: ",.0f"
-          value: { columnId: ko-val }
-          timeline: { columnId: ko-month }
-          periodComparison: month
-          trend: { shape: line }
-          comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
+    - id: ctrl-region
+      pageId: page-overview
+      kind: control
+      controlId: RegionFilter
+      name: Store Region
+      controlType: list
+      mode: include
+      selectionMode: multiple
+      filters:
+        - source: { kind: table, elementId: sales-source }
+          columnId: col-store-region
 
-        - id: kpi-units
-          kind: kpi-chart
-          name: Total Units Sold
-          source:
-            kind: table
-            elementId: sales-source
-          columns:
-            - id: ku-month
-              name: Month
-              formula: 'DateTrunc("month", [Sales Data/Date])'
-            - id: ku-val
-              name: Units
-              formula: "Sum([Sales Data/Quantity])"
-              format:
-                kind: number
-                formatString: ",.0f"
-          value: { columnId: ku-val }
-          timeline: { columnId: ku-month }
-          periodComparison: month
-          trend: { shape: area, areaStyle: gradient }
-          comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
+    - id: kpi-row
+      pageId: page-overview
+      kind: container
 
-        - id: chart-revenue-trend
-          kind: bar-chart
-          name: Monthly Revenue
-          source:
-            kind: table
-            elementId: sales-source
-          columns:
-            - id: rt-month
-              name: Month
-              formula: 'DateTrunc("month", [Sales Data/Date])'
-              format:
-                kind: datetime
-                formatString: "%b %Y"
-            - id: rt-revenue
-              name: Revenue
-              formula: "Sum([Sales Data/Revenue])"
-              format:
-                kind: number
-                formatString: "$,.0f"
-          xAxis:
-            columnId: rt-month
-            sort:
-              by: rt-month
-              direction: ascending
-          yAxis:
-            columnIds:
-              - rt-revenue
-          stacking: none
-          color:
-            by: single
-            value: "#2563EB"
+    - id: kpi-revenue
+      pageId: page-overview
+      kind: kpi-chart
+      name: Total Revenue
+      source:
+        kind: table
+        elementId: sales-source
+      columns:
+        - id: kr-month
+          name: Month
+          formula: 'DateTrunc("month", [Sales Data/Date])'
+        - id: kr-val
+          name: Revenue
+          formula: "Sum([Sales Data/Revenue])"
+          format:
+            kind: number
+            formatString: "$,.0f"
+      value: { columnId: kr-val }
+      timeline: { columnId: kr-month }
+      periodComparison: month
+      trend: { shape: area, areaStyle: gradient }
+      comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
 
-        - id: chart-by-region
-          kind: bar-chart
-          name: Revenue by Region
-          source:
-            kind: table
-            elementId: sales-source
-          columns:
-            - id: rr-region
-              name: Region
-              formula: "[Sales Data/Store Region]"
-            - id: rr-revenue
-              name: Revenue
-              formula: "Sum([Sales Data/Revenue])"
-              format:
-                kind: number
-                formatString: "$,.0f"
-          xAxis:
-            columnId: rr-region
-            sort:
-              by: rr-revenue
-              direction: descending
-          yAxis:
-            columnIds:
-              - rr-revenue
-          stacking: none
-          orientation: horizontal
-          color:
-            by: single
-            value: "#0EA5E9"
+    - id: kpi-profit
+      pageId: page-overview
+      kind: kpi-chart
+      name: Total Profit
+      source:
+        kind: table
+        elementId: sales-source
+      columns:
+        - id: kp-month
+          name: Month
+          formula: 'DateTrunc("month", [Sales Data/Date])'
+        - id: kp-val
+          name: Profit
+          formula: "Sum([Sales Data/Profit])"
+          format:
+            kind: number
+            formatString: "$,.0f"
+      value: { columnId: kp-val }
+      timeline: { columnId: kp-month }
+      periodComparison: month
+      trend: { shape: area, areaStyle: gradient }
+      comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
 
-        - id: chart-by-product
-          kind: donut-chart
-          name: Revenue by Product Type
-          source:
-            kind: table
-            elementId: sales-source
-          columns:
-            - id: rp-type
-              name: Product Type
-              formula: "[Sales Data/Product Type]"
-            - id: rp-revenue
-              name: Revenue
-              formula: "Sum([Sales Data/Revenue])"
-              format:
-                kind: number
-                formatString: "$,.0f"
-          value:
-            id: rp-revenue
-          color:
-            id: rp-type
-            sort:
-              by: rp-revenue
-              direction: descending
+    - id: kpi-orders
+      pageId: page-overview
+      kind: kpi-chart
+      name: Total Orders
+      source:
+        kind: table
+        elementId: sales-source
+      columns:
+        - id: ko-month
+          name: Month
+          formula: 'DateTrunc("month", [Sales Data/Date])'
+        - id: ko-val
+          name: Orders
+          formula: "CountDistinct([Sales Data/Order Number])"
+          format:
+            kind: number
+            formatString: ",.0f"
+      value: { columnId: ko-val }
+      timeline: { columnId: ko-month }
+      periodComparison: month
+      trend: { shape: line }
+      comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
 
-        - id: table-detail
-          kind: table
-          name: Sales Detail
-          source:
-            kind: table
-            elementId: sales-source
-          columns:
-            - id: td-store
-              name: Store
-              formula: "[Sales Data/Store Name]"
-            - id: td-region
-              name: Region
-              formula: "[Sales Data/Store Region]"
-            - id: td-product
-              name: Product Type
-              formula: "[Sales Data/Product Type]"
-            - id: td-family
-              name: Product Family
-              formula: "[Sales Data/Product Family]"
-            - id: td-revenue
-              name: Revenue
-              formula: "Sum([Sales Data/Revenue])"
-              format:
-                kind: number
-                formatString: "$,.0f"
-            - id: td-profit
-              name: Profit
-              formula: "Sum([Sales Data/Profit])"
-              format:
-                kind: number
-                formatString: "$,.0f"
-            - id: td-orders
-              name: Orders
-              formula: "CountDistinct([Sales Data/Order Number])"
-              format:
-                kind: number
-                formatString: ",.0f"
+    - id: kpi-units
+      pageId: page-overview
+      kind: kpi-chart
+      name: Total Units Sold
+      source:
+        kind: table
+        elementId: sales-source
+      columns:
+        - id: ku-month
+          name: Month
+          formula: 'DateTrunc("month", [Sales Data/Date])'
+        - id: ku-val
+          name: Units
+          formula: "Sum([Sales Data/Quantity])"
+          format:
+            kind: number
+            formatString: ",.0f"
+      value: { columnId: ku-val }
+      timeline: { columnId: ku-month }
+      periodComparison: month
+      trend: { shape: area, areaStyle: gradient }
+      comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
+
+    - id: chart-revenue-trend
+      pageId: page-overview
+      kind: bar-chart
+      name: Monthly Revenue
+      source:
+        kind: table
+        elementId: sales-source
+      columns:
+        - id: rt-month
+          name: Month
+          formula: 'DateTrunc("month", [Sales Data/Date])'
+          format:
+            kind: datetime
+            formatString: "%b %Y"
+        - id: rt-revenue
+          name: Revenue
+          formula: "Sum([Sales Data/Revenue])"
+          format:
+            kind: number
+            formatString: "$,.0f"
+      xAxis:
+        columnId: rt-month
+        sort:
+          by: rt-month
+          direction: ascending
+      yAxis:
+        columnIds:
+          - rt-revenue
+      stacking: none
+      color:
+        by: single
+        value: "#2563EB"
+
+    - id: chart-by-region
+      pageId: page-overview
+      kind: bar-chart
+      name: Revenue by Region
+      source:
+        kind: table
+        elementId: sales-source
+      columns:
+        - id: rr-region
+          name: Region
+          formula: "[Sales Data/Store Region]"
+        - id: rr-revenue
+          name: Revenue
+          formula: "Sum([Sales Data/Revenue])"
+          format:
+            kind: number
+            formatString: "$,.0f"
+      xAxis:
+        columnId: rr-region
+        sort:
+          by: rr-revenue
+          direction: descending
+      yAxis:
+        columnIds:
+          - rr-revenue
+      stacking: none
+      orientation: horizontal
+      color:
+        by: single
+        value: "#0EA5E9"
+
+    - id: chart-by-product
+      pageId: page-overview
+      kind: donut-chart
+      name: Revenue by Product Type
+      source:
+        kind: table
+        elementId: sales-source
+      columns:
+        - id: rp-type
+          name: Product Type
+          formula: "[Sales Data/Product Type]"
+        - id: rp-revenue
+          name: Revenue
+          formula: "Sum([Sales Data/Revenue])"
+          format:
+            kind: number
+            formatString: "$,.0f"
+      value:
+        id: rp-revenue
+      color:
+        id: rp-type
+        sort:
+          by: rp-revenue
+          direction: descending
+
+    - id: table-detail
+      pageId: page-overview
+      kind: table
+      name: Sales Detail
+      source:
+        kind: table
+        elementId: sales-source
+      columns:
+        - id: td-store
+          name: Store
+          formula: "[Sales Data/Store Name]"
+        - id: td-region
+          name: Region
+          formula: "[Sales Data/Store Region]"
+        - id: td-product
+          name: Product Type
+          formula: "[Sales Data/Product Type]"
+        - id: td-family
+          name: Product Family
+          formula: "[Sales Data/Product Family]"
+        - id: td-revenue
+          name: Revenue
+          formula: "Sum([Sales Data/Revenue])"
+          format:
+            kind: number
+            formatString: "$,.0f"
+        - id: td-profit
+          name: Profit
+          formula: "Sum([Sales Data/Profit])"
+          format:
+            kind: number
+            formatString: "$,.0f"
+        - id: td-orders
+          name: Orders
+          formula: "CountDistinct([Sales Data/Order Number])"
+          format:
+            kind: number
+            formatString: ",.0f"
 
   layout: |
     <?xml version="1.0" encoding="utf-8"?>
+    <Page type="grid" gridTemplateColumns="repeat(24, 1fr)" gridTemplateRows="auto" id="page-data">
+      <Element elementId="sales-source" gridColumn="1 / 25" gridRow="1 / 5"/>
+    </Page>
     <Page type="grid" gridTemplateColumns="repeat(24, 1fr)" gridTemplateRows="auto" id="page-overview">
-      <GridContainer elementId="header-container" type="grid" gridColumn="1 / 25" gridRow="1 / 5"
+      <Container elementId="header-container" type="grid" gridColumn="1 / 25" gridRow="1 / 5"
                      gridTemplateColumns="repeat(24, 1fr)" gridTemplateRows="auto">
-        <LayoutElement elementId="title-text" gridColumn="1 / 13" gridRow="1 / 5"/>
-        <LayoutElement elementId="ctrl-date" gridColumn="13 / 19" gridRow="1 / 5"/>
-        <LayoutElement elementId="ctrl-region" gridColumn="19 / 25" gridRow="1 / 5"/>
-      </GridContainer>
-      <GridContainer elementId="kpi-row" type="grid" gridColumn="1 / 25" gridRow="5 / 10"
+        <Element elementId="title-text" gridColumn="1 / 13" gridRow="1 / 5"/>
+        <Element elementId="ctrl-date" gridColumn="13 / 19" gridRow="1 / 5"/>
+        <Element elementId="ctrl-region" gridColumn="19 / 25" gridRow="1 / 5"/>
+      </Container>
+      <Container elementId="kpi-row" type="grid" gridColumn="1 / 25" gridRow="5 / 10"
                      gridTemplateColumns="repeat(24, 1fr)" gridTemplateRows="auto">
-        <LayoutElement elementId="kpi-revenue" gridColumn="1 / 7" gridRow="1 / 5"/>
-        <LayoutElement elementId="kpi-profit" gridColumn="7 / 13" gridRow="1 / 5"/>
-        <LayoutElement elementId="kpi-orders" gridColumn="13 / 19" gridRow="1 / 5"/>
-        <LayoutElement elementId="kpi-units" gridColumn="19 / 25" gridRow="1 / 5"/>
-      </GridContainer>
-      <LayoutElement elementId="chart-revenue-trend" gridColumn="1 / 25" gridRow="10 / 24"/>
-      <LayoutElement elementId="chart-by-region" gridColumn="1 / 13" gridRow="24 / 38"/>
-      <LayoutElement elementId="chart-by-product" gridColumn="13 / 25" gridRow="24 / 38"/>
-      <LayoutElement elementId="table-detail" gridColumn="1 / 25" gridRow="38 / 56"/>
+        <Element elementId="kpi-revenue" gridColumn="1 / 7" gridRow="1 / 5"/>
+        <Element elementId="kpi-profit" gridColumn="7 / 13" gridRow="1 / 5"/>
+        <Element elementId="kpi-orders" gridColumn="13 / 19" gridRow="1 / 5"/>
+        <Element elementId="kpi-units" gridColumn="19 / 25" gridRow="1 / 5"/>
+      </Container>
+      <Element elementId="chart-revenue-trend" gridColumn="1 / 25" gridRow="10 / 24"/>
+      <Element elementId="chart-by-region" gridColumn="1 / 13" gridRow="24 / 38"/>
+      <Element elementId="chart-by-product" gridColumn="13 / 25" gridRow="24 / 38"/>
+      <Element elementId="table-detail" gridColumn="1 / 25" gridRow="38 / 56"/>
     </Page>
