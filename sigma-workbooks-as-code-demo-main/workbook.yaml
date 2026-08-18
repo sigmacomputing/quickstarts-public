@@ -2,22 +2,295 @@ name: "Plugs Electronics — Sales Overview"
 folderId: "YOUR-FOLDER-ID-HERE"
 description: "Sales performance dashboard managed via GitHub. Source: sample data via custom SQL."
 document:
-  kind: workbook
   schemaVersion: 1
-  pages:
-    - id: page-data
-      name: Data
-      visibility: hidden
-
-    - id: page-overview
-      name: Sales Overview
   elements:
+    - id: header-container
+      pageId: page-overview
+      kind: container
+    - id: title-text
+      pageId: page-overview
+      kind: text
+      body: |-
+        ## **Plugs Electronics — Sales Overview**
+
+        <p class="p-small"><span style="color: rgb(100, 116, 139)">Managed via GitHub · Workbooks as Code</span></p>
+    - kind: control
+      controlId: DateFilter
+      id: ctrl-date
+      pageId: page-overview
+      name: Date Range
+      filters:
+        - source:
+            kind: table
+            elementId: sales-source
+          columnId: col-date
+      controlType: date-range
+      mode: last
+      value: 6
+      unit: month
+      includeToday: true
+      includeNulls: when-no-value-is-selected
+    - kind: control
+      controlId: RegionFilter
+      id: ctrl-region
+      pageId: page-overview
+      name: Store Region
+      filters:
+        - source:
+            kind: table
+            elementId: sales-source
+          columnId: col-store-region
+      controlType: list
+      mode: include
+      selectionMode: multiple
+      values: []
+      source:
+        kind: manual
+        valueType: text
+    - id: kpi-row
+      pageId: page-overview
+      kind: container
+    - id: kpi-inner-row
+      pageId: page-overview
+      kind: container
+    - id: kpi-revenue
+      pageId: page-overview
+      kind: kpi-chart
+      source:
+        elementId: sales-source
+        kind: table
+      columns:
+        - id: kr-month
+          formula: DateTrunc("month", [Sales Data/Date])
+          name: Month
+        - id: kr-val
+          formula: Sum([Sales Data/Revenue])
+          name: Revenue
+          format:
+            kind: number
+            formatString: $,.0f
+      value:
+        columnId: kr-val
+      name:
+        text: Total Revenue
+        fontSize: 16
+      layout:
+        anchor: middle
+      comparison:
+        colorGood: '#16a34a'
+        colorBad: '#dc2626'
+      timeline:
+        columnId: kr-month
+      periodComparison: month
+    - id: kpi-profit
+      pageId: page-overview
+      kind: kpi-chart
+      source:
+        elementId: sales-source
+        kind: table
+      columns:
+        - id: kp-month
+          formula: DateTrunc("month", [Sales Data/Date])
+          name: Month
+        - id: kp-val
+          formula: Sum([Sales Data/Profit])
+          name: Profit
+          format:
+            kind: number
+            formatString: $,.0f
+      value:
+        columnId: kp-val
+        fontSize: 20
+      name:
+        text: Total Profit
+        fontSize: 16
+      layout:
+        anchor: middle
+      comparison:
+        colorGood: '#16a34a'
+        colorBad: '#dc2626'
+      timeline:
+        columnId: kp-month
+      periodComparison: month
+    - id: kpi-orders
+      pageId: page-overview
+      kind: kpi-chart
+      source:
+        elementId: sales-source
+        kind: table
+      columns:
+        - id: ko-month
+          formula: DateTrunc("month", [Sales Data/Date])
+          name: Month
+        - id: ko-val
+          formula: CountDistinct([Sales Data/Order Number])
+          name: Orders
+          format:
+            kind: number
+            formatString: ',.0f'
+      value:
+        columnId: ko-val
+        fontSize: 20
+      name:
+        text: Total Orders
+        fontSize: 16
+      layout:
+        anchor: middle
+      comparison:
+        colorGood: '#16a34a'
+        colorBad: '#dc2626'
+      trend:
+        shape: line
+      timeline:
+        columnId: ko-month
+      periodComparison: month
+    - id: kpi-units
+      pageId: page-overview
+      kind: kpi-chart
+      source:
+        elementId: sales-source
+        kind: table
+      columns:
+        - id: ku-month
+          formula: DateTrunc("month", [Sales Data/Date])
+          name: Month
+        - id: ku-val
+          formula: Sum([Sales Data/Quantity])
+          name: Units
+          format:
+            kind: number
+            formatString: ',.0f'
+      value:
+        columnId: ku-val
+        fontSize: 20
+      name:
+        text: Total Units Sold
+        fontSize: 16
+      layout:
+        anchor: middle
+      comparison:
+        colorGood: '#16a34a'
+        colorBad: '#dc2626'
+      timeline:
+        columnId: ku-month
+      periodComparison: month
+    - id: chart-by-product
+      pageId: page-overview
+      kind: donut-chart
+      source:
+        elementId: sales-source
+        kind: table
+      columns:
+        - id: rp-type
+          formula: '[Sales Data/Product Type]'
+          name: Product Type
+        - id: rp-revenue
+          formula: Sum([Sales Data/Revenue])
+          name: Revenue
+          format:
+            kind: number
+            formatString: $,.0f
+      color:
+        id: rp-type
+        sort:
+          by: rp-revenue
+          direction: descending
+      value:
+        id: rp-revenue
+      name: Revenue by Product Type
+      dataLabel:
+        labels: shown
+        labelDisplay: value-percent
+    - id: chart-by-region
+      pageId: page-overview
+      kind: bar-chart
+      source:
+        elementId: sales-source
+        kind: table
+      columns:
+        - id: rr-region
+          formula: '[Sales Data/Store Region]'
+          name: Region
+        - id: rr-revenue
+          formula: Sum([Sales Data/Revenue])
+          name: Revenue
+          format:
+            kind: number
+            formatString: $,.0f
+      yAxis:
+        columnIds:
+          - rr-revenue
+      xAxis:
+        columnId: rr-region
+        sort:
+          by: rr-revenue
+          direction: descending
+      stacking: none
+      orientation: horizontal
+      color:
+        by: single
+        value: '#0ea5e9'
+      name: Revenue by Region
+    - id: table-detail
+      pageId: page-overview
+      kind: table
+      source:
+        elementId: sales-source
+        kind: table
+      columns:
+        - id: td-store
+          formula: '[Sales Data/Store Name]'
+          name: Store
+        - id: td-region
+          formula: '[Sales Data/Store Region]'
+          name: Region
+        - id: td-product
+          formula: '[Sales Data/Product Type]'
+          name: Product Type
+        - id: td-family
+          formula: '[Sales Data/Product Family]'
+          name: Product Family
+          style:
+            width: 137
+        - id: td-revenue
+          formula: Sum([Sales Data/Revenue])
+          name: Revenue
+          format:
+            kind: number
+            formatString: $,.0f
+          style:
+            align: center
+        - id: td-profit
+          formula: Sum([Sales Data/Profit])
+          name: Profit
+          format:
+            kind: number
+            formatString: $,.0f
+          style:
+            align: center
+        - id: td-orders
+          formula: CountDistinct([Sales Data/Order Number])
+          name: Orders
+          format:
+            kind: number
+            formatString: ',.0f'
+          style:
+            align: center
+      name: Sales Detail
+      description:
+        visibility: hidden
+      order:
+        - td-store
+        - td-region
+        - td-product
+        - td-family
+        - td-revenue
+        - td-profit
+        - td-orders
     - id: sales-source
       pageId: page-data
       kind: table
-      name: Sales Data
       source:
-        kind: sql
         connectionId: "YOUR-CONNECTION-ID-HERE"
         statement: |
           WITH sales AS (
@@ -82,346 +355,77 @@ document:
             store_name AS "Store Name",
             order_number AS "Order Number"
           FROM sales
+        kind: sql
       columns:
         - id: col-date
-          name: Date
           formula: '[Custom SQL/Date]'
+          name: Date
         - id: col-revenue
-          name: Revenue
           formula: '[Custom SQL/Revenue]'
+          name: Revenue
         - id: col-profit
-          name: Profit
           formula: '[Custom SQL/Profit]'
+          name: Profit
         - id: col-cogs
-          name: Cost of Goods Sold
           formula: '[Custom SQL/Cost of Goods Sold]'
+          name: Cost of Goods Sold
         - id: col-quantity
-          name: Quantity
           formula: '[Custom SQL/Quantity]'
+          name: Quantity
         - id: col-product-type
-          name: Product Type
           formula: '[Custom SQL/Product Type]'
+          name: Product Type
         - id: col-product-family
-          name: Product Family
           formula: '[Custom SQL/Product Family]'
-        - id: col-store-region
-          name: Store Region
-          formula: '[Custom SQL/Store Region]'
-        - id: col-store-name
-          name: Store Name
-          formula: '[Custom SQL/Store Name]'
-        - id: col-order-number
-          name: Order Number
-          formula: '[Custom SQL/Order Number]'
-
-    - id: header-container
-      pageId: page-overview
-      kind: container
-    - id: title-text
-      pageId: page-overview
-      kind: text
-      body: |
-        # **Plugs Electronics — Sales Overview**
-
-        <span style="color: #64748B">Managed via GitHub · Workbooks as Code</span>
-
-    - id: ctrl-date
-      pageId: page-overview
-      kind: control
-      controlId: DateFilter
-      name: Date Range
-      controlType: date-range
-      mode: last
-      unit: month
-      value: 6
-      includeToday: true
-      includeNulls: when-no-value-is-selected
-      filters:
-        - source: { kind: table, elementId: sales-source }
-          columnId: col-date
-
-    - id: ctrl-region
-      pageId: page-overview
-      kind: control
-      controlId: RegionFilter
-      name: Store Region
-      controlType: list
-      mode: include
-      selectionMode: multiple
-      filters:
-        - source: { kind: table, elementId: sales-source }
-          columnId: col-store-region
-
-    - id: kpi-row
-      pageId: page-overview
-      kind: container
-
-    - id: kpi-revenue
-      pageId: page-overview
-      kind: kpi-chart
-      name: Total Revenue
-      source:
-        kind: table
-        elementId: sales-source
-      columns:
-        - id: kr-month
-          name: Month
-          formula: 'DateTrunc("month", [Sales Data/Date])'
-        - id: kr-val
-          name: Revenue
-          formula: "Sum([Sales Data/Revenue])"
-          format:
-            kind: number
-            formatString: "$,.0f"
-      value: { columnId: kr-val }
-      timeline: { columnId: kr-month }
-      periodComparison: month
-      trend: { shape: area, areaStyle: gradient }
-      comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
-
-    - id: kpi-profit
-      pageId: page-overview
-      kind: kpi-chart
-      name: Total Profit
-      source:
-        kind: table
-        elementId: sales-source
-      columns:
-        - id: kp-month
-          name: Month
-          formula: 'DateTrunc("month", [Sales Data/Date])'
-        - id: kp-val
-          name: Profit
-          formula: "Sum([Sales Data/Profit])"
-          format:
-            kind: number
-            formatString: "$,.0f"
-      value: { columnId: kp-val }
-      timeline: { columnId: kp-month }
-      periodComparison: month
-      trend: { shape: area, areaStyle: gradient }
-      comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
-
-    - id: kpi-orders
-      pageId: page-overview
-      kind: kpi-chart
-      name: Total Orders
-      source:
-        kind: table
-        elementId: sales-source
-      columns:
-        - id: ko-month
-          name: Month
-          formula: 'DateTrunc("month", [Sales Data/Date])'
-        - id: ko-val
-          name: Orders
-          formula: "CountDistinct([Sales Data/Order Number])"
-          format:
-            kind: number
-            formatString: ",.0f"
-      value: { columnId: ko-val }
-      timeline: { columnId: ko-month }
-      periodComparison: month
-      trend: { shape: line }
-      comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
-
-    - id: kpi-units
-      pageId: page-overview
-      kind: kpi-chart
-      name: Total Units Sold
-      source:
-        kind: table
-        elementId: sales-source
-      columns:
-        - id: ku-month
-          name: Month
-          formula: 'DateTrunc("month", [Sales Data/Date])'
-        - id: ku-val
-          name: Units
-          formula: "Sum([Sales Data/Quantity])"
-          format:
-            kind: number
-            formatString: ",.0f"
-      value: { columnId: ku-val }
-      timeline: { columnId: ku-month }
-      periodComparison: month
-      trend: { shape: area, areaStyle: gradient }
-      comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
-
-    # Uncomment this element to add the Gross Margin KPI, then add its layout placement
-    # to the kpi-row Container below: <Element elementId="kpi-margin" gridColumn="20 / 25" gridRow="1 / 5"/>
-    # - id: kpi-margin
-    #   pageId: page-overview
-    #   kind: kpi-chart
-    #   name: Gross Margin
-    #   source:
-    #     kind: table
-    #     elementId: sales-source
-    #   columns:
-    #     - id: km-month
-    #       name: Month
-    #       formula: 'DateTrunc("month", [Sales Data/Date])'
-    #     - id: km-val
-    #       name: Margin
-    #       formula: "Sum([Sales Data/Profit]) / Sum([Sales Data/Revenue])"
-    #       format:
-    #         kind: number
-    #         formatString: "0.0%"
-    #   value: { columnId: km-val }
-    #   timeline: { columnId: km-month }
-    #   periodComparison: month
-    #   trend: { shape: line }
-    #   comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
-
-    - id: chart-revenue-trend
-      pageId: page-overview
-      kind: bar-chart
-      name: Monthly Revenue
-      source:
-        kind: table
-        elementId: sales-source
-      columns:
-        - id: rt-month
-          name: Month
-          formula: 'DateTrunc("month", [Sales Data/Date])'
-          format:
-            kind: datetime
-            formatString: "%b %Y"
-        - id: rt-revenue
-          name: Revenue
-          formula: "Sum([Sales Data/Revenue])"
-          format:
-            kind: number
-            formatString: "$,.0f"
-      xAxis:
-        columnId: rt-month
-        sort:
-          by: rt-month
-          direction: ascending
-      yAxis:
-        columnIds:
-          - rt-revenue
-      stacking: none
-      color:
-        by: single
-        value: "#2563EB"
-
-    - id: chart-by-region
-      pageId: page-overview
-      kind: bar-chart
-      name: Revenue by Region
-      source:
-        kind: table
-        elementId: sales-source
-      columns:
-        - id: rr-region
-          name: Region
-          formula: "[Sales Data/Store Region]"
-        - id: rr-revenue
-          name: Revenue
-          formula: "Sum([Sales Data/Revenue])"
-          format:
-            kind: number
-            formatString: "$,.0f"
-      xAxis:
-        columnId: rr-region
-        sort:
-          by: rr-revenue
-          direction: descending
-      yAxis:
-        columnIds:
-          - rr-revenue
-      stacking: none
-      orientation: horizontal
-      color:
-        by: single
-        value: "#0EA5E9"
-
-    - id: chart-by-product
-      pageId: page-overview
-      kind: donut-chart
-      name: Revenue by Product Type
-      source:
-        kind: table
-        elementId: sales-source
-      columns:
-        - id: rp-type
-          name: Product Type
-          formula: "[Sales Data/Product Type]"
-        - id: rp-revenue
-          name: Revenue
-          formula: "Sum([Sales Data/Revenue])"
-          format:
-            kind: number
-            formatString: "$,.0f"
-      value:
-        id: rp-revenue
-      color:
-        id: rp-type
-        sort:
-          by: rp-revenue
-          direction: descending
-
-    - id: table-detail
-      pageId: page-overview
-      kind: table
-      name: Sales Detail
-      source:
-        kind: table
-        elementId: sales-source
-      columns:
-        - id: td-store
-          name: Store
-          formula: "[Sales Data/Store Name]"
-        - id: td-region
-          name: Region
-          formula: "[Sales Data/Store Region]"
-        - id: td-product
-          name: Product Type
-          formula: "[Sales Data/Product Type]"
-        - id: td-family
           name: Product Family
-          formula: "[Sales Data/Product Family]"
-        - id: td-revenue
-          name: Revenue
-          formula: "Sum([Sales Data/Revenue])"
-          format:
-            kind: number
-            formatString: "$,.0f"
-        - id: td-profit
-          name: Profit
-          formula: "Sum([Sales Data/Profit])"
-          format:
-            kind: number
-            formatString: "$,.0f"
-        - id: td-orders
-          name: Orders
-          formula: "CountDistinct([Sales Data/Order Number])"
-          format:
-            kind: number
-            formatString: ",.0f"
-
+        - id: col-store-region
+          formula: '[Custom SQL/Store Region]'
+          name: Store Region
+        - id: col-store-name
+          formula: '[Custom SQL/Store Name]'
+          name: Store Name
+        - id: col-order-number
+          formula: '[Custom SQL/Order Number]'
+          name: Order Number
+      name: Sales Data
+      order:
+        - col-date
+        - col-revenue
+        - col-profit
+        - col-cogs
+        - col-quantity
+        - col-product-type
+        - col-product-family
+        - col-store-region
+        - col-store-name
+        - col-order-number
+  pages:
+    - id: page-overview
+      name: Sales Overview
+    - id: page-data
+      name: Data
+      visibility: hidden
+  kind: workbook
   layout: |
     <?xml version="1.0" encoding="utf-8"?>
-    <Page type="grid" gridTemplateColumns="repeat(24, 1fr)" gridTemplateRows="auto" id="page-data">
-      <Element elementId="sales-source" gridColumn="1 / 25" gridRow="1 / 5"/>
-    </Page>
     <Page type="grid" gridTemplateColumns="repeat(24, 1fr)" gridTemplateRows="auto" id="page-overview">
-      <Container elementId="header-container" type="grid" gridColumn="1 / 25" gridRow="1 / 5"
-                     gridTemplateColumns="repeat(24, 1fr)" gridTemplateRows="auto">
-        <Element elementId="title-text" gridColumn="1 / 13" gridRow="1 / 5"/>
-        <Element elementId="ctrl-date" gridColumn="13 / 19" gridRow="1 / 5"/>
-        <Element elementId="ctrl-region" gridColumn="19 / 25" gridRow="1 / 5"/>
+      <Container elementId="header-container" type="grid" gridColumn="1 / 25" gridRow="1 / 3" gridTemplateColumns="repeat(24, 1fr)" gridTemplateRows="auto">
+        <Element elementId="title-text" gridColumn="1 / 13" gridRow="1 / 3"/>
+        <Element elementId="ctrl-date" gridColumn="13 / 19" gridRow="1 / 3"/>
+        <Element elementId="ctrl-region" gridColumn="19 / 25" gridRow="1 / 3"/>
       </Container>
-      <Container elementId="kpi-row" type="grid" gridColumn="1 / 25" gridRow="5 / 10"
-                     gridTemplateColumns="repeat(24, 1fr)" gridTemplateRows="auto">
-        <Element elementId="kpi-revenue" gridColumn="1 / 6" gridRow="1 / 5"/>
-        <Element elementId="kpi-profit" gridColumn="6 / 11" gridRow="1 / 5"/>
-        <Element elementId="kpi-orders" gridColumn="11 / 16" gridRow="1 / 5"/>
-        <Element elementId="kpi-units" gridColumn="16 / 20" gridRow="1 / 5"/>
+      <Container elementId="kpi-row" type="grid" gridColumn="1 / 25" gridRow="3 / 7" gridTemplateColumns="repeat(6, 1fr)" gridTemplateRows="auto">
+        <Container elementId="kpi-inner-row" type="grid" gridColumn="1 / 7" gridRow="1 / 5" gridTemplateColumns="repeat(12, 1fr)" gridTemplateRows="auto">
+          <Element elementId="kpi-revenue" gridColumn="1 / 3" gridRow="1 / 5"/>
+          <Element elementId="kpi-profit" gridColumn="3 / 6" gridRow="1 / 5"/>
+          <Element elementId="kpi-orders" gridColumn="6 / 8" gridRow="1 / 5"/>
+          <Element elementId="kpi-units" gridColumn="8 / 11" gridRow="1 / 5"/>
+        </Container>
       </Container>
-      <Element elementId="chart-revenue-trend" gridColumn="1 / 25" gridRow="10 / 24"/>
-      <Element elementId="chart-by-region" gridColumn="1 / 13" gridRow="24 / 38"/>
-      <Element elementId="chart-by-product" gridColumn="13 / 25" gridRow="24 / 38"/>
-      <Element elementId="table-detail" gridColumn="1 / 25" gridRow="38 / 56"/>
+      <Element elementId="chart-by-product" gridColumn="1 / 13" gridRow="7 / 17"/>
+      <Element elementId="chart-by-region" gridColumn="13 / 25" gridRow="7 / 17"/>
+      <Element elementId="table-detail" gridColumn="1 / 25" gridRow="17 / 35"/>
+    </Page>
+    <Page type="grid" gridTemplateColumns="repeat(24, 1fr)" gridTemplateRows="auto" id="page-data">
+      <Element elementId="sales-source" gridColumn="1 / 25" gridRow="1 / 17"/>
     </Page>
