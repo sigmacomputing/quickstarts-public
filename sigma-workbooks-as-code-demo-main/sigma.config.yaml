@@ -1,3 +1,3 @@
-workbook_id: "2367f304-30e7-45e7-b37c-77cc9f77517b"
+workbook_id: "YOUR-WORKBOOK-ID-HERE"
 api_host: "https://aws-api.sigmacomputing.com"
 spec_file: "workbook.yaml"
