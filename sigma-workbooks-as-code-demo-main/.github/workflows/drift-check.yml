@@ -1,0 +1,93 @@
+name: Drift Check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"  # Every 6 hours
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.1/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Get Sigma API token
+        id: auth
+        run: |
+          TOKEN=$(curl -sf -X POST \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=client_credentials&client_id=${{ secrets.SIGMA_CLIENT_ID }}&client_secret=${{ secrets.SIGMA_CLIENT_SECRET }}" \
+            "${{ vars.SIGMA_API_HOST }}/v2/auth/token" | jq -r '.access_token')
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Check for drift
+        id: drift
+        env:
+          SIGMA_API_HOST: ${{ vars.SIGMA_API_HOST }}
+          SIGMA_API_TOKEN: ${{ steps.auth.outputs.token }}
+        run: ./scripts/drift-check.sh workbook.yaml || echo "drift=true" >> "$GITHUB_OUTPUT"
+
+      - name: Pull live spec and open PR
+        if: steps.drift.outputs.drift == 'true'
+        env:
+          SIGMA_API_HOST: ${{ vars.SIGMA_API_HOST }}
+          SIGMA_API_TOKEN: ${{ steps.auth.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING=$(gh pr list --label drift --state open --json number --jq 'length')
+          if [[ "$EXISTING" != "0" ]]; then
+            echo "Drift PR already open — skipping"
+            exit 0
+          fi
+
+          WORKBOOK_ID=$(yq -r '.workbook_id' sigma.config.yaml)
+          BRANCH="drift/sync-$(date +%Y%m%d-%H%M%S)"
+
+          # Pull the live spec and strip server-generated metadata
+          curl -sf -X GET \
+            -H "Authorization: Bearer $SIGMA_API_TOKEN" \
+            -H "Accept: application/yaml" \
+            "$SIGMA_API_HOST/v2/workbooks/$WORKBOOK_ID/spec" \
+          | yq -P 'del(.workbookId, .url, .documentVersion, .latestDocumentVersion, .ownerId, .createdBy, .updatedBy, .createdAt, .updatedAt)' \
+          > workbook.yaml
+
+          # Check if there are actual changes
+          if git diff --quiet workbook.yaml; then
+            echo "No meaningful changes — skipping"
+            exit 0
+          fi
+
+          # Create branch and PR
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add workbook.yaml
+          git commit -m "Sync workbook spec with live Sigma edits"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --title "Sync: pull live workbook changes into git" \
+            --label drift \
+            --body "$(cat <<'BODY'
+          ## Drift detected
+
+          The live Sigma workbook was edited in the UI and now differs from the spec in `workbook.yaml`.
+
+          This PR pulls those changes into git. Review the diff to confirm the changes are intentional, then merge.
+
+          **If the UI edit was a mistake**, close this PR and re-run the deploy workflow to restore the git version.
+
+          Created automatically by the drift-check workflow.
+          BODY
+          )"

@@ -1,0 +1,32 @@
+name: Validate Workbook Spec
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.1/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Get Sigma API token
+        id: auth
+        run: |
+          TOKEN=$(curl -sf -X POST \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=client_credentials&client_id=${{ secrets.SIGMA_CLIENT_ID }}&client_secret=${{ secrets.SIGMA_CLIENT_SECRET }}" \
+            "${{ vars.SIGMA_API_HOST }}/v2/auth/token" | jq -r '.access_token')
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Validate spec
+        env:
+          SIGMA_API_HOST: ${{ vars.SIGMA_API_HOST }}
+          SIGMA_API_TOKEN: ${{ steps.auth.outputs.token }}
+        run: ./scripts/validate.sh workbook.yaml
