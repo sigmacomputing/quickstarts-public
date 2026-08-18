@@ -1,5 +1,5 @@
 name: "Plugs Electronics — Sales Overview"
-folderId: "ce70860a-a347-4fa2-b114-2eb2692a662c"
+folderId: "YOUR-FOLDER-ID-HERE"
 description: "Sales performance dashboard managed via GitHub. Source: sample data via custom SQL."
 document:
   kind: workbook
