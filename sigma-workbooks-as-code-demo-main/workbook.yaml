@@ -13,7 +13,7 @@ document:
       body: |-
         ## **Plugs Electronics — Sales Overview**
 
-        <p class="p-small"><span style="color: rgb(100, 116, 139)">Managed via GitHub · Workbooks as Code</span></p>
+        <p class="p-small"><span style="color: #64748B">Managed via GitHub · Workbooks as Code</span></p>
     - kind: control
       controlId: DateFilter
       id: ctrl-date
