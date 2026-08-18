@@ -248,7 +248,8 @@ document:
       trend: { shape: area, areaStyle: gradient }
       comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
 
-    # Uncomment this element (and its layout placement below) to add the Gross Margin KPI
+    # Uncomment this element to add the Gross Margin KPI, then add its layout placement
+    # to the kpi-row Container below: <Element elementId="kpi-margin" gridColumn="20 / 25" gridRow="1 / 5"/>
     # - id: kpi-margin
     #   pageId: page-overview
     #   kind: kpi-chart
@@ -418,8 +419,6 @@ document:
         <Element elementId="kpi-profit" gridColumn="6 / 11" gridRow="1 / 5"/>
         <Element elementId="kpi-orders" gridColumn="11 / 16" gridRow="1 / 5"/>
         <Element elementId="kpi-units" gridColumn="16 / 20" gridRow="1 / 5"/>
-        <!-- Uncomment to place the Gross Margin KPI in the fifth slot of this row -->
-        <!-- <Element elementId="kpi-margin" gridColumn="20 / 25" gridRow="1 / 5"/> -->
       </Container>
       <Element elementId="chart-revenue-trend" gridColumn="1 / 25" gridRow="10 / 24"/>
       <Element elementId="chart-by-region" gridColumn="1 / 13" gridRow="24 / 38"/>
