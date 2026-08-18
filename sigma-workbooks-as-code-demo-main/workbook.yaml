@@ -248,6 +248,30 @@ document:
       trend: { shape: area, areaStyle: gradient }
       comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
 
+    # Uncomment this element (and its layout placement below) to add the Gross Margin KPI
+    # - id: kpi-margin
+    #   pageId: page-overview
+    #   kind: kpi-chart
+    #   name: Gross Margin
+    #   source:
+    #     kind: table
+    #     elementId: sales-source
+    #   columns:
+    #     - id: km-month
+    #       name: Month
+    #       formula: 'DateTrunc("month", [Sales Data/Date])'
+    #     - id: km-val
+    #       name: Margin
+    #       formula: "Sum([Sales Data/Profit]) / Sum([Sales Data/Revenue])"
+    #       format:
+    #         kind: number
+    #         formatString: "0.0%"
+    #   value: { columnId: km-val }
+    #   timeline: { columnId: km-month }
+    #   periodComparison: month
+    #   trend: { shape: line }
+    #   comparison: { display: percentage, direction: higher, colorGood: "#16A34A", colorBad: "#DC2626" }
+
     - id: chart-revenue-trend
       pageId: page-overview
       kind: bar-chart
@@ -390,10 +414,12 @@ document:
       </Container>
       <Container elementId="kpi-row" type="grid" gridColumn="1 / 25" gridRow="5 / 10"
                      gridTemplateColumns="repeat(24, 1fr)" gridTemplateRows="auto">
-        <Element elementId="kpi-revenue" gridColumn="1 / 7" gridRow="1 / 5"/>
-        <Element elementId="kpi-profit" gridColumn="7 / 13" gridRow="1 / 5"/>
-        <Element elementId="kpi-orders" gridColumn="13 / 19" gridRow="1 / 5"/>
-        <Element elementId="kpi-units" gridColumn="19 / 25" gridRow="1 / 5"/>
+        <Element elementId="kpi-revenue" gridColumn="1 / 6" gridRow="1 / 5"/>
+        <Element elementId="kpi-profit" gridColumn="6 / 11" gridRow="1 / 5"/>
+        <Element elementId="kpi-orders" gridColumn="11 / 16" gridRow="1 / 5"/>
+        <Element elementId="kpi-units" gridColumn="16 / 20" gridRow="1 / 5"/>
+        <!-- Uncomment to place the Gross Margin KPI in the fifth slot of this row -->
+        <!-- <Element elementId="kpi-margin" gridColumn="20 / 25" gridRow="1 / 5"/> -->
       </Container>
       <Element elementId="chart-revenue-trend" gridColumn="1 / 25" gridRow="10 / 24"/>
       <Element elementId="chart-by-region" gridColumn="1 / 13" gridRow="24 / 38"/>
