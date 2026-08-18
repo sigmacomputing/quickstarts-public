@@ -24,10 +24,19 @@ fi
 
 echo "Pulling live spec for workbook $WORKBOOK_ID..."
 
-LIVE_SPEC=$(curl -sf -X GET \
+HTTP_CODE=$(curl -s -o /tmp/drift-check-response.yaml -w "%{http_code}" \
+  -X GET \
   -H "Authorization: Bearer $SIGMA_API_TOKEN" \
   -H "Accept: application/yaml" \
   "$SIGMA_API_HOST/v2/workbooks/$WORKBOOK_ID/spec")
+
+if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
+  echo "FAIL: fetching live spec returned HTTP $HTTP_CODE"
+  cat /tmp/drift-check-response.yaml
+  exit 1
+fi
+
+LIVE_SPEC=$(cat /tmp/drift-check-response.yaml)
 
 # Strip server-generated metadata for comparison
 LIVE_NORMALIZED=$(echo "$LIVE_SPEC" | yq -P 'del(.workbookId, .url, .documentVersion, .latestDocumentVersion, .ownerId, .createdBy, .updatedBy, .createdAt, .updatedAt)')
