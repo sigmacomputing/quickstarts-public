@@ -45,6 +45,10 @@ jobs:
           SIGMA_API_TOKEN: ${{ steps.auth.outputs.token }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Ensure the "drift" label exists - a fresh repo won't have it, and gh pr create
+          # fails outright (no PR created at all) if asked to apply a label that doesn't exist
+          gh label create drift --color "D93F0B" --description "Opened automatically by drift-check" 2>/dev/null || true
+
           EXISTING=$(gh pr list --label drift --state open --json number --jq 'length')
           if [[ "$EXISTING" != "0" ]]; then
             echo "Drift PR already open — skipping"
