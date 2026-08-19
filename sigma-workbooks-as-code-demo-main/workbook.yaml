@@ -5,10 +5,8 @@ document:
   schemaVersion: 1
   elements:
     - id: header-container
-      pageId: page-overview
       kind: container
     - id: title-text
-      pageId: page-overview
       kind: text
       body: |-
         ## **Plugs Electronics — Sales Overview**
@@ -17,7 +15,6 @@ document:
     - kind: control
       controlId: DateFilter
       id: ctrl-date
-      pageId: page-overview
       name: Date Range
       filters:
         - source:
@@ -33,7 +30,6 @@ document:
     - kind: control
       controlId: RegionFilter
       id: ctrl-region
-      pageId: page-overview
       name: Store Region
       filters:
         - source:
@@ -48,13 +44,10 @@ document:
         kind: manual
         valueType: text
     - id: kpi-row
-      pageId: page-overview
       kind: container
     - id: kpi-inner-row
-      pageId: page-overview
       kind: container
     - id: kpi-revenue
-      pageId: page-overview
       kind: kpi-chart
       source:
         elementId: sales-source
@@ -83,7 +76,6 @@ document:
         columnId: kr-month
       periodComparison: month
     - id: kpi-profit
-      pageId: page-overview
       kind: kpi-chart
       source:
         elementId: sales-source
@@ -113,7 +105,6 @@ document:
         columnId: kp-month
       periodComparison: month
     - id: kpi-orders
-      pageId: page-overview
       kind: kpi-chart
       source:
         elementId: sales-source
@@ -145,7 +136,6 @@ document:
         columnId: ko-month
       periodComparison: month
     - id: kpi-units
-      pageId: page-overview
       kind: kpi-chart
       source:
         elementId: sales-source
@@ -175,7 +165,6 @@ document:
         columnId: ku-month
       periodComparison: month
     - id: chart-by-product
-      pageId: page-overview
       kind: donut-chart
       source:
         elementId: sales-source
@@ -202,7 +191,6 @@ document:
         labels: shown
         labelDisplay: value-percent
     - id: chart-by-region
-      pageId: page-overview
       kind: bar-chart
       source:
         elementId: sales-source
@@ -232,7 +220,6 @@ document:
         value: '#0ea5e9'
       name: Revenue by Region
     - id: table-detail
-      pageId: page-overview
       kind: table
       source:
         elementId: sales-source
@@ -288,7 +275,6 @@ document:
         - td-profit
         - td-orders
     - id: sales-source
-      pageId: page-data
       kind: table
       source:
         connectionId: "YOUR-CONNECTION-ID-HERE"
