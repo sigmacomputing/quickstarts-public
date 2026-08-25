@@ -1,0 +1,88 @@
+#!/usr/bin/env ruby
+# Phase 5e — Domo-specific spec QA gate (runs on discovery/chart-specs.json BEFORE
+# assembly/POST). Operationalizes refs/card-to-element.md's checklist so the fixes
+# from the field feedback can't silently regress. Complements the reused
+# assert-phase6-ran.rb (the Phase-6 hard gate); this is the pre-parity spec check.
+#
+#   ruby scripts/qa-check.rb            # reads discovery/chart-specs.json
+#   ruby scripts/qa-check.rb --in <chart-specs.json>
+#
+# Exit 0 = clean; exit 1 = hard violations found.
+
+require 'json'
+require 'optparse'
+require_relative 'lib/domo_sigma_util'
+include DomoSigma
+
+# Pull the column display name out of a [Master/Name] ref inside a formula.
+def refs_in(formula)
+  formula.to_s.scan(/\[Master\/([^\]]+)\]/).flatten
+end
+
+def check(spec)
+  errors = []
+  warns  = []
+  pages = spec['pages'] || []
+  pages.each do |pg|
+    els = pg['elements'] || []
+    charts = els.reject { |e| e['kind'] == 'control' }
+    controls = els.select { |e| e['kind'] == 'control' }
+
+    els.each do |e|
+      case e['kind']
+      when 'kpi-chart'
+        vcol = (e['columns'] || []).find { |c| c['id'] == e.dig('value', 'columnId') } || (e['columns'] || []).first
+        f = vcol && vcol['formula']
+        # #1: a KPI must not be Count/CountDistinct of a row-key/id column.
+        if f =~ /\A\s*(Count|CountDistinct)\s*\(/i && refs_in(f).any? { |r| id_like?(r) }
+          errors << "[#{pg['name']}] KPI '#{e['name']}' value is #{f} — counts a row-key/id (Domo table default). Use the authored measure (kpi-overrides.json)."
+        end
+        # KPI value must bind via columnId (not id).
+        errors << "[#{pg['name']}] KPI '#{e['name']}' missing value.columnId." unless e.dig('value', 'columnId')
+      when 'bar-chart', 'line-chart', 'area-chart', 'combo-chart', 'scatter-chart'
+        # #8: gridlines should default off.
+        %w[xAxis yAxis].each do |ax|
+          next unless e[ax]
+          marks = e.dig(ax, 'format', 'marks')
+          warns << "[#{pg['name']}] '#{e['name']}' #{ax} gridlines not disabled (format.marks != none)." unless marks == 'none'
+        end
+        # #7: a chart must not be a table carrying dataBars.
+        errors << "[#{pg['name']}] chart '#{e['name']}' has dataBars — a bar chart must be a bar-chart element, not a table." if e['conditionalFormats']
+      when 'table'
+        # #5: dimension (non-aggregated) columns should allow text wrap.
+        dim_cols = (e['columns'] || []).reject { |c| c['formula'].to_s =~ /\A\s*(Sum|Avg|Count|CountDistinct|Min|Max)\s*\(/i }
+        unwrapped = dim_cols.reject { |c| c.dig('style', 'textWrap') }
+        warns << "[#{pg['name']}] table '#{e['name']}' has #{unwrapped.size} text column(s) without textWrap:wrap." unless unwrapped.empty?
+      end
+    end
+
+    # #2: every control must fan out via the shared master (or every chart), not
+    # a single element — the "filters fall off after the first element" bug.
+    controls.each do |c|
+      targets = Array(c['filters']).map { |fl| fl.dig('source', 'elementId') }
+      to_master = targets.include?('master')
+      covers_all = charts.any? && (charts.map { |ch| ch['id'] } - targets).empty?
+      unless to_master || covers_all
+        errors << "[#{pg['name']}] control '#{c['name']}' targets #{targets.inspect} — bind to 'master' (or every element) so the filter reaches all elements."
+      end
+    end
+  end
+  [errors, warns]
+end
+
+if $PROGRAM_NAME == __FILE__
+  opts = {}
+  OptionParser.new { |o| o.on('--in PATH') { |v| opts[:in] = v } }.parse!(ARGV)
+  path = opts[:in] || File.expand_path('../discovery/chart-specs.json', __dir__)
+  spec = JSON.parse(File.read(path))
+  errors, warns = check(spec)
+  warns.each  { |w| warn "  ⚠ #{w}" }
+  errors.each { |e| warn "  ✗ #{e}" }
+  if errors.empty?
+    warn "\n  QA PASS#{warns.empty? ? '' : " (#{warns.size} warning(s))"}"
+    exit 0
+  else
+    warn "\n  QA FAIL — #{errors.size} hard violation(s)"
+    exit 1
+  end
+end

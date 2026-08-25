@@ -1,0 +1,12 @@
+[
+  { "id": 1001, "title": "Metric Units",   "chartType": "badge_singlevalue",     "sigmaKindHint": "kpi-chart",  "_size": "", "_pageOrder": 0 },
+  { "id": 1002, "title": "Revenue Trend",  "chartType": "badge_symbolline",      "sigmaKindHint": "line-chart", "_size": "", "_pageOrder": 1 },
+  { "id": 1003, "title": "Metric Revenue", "chartType": "badge_singlevalue",     "sigmaKindHint": "kpi-chart",  "_size": "", "_pageOrder": 2 },
+  { "id": 1004, "title": "Metric Margin",  "chartType": "badge_singlevalue",     "sigmaKindHint": "kpi-chart",  "_size": "", "_pageOrder": 3 },
+  { "id": 1005, "title": "Category Bar",   "chartType": "badge_horiz_bar",       "sigmaKindHint": "bar-chart",  "_size": "", "_pageOrder": 4 },
+  { "id": 1006, "title": "Metric Orders",  "chartType": "badge_singlevalue",     "sigmaKindHint": "kpi-chart",  "_size": "", "_pageOrder": 5 },
+  { "id": 2001, "title": "Share Donut",    "chartType": "badge_donut",           "sigmaKindHint": "donut-chart", "_size": "", "_pageOrder": 0 },
+  { "id": 2002, "title": "Compare Bar",    "chartType": "badge_vert_stackedbar", "sigmaKindHint": "bar-chart",  "_size": "", "_pageOrder": 1 },
+  { "id": 2003, "title": "Detail Table",   "chartType": "badge_table",          "sigmaKindHint": "table",       "_size": "", "_pageOrder": 2 },
+  { "id": 2004, "title": "Combo Metric",   "chartType": "badge_line_bar",        "sigmaKindHint": "bar-chart",  "_size": "", "_pageOrder": 3 }
+]

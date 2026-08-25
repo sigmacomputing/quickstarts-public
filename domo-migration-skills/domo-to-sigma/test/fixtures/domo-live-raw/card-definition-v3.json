@@ -1,0 +1,111 @@
+{
+  "id": 700000001,
+  "urn": "700000001",
+  "drillpath": {},
+  "embedded": false,
+  "dataSourceWrite": false,
+  "columns": [
+    { "id": "row_key", "name": "row_key", "type": "numeric", "isCalculation": false },
+    { "id": "metric_alpha", "name": "metric_alpha", "type": "numeric", "isCalculation": false }
+  ],
+  "definition": {
+    "title": "Metric Alpha",
+    "description": "METRIC ALPHA\nSample description for the anonymized fixture card.",
+    "chartVersion": "12",
+    "allowTableDrill": true,
+    "inputTable": false,
+    "modified": 1780955925000,
+    "annotations": [],
+    "slicers": [],
+    "segments": { "active": [], "definitions": [] },
+    "conditionalFormats": [],
+    "charts": {
+      "main": {
+        "component": "main",
+        "chartType": "badge_treemap",
+        "overrides": { "hide_series": "none" },
+        "goal": null
+      }
+    },
+    "subscriptions": {
+      "big_number": {
+        "name": "big_number",
+        "columns": [
+          {
+            "column": "metric_alpha",
+            "aggregation": "SUM",
+            "distinct": false,
+            "alias": "Metric Alpha in Period",
+            "format": { "type": "number", "format": "###,##0" }
+          }
+        ],
+        "filters": [],
+        "orderBy": [],
+        "groupBy": [],
+        "limit": 1
+      },
+      "main": {
+        "name": "main",
+        "columns": [
+          { "column": "category_col", "mapping": "ITEM" },
+          { "column": "metric_alpha", "aggregation": "SUM", "mapping": "VALUE" },
+          { "column": "series_col", "mapping": "SERIES" }
+        ],
+        "filters": [
+          { "column": "region_col", "values": ["West"], "filterType": "LEGACY", "operand": "IN" }
+        ],
+        "dateRangeFilter": {
+          "column": { "column": "date_col", "exprType": "COLUMN" },
+          "dateTimeRange": { "dateTimeRangeType": "ROLLING_PERIOD", "interval": "MONTH", "offset": 0, "count": 6 }
+        },
+        "dateGrain": { "column": "date_col", "dateTimeElement": "MONTH" },
+        "orderBy": [],
+        "groupBy": [ { "column": "category_col" } ]
+      }
+    },
+    "formulas": [
+      {
+        "templateId": 63,
+        "id": "calculation_11111111-aaaa-bbbb-cccc-111111111111",
+        "name": "Open Rate",
+        "formula": "(CASE WHEN (SUM(`metric_sent`) = 0) THEN 0 ELSE (SUM(`metric_opened`) / SUM(`metric_sent`)) END )",
+        "variable": false,
+        "status": "VALID",
+        "persistedOnDataSource": true,
+        "columnPositions": [],
+        "isAnalytic": false,
+        "isAggregatable": true,
+        "dataType": "DECIMAL",
+        "usedByOtherCards": true
+      },
+      {
+        "templateId": 75,
+        "id": "calculation_22222222-aaaa-bbbb-cccc-222222222222",
+        "name": "Running Total",
+        "formula": "SUM(SUM(`metric_alpha`)) OVER (ORDER BY `date_col`)",
+        "variable": false,
+        "status": "VALID",
+        "persistedOnDataSource": true,
+        "columnPositions": [],
+        "isAnalytic": true,
+        "isAggregatable": false,
+        "dataType": "LONG",
+        "usedByOtherCards": false
+      },
+      {
+        "templateId": 88,
+        "id": "calculation_33333333-aaaa-bbbb-cccc-333333333333",
+        "name": "Margin Pct",
+        "formula": "(CASE WHEN (SUM(`metric_denominator`) = 0) THEN 0 ELSE (SUM(`metric_numerator`) / SUM(`metric_denominator`)) END )",
+        "variable": false,
+        "status": "VALID",
+        "persistedOnDataSource": true,
+        "columnPositions": [],
+        "isAnalytic": false,
+        "isAggregatable": false,
+        "dataType": "DECIMAL",
+        "usedByOtherCards": false
+      }
+    ]
+  }
+}

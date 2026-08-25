@@ -1,0 +1,26 @@
+{
+  "totalCardCount": 3,
+  "cards": [
+    {
+      "cardUrn": "700000007",
+      "cardTitle": "Metric Eta",
+      "type": "chart",
+      "pages": [90210001],
+      "lastModified": 1780955910000
+    },
+    {
+      "cardUrn": "700000008",
+      "cardTitle": "Metric Theta",
+      "type": "chart",
+      "pages": [90210001],
+      "lastModified": 1780955911000
+    },
+    {
+      "cardUrn": "700000009",
+      "cardTitle": "Metric Iota (other page)",
+      "type": "chart",
+      "pages": [12345678],
+      "lastModified": 1780955912000
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "totalCardCount": 2,
+  "cardAdminSummaries": [
+    {
+      "id": 700000005,
+      "type": "kpi",
+      "title": "Metric Epsilon",
+      "locked": false,
+      "badgeUpdated": 1780955908000,
+      "owners": [ { "id": "27", "type": "USER", "displayName": "SampleOwner" } ],
+      "pageHierarchy": [
+        { "pageId": -100002, "title": "Shared" },
+        { "pageId": 90210001, "title": "Sample Metrics Page" }
+      ]
+    },
+    {
+      "id": 700000006,
+      "type": "kpi",
+      "title": "Metric Zeta",
+      "locked": false,
+      "badgeUpdated": 1780955909000,
+      "owners": [ { "id": "27", "type": "USER", "displayName": "SampleOwner" } ],
+      "pageHierarchy": [
+        { "pageId": -100002, "title": "Shared" },
+        { "pageId": 90210001, "title": "Sample Metrics Page" }
+      ]
+    }
+  ]
+}

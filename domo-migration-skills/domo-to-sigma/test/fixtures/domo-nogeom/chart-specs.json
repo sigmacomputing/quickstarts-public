@@ -1,0 +1,24 @@
+{
+  "pages": [
+    {
+      "name": "Detail",
+      "elements": [
+        {
+          "id": "el-2004",
+          "kind": "combo-chart",
+          "name": "Combo Metric"
+        },
+        {
+          "id": "ctl-region-filter",
+          "kind": "control",
+          "name": "Region Filter"
+        },
+        {
+          "id": "el-2003-summary",
+          "kind": "kpi-chart",
+          "name": "Detail Table Total"
+        }
+      ]
+    }
+  ]
+}

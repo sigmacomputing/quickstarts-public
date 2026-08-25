@@ -1,0 +1,14 @@
+{
+  "dataModelId": "dm-fixture-1",
+  "pages": [
+    {
+      "id": "page-dm-data",
+      "name": "Data",
+      "visibility": null,
+      "elements": [
+        { "id": "el-fact-1", "kind": "table", "name": "Sales Fact", "columnLabels": ["Project Name", "Sales Amount"] },
+        { "id": "el-dim-1", "kind": "table", "name": "Customer Dim", "columnLabels": ["Region", "Segment"] }
+      ]
+    }
+  ]
+}
