@@ -1,0 +1,46 @@
+{
+  "name": "Domo Migration",
+  "schemaVersion": 1,
+  "pages": [
+    {
+      "id": "page-dm-data",
+      "name": "Data",
+      "elements": [
+        {
+          "id": "el-fact-1",
+          "kind": "table",
+          "source": {
+            "connectionId": "<CONNECTION_ID>",
+            "kind": "warehouse-table",
+            "path": ["ANALYTICS", "PUBLIC", "SALES_FACT"]
+          },
+          "columns": [
+            { "id": "c-project-name", "formula": "[SALES_FACT/Project Name]" },
+            { "id": "c-sales-amount", "formula": "[SALES_FACT/Sales Amount]" }
+          ],
+          "metrics": [],
+          "order": ["c-project-name", "c-sales-amount"],
+          "relationships": [],
+          "_datasetId": "ds1"
+        },
+        {
+          "id": "el-dim-1",
+          "kind": "table",
+          "source": {
+            "connectionId": "<CONNECTION_ID>",
+            "kind": "warehouse-table",
+            "path": ["ANALYTICS", "PUBLIC", "CUSTOMER_DIM"]
+          },
+          "columns": [
+            { "id": "c-region", "formula": "[CUSTOMER_DIM/Region]" },
+            { "id": "c-segment", "formula": "[CUSTOMER_DIM/Segment]" }
+          ],
+          "metrics": [],
+          "order": ["c-region", "c-segment"],
+          "relationships": [],
+          "_datasetId": "ds-dim"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "id": 700000010,
+  "urn": "700000010",
+  "drillpath": {},
+  "embedded": false,
+  "dataSourceWrite": false,
+  "columns": [
+    { "id": "metric_numerator", "name": "metric_numerator", "type": "numeric", "isCalculation": false },
+    { "id": "metric_denominator", "name": "metric_denominator", "type": "numeric", "isCalculation": false }
+  ],
+  "definition": {
+    "title": "Metric Ratio",
+    "description": "Anonymized fixture card whose summary number is bound to a Beast Mode.",
+    "chartVersion": "12",
+    "allowTableDrill": true,
+    "inputTable": false,
+    "modified": 1780955930000,
+    "annotations": [],
+    "slicers": [],
+    "segments": { "active": [], "definitions": [] },
+    "conditionalFormats": [],
+    "charts": {
+      "main": {
+        "component": "main",
+        "chartType": "badge_singlevalue",
+        "overrides": { "hide_series": "none" },
+        "goal": null
+      }
+    },
+    "subscriptions": {
+      "big_number": {
+        "name": "big_number",
+        "columns": [
+          {
+            "formulaId": "calculation_44444444-aaaa-bbbb-cccc-444444444444",
+            "calendar": false,
+            "alias": "Metric Ratio Pct",
+            "format": {
+              "type": "percent",
+              "format": "##0.0%",
+              "commas": true,
+              "percentMultiplied": true,
+              "precision": 1
+            }
+          }
+        ],
+        "filters": [],
+        "orderBy": [],
+        "groupBy": [],
+        "limit": 1
+      }
+    },
+    "formulas": [
+      {
+        "templateId": 88,
+        "id": "calculation_44444444-aaaa-bbbb-cccc-444444444444",
+        "name": "Metric Ratio Pct",
+        "formula": "(CASE WHEN (SUM(`metric_denominator`) = 0) THEN 0 ELSE (SUM(`metric_numerator`) / SUM(`metric_denominator`)) END )",
+        "variable": false,
+        "status": "VALID",
+        "persistedOnDataSource": true,
+        "columnPositions": [],
+        "isAnalytic": false,
+        "isAggregatable": false,
+        "dataType": "DECIMAL",
+        "usedByOtherCards": false
+      },
+      {
+        "templateId": 89,
+        "id": "calculation_55555555-aaaa-bbbb-cccc-555555555555",
+        "name": "Metric Ratio Pct 2",
+        "formula": "(SUM(`metric_numerator`) / COUNT(DISTINCT `metric_denominator`))",
+        "variable": false,
+        "status": "VALID",
+        "persistedOnDataSource": true,
+        "columnPositions": [],
+        "isAnalytic": false,
+        "isAggregatable": false,
+        "dataType": "DECIMAL",
+        "usedByOtherCards": false
+      }
+    ]
+  }
+}

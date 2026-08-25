@@ -1,0 +1,4 @@
+[
+  { "id": "p-overview", "title": "Overview", "cardIds": [1001, 1002, 1003, 1004, 1005, 1006] },
+  { "id": "p-detail", "title": "Detail", "cardIds": [2001, 2002, 2003, 2004] }
+]

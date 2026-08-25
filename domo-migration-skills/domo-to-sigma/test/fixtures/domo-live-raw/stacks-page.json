@@ -1,0 +1,134 @@
+{
+  "id": 90210001,
+  "page": { "pageId": 90210001, "title": "Sample Metrics Page" },
+  "type": "page",
+  "title": "Sample Metrics Page",
+  "sizes": [
+    { "id": "700000001", "size": "medium" },
+    { "id": "700000002", "size": "medium" },
+    { "id": "700000003", "size": "large" },
+    { "id": "700000004", "size": "medium" },
+    { "id": "700000005", "size": "" }
+  ],
+  "cards": [
+    {
+      "id": 700000001,
+      "urn": "700000001",
+      "type": "kpi",
+      "title": "Metric Alpha",
+      "description": "METRIC ALPHA\nSample description for the anonymized fixture card.",
+      "active": true,
+      "allowTableDrill": true,
+      "locked": false,
+      "created": 1780955918,
+      "badgeUpdated": 1780955918000,
+      "creatorId": 27,
+      "ownerId": 27,
+      "metadata": {
+        "chartType": "badge_map",
+        "chartVersion": "6",
+        "currentLabel": "Metric Alpha in Period",
+        "calendar": "default",
+        "columnAliases": "{\"state_col\":\"State\",\"name_col\":\"Name\"}",
+        "columnFormats": "{}",
+        "SummaryNumberFormat": "{\"type\":\"number\",\"format\":\"0.0A\"}"
+      },
+      "datasources": [
+        {
+          "dataSourceId": "aaaaaaaa-0000-0000-0000-000000000001",
+          "dataSourceName": "Sample Source A",
+          "displayType": "sample-data",
+          "dataType": "publicsampledata",
+          "providerType": "publicsampledata",
+          "isSampleData": true
+        }
+      ],
+      "owners": [ { "id": "27", "type": "USER", "displayName": "SampleOwner" } ]
+    },
+    {
+      "id": 700000002,
+      "urn": "700000002",
+      "type": "kpi",
+      "title": "Metric Beta",
+      "active": true,
+      "locked": false,
+      "metadata": {
+        "chartType": "badge_treemap",
+        "columnAliases": "{}",
+        "columnFormats": "{}",
+        "SummaryNumberFormat": "{\"type\":\"number\",\"format\":\"###,##0\"}"
+      },
+      "datasources": [
+        { "dataSourceId": "aaaaaaaa-0000-0000-0000-000000000002", "dataSourceName": "Sample Source B" }
+      ]
+    },
+    {
+      "id": 700000003,
+      "urn": "700000003",
+      "type": "kpi",
+      "title": "Metric Gamma",
+      "active": true,
+      "locked": false,
+      "metadata": {
+        "chartType": "badge_donut",
+        "columnAliases": "{not valid json",
+        "columnFormats": "{}",
+        "SummaryNumberFormat": null
+      },
+      "datasources": [
+        { "dataSourceId": "aaaaaaaa-0000-0000-0000-000000000003", "dataSourceName": "Sample Source C" }
+      ]
+    },
+    {
+      "id": 700000004,
+      "urn": "700000004",
+      "type": "kpi",
+      "title": "Metric Delta (uncollected)",
+      "active": true,
+      "locked": false,
+      "metadata": { "chartType": "badge_vert_bar" },
+      "datasources": [
+        { "dataSourceId": "aaaaaaaa-0000-0000-0000-000000000004", "dataSourceName": "Sample Source D" }
+      ]
+    },
+    {
+      "id": 700000005,
+      "urn": "700000005",
+      "type": "kpi",
+      "title": "Metric Epsilon (API-created, unsized)",
+      "active": true,
+      "locked": false,
+      "metadata": { "chartType": "badge_singlevalue" },
+      "datasources": [
+        { "dataSourceId": "aaaaaaaa-0000-0000-0000-000000000005", "dataSourceName": "Sample Source E" }
+      ]
+    }
+  ],
+  "collections": [
+    {
+      "id": 810000001,
+      "title": "Source A Section",
+      "description": "Example cards based on sample data from Source A",
+      "minimized": false,
+      "cardIndices": [0, 1]
+    },
+    {
+      "id": 810000002,
+      "title": "Source C Section",
+      "description": "Example cards based on sample data from Source C",
+      "minimized": false,
+      "cardIndices": [2]
+    }
+  ],
+  "locked": true,
+  "isFavorite": false,
+  "pageAnalyzerSettings": {
+    "pageId": 90210001,
+    "interactionFilters": false,
+    "noAddingNewFilters": false,
+    "showFilterBar": true,
+    "showGlobalDateFilters": true,
+    "showSegments": true,
+    "showFilterIcons": true
+  }
+}
