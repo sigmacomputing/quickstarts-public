@@ -122,6 +122,94 @@ Dir.mktmpdir('domo-build-layout-rung1-companion') do |dir|
 end
 
 # ===========================================================================
+# F3 / blocker 3 (2026-08-05 batch-verify): pages.json's cardIds is unreliable
+# (GET /v1/pages/{id} reports cardIds: [] even for a page that genuinely owns
+# every card — domo-discover.rb's "Bug 1 (P0)"). When that happens and there
+# is exactly ONE page in scope, this file must fall back to that page's REAL
+# title — the SAME fallback build-workbook.rb's group_cards_by_page already
+# uses (see test-build-workbook.rb's own F3 tests) — not the literal
+# 'Overview'. Before this fix, build-domo-layout.rb still hard-coded
+# 'Overview' while build-workbook.rb had already been fixed to use the real
+# title, so load_chart_specs_companions'/load_chart_specs_controls' page-NAME
+# keyed lookup missed every companion/control: measured on the real cold run,
+# 50 zones w/ 5 companion KPIs (name-matched) vs 45 zones w/ 0 companion KPIs
+# (as-landed, before this fix). Reproduced at fixture scale below: a companion
+# KPI keyed under the page's real title in chart-specs.json must still reach
+# a zone even though pages.json's cardIds is empty.
+# ===========================================================================
+Dir.mktmpdir('domo-build-layout-f3-page-name') do |dir|
+  w = ->(name, obj) { File.write(File.join(dir, name), JSON.generate(obj)) }
+  w.call('cards.json', [
+    { 'id' => 'c1', 'title' => 'Revenue', 'chartType' => 'badge_vert_bar',
+      'x' => 0, 'y' => 0, 'w' => 100, 'h' => 30 },
+  ])
+  # Deliberately cardIds: [] (the real Domo shape) on a title that is NOT
+  # 'Overview' — the exact real-data mismatch (page 'Sample DataSets +
+  # Cards', pages.json's cardIds: []).
+  w.call('pages.json', [{ 'id' => 59931332, 'title' => 'Sample DataSets + Cards', 'cardIds' => [] }])
+  w.call('chart-specs.json', { 'pages' => [{ 'name' => 'Sample DataSets + Cards', 'elements' => [
+    { 'id' => 'el-c1', 'kind' => 'bar-chart', 'name' => 'Revenue' },
+    { 'id' => 'el-c1-summary', 'kind' => 'kpi-chart', 'name' => 'Total Revenue' },
+  ] }] })
+
+  env = { 'DOMO_DISCOVERY_DIR' => dir }
+  out = IO.popen(env, ['ruby', File.join(SCRIPTS, 'build-domo-layout.rb')], err: [:child, :out], &:read)
+  ok($?.success?, "build-domo-layout.rb exits 0 with an empty cardIds and a companion KPI keyed by the " \
+                   "page's real title\n#{out unless $?.success?}")
+
+  dashboards = JSON.parse(File.read(File.join(dir, 'dashboard-layout.json')))
+  ok(dashboards.none? { |d| d['dashboard'] == 'Overview' },
+     "the placeholder 'Overview' name is NOT used when there is exactly one real page in scope (F3)")
+  dash = dashboards.find { |d| d['dashboard'] == 'Sample DataSets + Cards' }
+  ok(dash, "the dashboard is named after the page's REAL title, not 'Overview' " \
+           "(dashboards seen: #{dashboards.map { |d| d['dashboard'] }.inspect})")
+  if dash
+    z_comp = dash['zones'].find { |z| z['id'].to_s == 'el-c1-summary' }
+    ok(z_comp, 'the companion KPI (chart-specs.json, keyed by the REAL page title) reaches a zone — ' \
+               "before this fix it was silently dropped (page-NAME mismatch: 'Overview' vs the real title)")
+    eq(z_comp['caption'], 'Total Revenue', 'the recovered companion zone is captioned with its own name') if z_comp
+  end
+end
+
+# ===========================================================================
+# F3 / blocker 3 cross-file consistency: build-workbook.rb's
+# group_cards_by_page and build-domo-layout.rb's group_cards_by_page_for_layout
+# MUST resolve the same default page name for the same pages.json input — a
+# mismatch here is exactly what silently drops layout zones (see above). Both
+# real functions are exercised directly (not re-implemented here) so a future
+# edit to either one's fallback logic that de-syncs them fails this test.
+# ===========================================================================
+# Both scripts independently assign OUT = ENV['DOMO_DISCOVERY_DIR'] || ... at
+# their own top level (same value, never read below) — requiring both in one
+# process trips Ruby's unconditional "already initialized constant" notice.
+# Silence just that, not real warnings from the assertions below.
+old_verbose = $VERBOSE
+$VERBOSE = nil
+require_relative '../scripts/build-workbook'
+require_relative '../scripts/build-domo-layout' # group_cards_by_page_for_layout lives here
+$VERBOSE = old_verbose
+
+[
+  ['single page, empty cardIds -> falls back to the page\'s real title',
+   [{ 'id' => 'card-1' }, { 'id' => 'card-2' }],
+   [{ 'id' => 59931332, 'title' => 'Sample DataSets + Cards', 'cardIds' => [] }]],
+  ['multiple pages, no reliable attribution -> both fall back to the honest Overview placeholder',
+   [{ 'id' => 'card-1' }, { 'id' => 'card-2' }],
+   [{ 'id' => 1, 'title' => 'Page One', 'cardIds' => [] }, { 'id' => 2, 'title' => 'Page Two', 'cardIds' => [] }]],
+  ['reliable cardIds present -> both honor the real per-page attribution identically',
+   [{ 'id' => 'card-1' }, { 'id' => 'card-2' }],
+   [{ 'id' => 1, 'title' => 'Page One', 'cardIds' => ['card-1'] }, { 'id' => 2, 'title' => 'Page Two', 'cards' => ['card-2'] }]],
+].each do |desc, cards, pages|
+  from_workbook = group_cards_by_page(cards, pages)
+  from_layout   = group_cards_by_page_for_layout(cards, pages)
+  eq(from_workbook.keys.sort, from_layout.keys.sort, "#{desc} — page names agree")
+  from_workbook.each do |pname, pcards|
+    eq(pcards.map { |c| c['id'] }.sort, Array(from_layout[pname]).map { |c| c['id'] }.sort,
+       "#{desc} — page '#{pname}' gets the SAME cards from both functions")
+  end
+end
+
+# ===========================================================================
 # Live-validation fix (refs/live-validation-2026-07-30.md): a real classic
 # Domo page's private read carries NO x/y/w/h at all — only a per-card
 # T-shirt size token (stacks['sizes']) and titled collections[] grouping
@@ -339,10 +427,19 @@ end
 Dir.mktmpdir('domo-build-layout-observed') do |dir|
   w = ->(name, obj) { File.write(File.join(dir, name), JSON.generate(obj)) }
   w.call('cards.json', [
-    { 'id' => 'ov1', 'title' => 'Observed KPI', 'chartType' => 'badge_singlevalue', '_size' => '', '_pageOrder' => 0 },
+    { 'id' => 'ov1', 'title' => 'Observed Chart', 'chartType' => 'badge_vert_bar', '_size' => '', '_pageOrder' => 0 },
     { 'id' => 'ov2', 'title' => 'Composed Chart', 'chartType' => 'badge_vert_bar', '_size' => '', '_pageOrder' => 1 },
   ])
   w.call('pages.json', [{ 'id' => 'p1', 'title' => 'Observed Page', 'cardIds' => %w[ov1 ov2] }])
+  w.call('chart-specs.json', {
+    'pages' => [{
+      'name' => 'Observed Page',
+      'elements' => [
+        { 'id' => 'el-ov1', 'kind' => 'bar-chart', 'name' => 'Observed Chart' },
+        { 'id' => 'el-ov1-summary', 'kind' => 'kpi-chart', 'name' => 'Observed Total' },
+      ],
+    }],
+  })
   w.call('layout-observed.json', {
     'ov1' => { 'x' => 0.0, 'y' => 0.0, 'w' => 0.4, 'h' => 0.15 },
     'nonexistent-card-id' => { 'x' => 0.0, 'y' => 0.0, 'w' => 1.0, 'h' => 1.0 }, # typo -> must WARN
@@ -358,11 +455,102 @@ Dir.mktmpdir('domo-build-layout-observed') do |dir|
   dash = JSON.parse(File.read(File.join(dir, 'dashboard-layout.json'))).find { |d| d['dashboard'] == 'Observed Page' }
   zov1 = dash['zones'].find { |z| z['id'] == 'ov1' }
   zov2 = dash['zones'].find { |z| z['id'] == 'ov2' }
-  eq([zov1['x_pct'], zov1['y_pct'], zov1['w_pct'], zov1['h_pct']], [0.0, 0.0, 40.0, 15.0],
-     "ov1's zone is placed EXACTLY at its observed fraction * 100, through the real CLI entrypoint")
+  zsum = dash['zones'].find { |z| z['id'] == 'el-ov1-summary' }
+  eq([zov1['x_pct'], zov1['y_pct'], zov1['w_pct'], zov1['h_pct']], [0.0, 3.6, 40.0, 11.4],
+     "ov1's observed card rectangle reserves its top 24% for the source Summary Number")
+  eq([zsum['x_pct'], zsum['y_pct'], zsum['w_pct'], zsum['h_pct']], [0.0, 0.0, 40.0, 3.6],
+     'the companion KPI occupies that source-card header area instead of a bottom KPI band')
+  eq(zsum['_source'], 'observed-from-screenshot-summary',
+     'the companion placement is explicitly tagged as screenshot-derived')
   eq(zov1['_source'], 'observed-from-screenshot', "ov1's zone is tagged _source, end to end")
   ok(zov2['_source'].nil?, 'ov2 (not in the sidecar) falls back to the kind-aware default composition, untagged')
   ok(zov2['y_pct'] > zov1['y_pct'], 'the composed remainder (ov2) is placed below the observed region, end to end')
+end
+
+# ===========================================================================
+# bead wmkf: a KPI-kind card's ZONE caption must match the name build_kpi
+# (build-workbook.rb) will actually give the built Sigma element — it prefers
+# the card's Summary Number label over the card's own title (Domo lets an
+# author label a tile differently from the card's own title; the label is
+# what actually renders ON the KPI). Regression for a real live bug: a card
+# titled "Units Ordered" but labeled "Units" on the tile itself produced a
+# zone captioned "Units Ordered", which build-dashboard-layout.rb's NAME-based
+# zone matcher (els_by_name, keyed on the real built element's name "Units")
+# could never match — silently dropping the KPI out of the shared top KPI row
+# and into the generic "no zone matched" bottom-band fallback instead.
+#
+# No card here carries x/y/w/h, '_collection', or a real '_size' token, so
+# every card routes through rung 2a (compose_kind_aware_rows / kpi_rows_for)
+# — the same call site (build-domo-layout.rb's row-tuple `chart_kind`
+# destructure) the real live bug (card id 390868622) was reproduced through.
+# ===========================================================================
+Dir.mktmpdir('domo-build-layout-kpi-caption') do |dir|
+  w = ->(name, obj) { File.write(File.join(dir, name), JSON.generate(obj)) }
+  w.call('cards.json', [
+    { 'id' => 'kpi-label-diff', 'title' => 'Units Ordered', 'chartType' => 'badge_singlevalue',
+      'summaryNumber' => { 'column' => 'QUANTITY_ORDERED', 'aggregation' => 'SUM', 'label' => 'Units' },
+      '_size' => '', '_pageOrder' => 0 },
+    { 'id' => 'kpi-label-same', 'title' => 'Orders', 'chartType' => 'badge_singlevalue',
+      'summaryNumber' => { 'column' => 'ORDER_ID', 'aggregation' => 'COUNT', 'label' => 'Orders' },
+      '_size' => '', '_pageOrder' => 1 },
+    { 'id' => 'kpi-label-blank', 'title' => 'Net Revenue', 'chartType' => 'badge_singlevalue',
+      'summaryNumber' => { 'column' => 'NET_REVENUE', 'aggregation' => 'SUM', 'label' => '' },
+      '_size' => '', '_pageOrder' => 2 },
+    { 'id' => 'kpi-no-summary', 'title' => 'Gross Profit', 'chartType' => 'badge_singlevalue',
+      '_size' => '', '_pageOrder' => 3 },
+  ])
+  w.call('pages.json', [{ 'id' => 'p1', 'title' => 'KPI Caption Page',
+                          'cardIds' => %w[kpi-label-diff kpi-label-same kpi-label-blank kpi-no-summary] }])
+
+  env = { 'DOMO_DISCOVERY_DIR' => dir }
+  out = IO.popen(env, ['ruby', File.join(SCRIPTS, 'build-domo-layout.rb')], err: [:child, :out], &:read)
+  status = $?.success?
+  ok(status, "build-domo-layout.rb exits 0 on a page of KPI cards whose title/summaryNumber.label vary\n#{out unless status}")
+
+  dash = JSON.parse(File.read(File.join(dir, 'dashboard-layout.json'))).find { |d| d['dashboard'] == 'KPI Caption Page' }
+  zones = dash['zones']
+
+  z_diff  = zones.find { |z| z['id'] == 'kpi-label-diff' }
+  z_same  = zones.find { |z| z['id'] == 'kpi-label-same' }
+  z_blank = zones.find { |z| z['id'] == 'kpi-label-blank' }
+  z_none  = zones.find { |z| z['id'] == 'kpi-no-summary' }
+  ok(z_diff && z_same && z_blank && z_none, 'every KPI card in the fixture was placed')
+
+  eq(z_diff['caption'], 'Units',
+     "bead wmkf: a KPI whose summaryNumber.label ('Units') differs from its card title ('Units Ordered') " \
+     'gets a zone captioned with the LABEL — the same name build_kpi actually gives the built Sigma element')
+  eq(z_same['caption'], 'Orders', 'a KPI whose label already matches its title is unaffected (unchanged behavior)')
+  eq(z_blank['caption'], 'Net Revenue',
+     'a KPI with a BLANK summaryNumber.label falls back to the card title, unchanged (regression guard)')
+  eq(z_none['caption'], 'Gross Profit',
+     'a KPI card with no summaryNumber at all falls back to the card title, unchanged (regression guard)')
+end
+
+Dir.mktmpdir('domo-build-layout-v4-content') do |dir|
+  w = ->(name, obj) { File.write(File.join(dir, name), JSON.generate(obj)) }
+  w.call('cards.json', [
+    { 'id' => 'c1', 'title' => 'Revenue', 'chartType' => 'badge_vert_bar',
+      'x' => 0, 'y' => 2, 'w' => 24, 'h' => 8 },
+  ])
+  w.call('pages.json', [{
+    'id' => 'p1', 'title' => 'Printable', 'cardIds' => ['c1'],
+    '_layoutContent' => [
+      { 'id' => 'domo-layout-p1-header-1', 'type' => 'header', 'text' => 'Revenue section',
+        'x' => 0, 'y' => 0, 'w' => 24, 'h' => 2 },
+      { 'id' => 'domo-layout-p1-page-break-2', 'type' => 'page-break',
+        'x' => 0, 'y' => 10, 'w' => 24, 'h' => 1 },
+    ],
+  }])
+
+  env = { 'DOMO_DISCOVERY_DIR' => dir }
+  out = IO.popen(env, ['ruby', File.join(SCRIPTS, 'build-domo-layout.rb')], err: [:child, :out], &:read)
+  ok($?.success?, "build-domo-layout.rb exits 0 with authored v4 header/page-break content\n#{out unless $?.success?}")
+  dash = JSON.parse(File.read(File.join(dir, 'dashboard-layout.json'))).first
+  header = dash['zones'].find { |zone| zone['id'] == 'domo-layout-p1-header-1' }
+  page_break = dash['zones'].find { |zone| zone['id'] == 'domo-layout-p1-page-break-2' }
+  eq(header && header['chart_kind'], 'text', 'v4 HEADER reaches layout as a text zone')
+  eq(header && header['caption'], 'Revenue section', 'v4 HEADER keeps its authored caption')
+  eq(page_break && page_break['chart_kind'], 'page-break', 'v4 PAGE_BREAK reaches layout as a page-break zone')
 end
 
 puts

@@ -220,6 +220,5 @@ MISSING  a2 "United Widgets" raw="12,345B" — closest candidate 1.2e12 in "Top 
   `--accept-residuals` does not apply. The numbers are wrong; fix or reclassify
   with evidence.
 - **Waiver budget (exit 19):** more than 2 quality waivers → GREEN unavailable
-  (YELLOW cap). Anchors and similarity skips count; `--skip-telemetry-gate`
-  (policy) and the sanctioned builder→verifier `--skip-visual-comparison`
-  handoff do not.
+  (YELLOW cap). Anchors and similarity skips count; the sanctioned
+  builder→verifier `--skip-visual-comparison` handoff does not.

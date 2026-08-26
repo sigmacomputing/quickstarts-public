@@ -14,7 +14,22 @@
 #   discover -> capture-visuals -> convert-beast-modes -> build-dm* ->
 #   post-and-readback(data-model)* -> build-workbook -> build-workbook-spec ->
 #   post-and-readback(workbook) -> build-domo-layout -> build-dashboard-layout ->
-#   put-layout -> verify-parity -> assert-phase6-ran
+#   put-layout -> render-visual -> verify-parity -> record-visual-check ->
+#   assert-phase6-ran
+#
+#   render-visual (bead B5) renders the posted workbook's first visible page
+#   to <out>/sigma-render.png via sigma-export-png.py — assert-phase6-ran.rb's
+#   gate 8 hard-requires this file and nothing upstream of this fix ever
+#   produced it. record-visual-check.rb (the verdict recorder gate 8b reads)
+#   runs AFTER verify-parity rather than immediately after the render: it
+#   hard-requires parity-final.json to already exist on disk (it merges into
+#   it, never creates it from nothing), and that file is first written by
+#   phase6-parity-domo.rb, the parity finalizer (bead 2tkm — it used to be
+#   written by verify-parity.rb's --score-out, which is what BROKE gate 1:
+#   --score-out emits the tiles_* score schema, not the gate's charts_*
+#   contract. --score-out now targets parity-score.json). This orchestrator has no image input, so
+#   it records the only HONEST verdict it is entitled to — not-executable —
+#   rather than fabricate a pass; see phase_record_visual_check! below.
 #
 #   * build-dm + the data-model half of post-and-readback are NOT named as
 #     their own step in this task's phase list, but build-workbook-spec.rb
@@ -70,6 +85,10 @@ require 'open3'
 require_relative 'lib/run_state'
 require_relative 'lib/domo_sigma_util'
 require_relative 'lib/zone_census'
+require_relative 'lib/code_rep'
+require_relative 'lib/layout'
+require_relative 'lib/sigma_rest'
+require_relative 'lib/domo_warehouse_column_refs'
 include DomoSigma
 
 opts = { mode: 'page-per-worksheet', workbook_name: 'Domo Migration' }
@@ -88,7 +107,12 @@ OptionParser.new do |o|
   o.on('--description STR', 'Workbook description.') { |v| opts[:description] = v }
   o.on('--mode MODE', %w[dashboard page-per-worksheet], 'build-workbook-spec.rb page layout mode ' \
        '(default page-per-worksheet).') { |v| opts[:mode] = v }
-  o.on('--parity-plan PATH', 'LIVE mode: verify-parity.rb plan (phase skipped with a note when absent).') { |v| opts[:parity_plan] = v }
+  o.on('--parity-plan PATH', 'LIVE mode: a hand-supplied verify-parity.rb plan. Overrides the ' \
+       'built-in parity oracle, which otherwise builds one automatically.') { |v| opts[:parity_plan] = v }
+  o.on('--skip-parity-oracle REASON', 'Do NOT build the parity oracle automatically. Without a ' \
+       '--parity-plan this leaves the run with no gate-1 evidence at all, so ' \
+       'assert-phase6-ran.rb gets --skip-parity-gate and rejects it (exit 18) absent a passing ' \
+       'anchors-verdict.json. In other words: this run cannot then be GREEN.') { |v| opts[:skip_parity_oracle] = v }
 end.parse!(ARGV)
 
 abort('FATAL: --out DIR is required') unless opts[:out]
@@ -125,6 +149,26 @@ def run_script!(script, *args)
   out.each_line { |l| print "    #{l}" }
   puts if !out.empty? && !out.end_with?("\n")
   [status.success?, status.exitstatus, out]
+end
+
+# Same argv-array discipline as run_script!, for this skill's one Python
+# phase script (sigma-export-png.py — the /v2/workbooks/{id}/export REST
+# contract; see its header). Unlike the vendored converters (tableau/
+# quicksight/qlik/powerbi) this skill never carried a lib/py_resolve.rb
+# python3/python/py-3 Windows resolver for a single call site — invoked the
+# same plain `python3` refs/layout-visual-qa.md already documents. Returns
+# [success?, exitstatus-or-nil, combined_output]; exitstatus is nil ONLY when
+# python3 itself is missing from PATH (Errno::ENOENT) — the caller treats
+# that as a genuinely-absent prerequisite (honest SKIP), never a phase FAIL.
+def run_py_script!(script, *args)
+  path = File.join(SCRIPTS, script)
+  log "$ python3 #{script} #{args.join(' ')}".rstrip
+  out, status = Open3.capture2e('python3', path, *args)
+  out.each_line { |l| print "    #{l}" }
+  puts if !out.empty? && !out.end_with?("\n")
+  [status.success?, status.exitstatus, out]
+rescue Errno::ENOENT
+  [false, nil, '']
 end
 
 def fail_phase!(name, reason)
@@ -271,14 +315,60 @@ def offline_build_workbook_spec!(chart_specs_path, name:, description:, folder_i
     { 'id' => slugify_page_id(p['name'], used_ids), 'name' => p['name'], 'elements' => p['elements'] }
   end
 
-  wb = {
-    'name' => name, 'schemaVersion' => 1, 'folderId' => folder_id,
-    'pages' => [data_page] + visible_pages,
+  if visible_pages.size > 1
+    page_labels = visible_pages.each_with_object({}) { |page, labels| labels[page['id']] = page['name'] }
+    visible_pages.each do |page|
+      page['elements'].unshift(
+        'id' => "nav-#{page['id']}",
+        'kind' => 'navigation',
+        'mode' => 'auto',
+        'pageLabels' => page_labels
+      )
+    end
+  end
+
+  page_records = [data_page] + visible_pages
+  layout_pages = page_records.map do |page|
+    row = 1
+    children = Array(page['elements']).map do |element|
+      height = case element['kind']
+               when 'page-break' then 1
+               when 'control', 'text', 'navigation', 'progress', 'image', 'divider' then 3
+               when 'kpi-chart' then 6
+               when 'table', 'pivot-table' then 12
+               else 10
+               end
+      placed = SigmaLayout.le(element['id'], 1, 25, row, row + height)
+      row += height
+      placed
+    end
+    SigmaLayout.page_xml(page['id'], children.join("\n"))
+  end
+  document = {
+    'schemaVersion' => 1,
+    'kind' => 'workbook',
+    'pages' => page_records.map do |page|
+      metadata = page.reject { |key, _| key == 'elements' }
+      metadata['visibility'] = 'hidden' if page['id'] == 'page-data'
+      metadata
+    end,
+    'elements' => page_records.flat_map { |page| Array(page['elements']) },
+    'layout' => SigmaLayout.assemble(*layout_pages),
+    'panels' => [],
+    'overlays' => []
+  }
+  if visible_pages.size > 1
+    document['settings'] = { 'navigation' => { 'pageTabsInViewMode' => 'shown' } }
+  end
+
+  metadata = {
+    'name' => name, 'folderId' => folder_id,
     '_offline' => true,
     '_note' => 'assembled by migrate-domo.rb --offline without a live Sigma Data Model readback — ' \
                'the master element source and folderId are placeholders; NOT postable as-is.',
   }
-  wb['description'] = description if description
+  metadata['description'] = description if description
+  wb = Sigma::CodeRep.wrap(document, extra: metadata)
   File.write(out_path, JSON.pretty_generate(wb) + "\n")
   wb
 end
@@ -292,7 +382,9 @@ def offline_put_layout!(spec_path, layout_xml_path, elements_sidecar_path)
   xml = File.read(layout_xml_path, encoding: 'UTF-8')
   raise 'FATAL: empty elementId in layout XML' if xml.match?(/elementId=""/)
 
-  spec = JSON.parse(File.read(spec_path))
+  raw_spec = JSON.parse(File.read(spec_path))
+  spec = Sigma::CodeRep.document(raw_spec)
+  metadata = Sigma::CodeRep.metadata(raw_spec)
   spec['pages'].each { |p| p.delete('layout') }
   spec['layout'] = xml
 
@@ -305,19 +397,33 @@ def offline_put_layout!(spec_path, layout_xml_path, elements_sidecar_path)
         log "WARN: layout elements sidecar references unknown page #{page_id.inspect} — skipped"
         next
       end
-      page['elements'] ||= []
-      existing = page['elements'].map { |e| e['id'] }
+      spec['elements'] ||= []
+      existing = spec['elements'].map { |e| e['id'] }
       els.each do |el|
         next if existing.include?(el['id'])
-        page['elements'] << el
+        spec['elements'] << el
+        existing << el['id']
         injected += 1
       end
     end
     log "injected #{injected} container/header element(s) from #{File.basename(elements_sidecar_path)}"
   end
 
-  File.write(spec_path, JSON.pretty_generate(spec) + "\n")
-  spec
+  element_ids = Array(spec['elements']).map { |element| element['id'] }
+  placed_ids = xml.scan(/\belementId="([^"]+)"/).flatten
+  duplicate_elements = element_ids.tally.select { |_id, count| count > 1 }.keys
+  duplicate_placements = placed_ids.tally.select { |_id, count| count > 1 }.keys
+  unplaced = element_ids - placed_ids
+  unknown = placed_ids - element_ids
+  unless duplicate_elements.empty? && duplicate_placements.empty? && unplaced.empty? && unknown.empty?
+    raise "FATAL: layout must place every flat workbook element exactly once: " \
+          "duplicate element ids=#{duplicate_elements.inspect}; duplicate placements=#{duplicate_placements.inspect}; " \
+          "unplaced=#{unplaced.inspect}; unknown=#{unknown.inspect}"
+  end
+
+  wrapped = Sigma::CodeRep.wrap(spec, extra: metadata)
+  File.write(spec_path, JSON.pretty_generate(wrapped) + "\n")
+  wrapped
 end
 
 # wb-ids.json (the shape post-and-readback.rb --type workbook emits and
@@ -325,12 +431,35 @@ end
 # just-assembled workbook-spec.json's pages/elements — no live workbook exists
 # in --offline mode to read this back from.
 def wb_ids_from_spec(spec)
+  document = Sigma::CodeRep.document(spec)
+  elements_by_id = Sigma::CodeRep.workbook_elements(document).each_with_object({}) do |element, index|
+    index[element['id']] = element if element['id']
+  end
+  page_element_ids = Sigma::CodeRep.workbook_page_element_ids(document)
   {
-    'pages' => spec['pages'].map do |p|
+    'pages' => Array(document['pages']).map do |p|
       { 'id' => p['id'], 'name' => p['name'],
-        'elements' => Array(p['elements']).map { |e| { 'id' => e['id'], 'name' => e['name'] }.compact } }
+        'visibility' => p['visibility'],
+        'elements' => Array(page_element_ids[p['id']]).filter_map do |element_id|
+          element = elements_by_id[element_id]
+          { 'id' => element['id'], 'kind' => element['kind'], 'name' => element['name'] }.compact if element
+        end }
     end,
   }
+end
+
+# ---------------------------------------------------------------------------
+# Phase 6f (gate 8) — which posted page to render. The hidden "Data" page
+# (id 'page-data' — build-workbook-spec.rb's master-table container) carries
+# no user-visible content; rendering it would produce a blank/placeholder
+# PNG that satisfies gate 8's file-exists check while proving nothing. Pick
+# the first VISIBLE page instead — the same id-substring filter every sibling
+# converter's own visual-QA phase uses (tableau/quicksight/qlik/powerbi
+# migrate-*.rb: `.reject { |p| p['id'].to_s.downcase.include?('data') }`).
+# Pure/no I/O so it is unit-testable without a live wb-ids.json (see
+# test-migrate-domo.rb).
+def render_target_page(wb_ids)
+  Array(wb_ids['pages']).find { |p| !p['id'].to_s.downcase.include?('data') }
 end
 
 # ---------------------------------------------------------------------------
@@ -372,6 +501,15 @@ def phase_convert_beast_modes!(opts)
   ok, code, _out = run_script!('convert-beast-modes.rb')
   fail_phase!('convert-beast-modes', "normalize step exited #{code}") unless ok
 
+  ok, code, _out = run_script!('convert-beast-modes.rb', '--convert')
+  if !ok && code == 10
+    fail_phase!('convert-beast-modes',
+                'no vendored converter/sql.mjs and no --mcp-dir/DOMO_MCP_DIR — re-run ' \
+                "'ruby scripts/convert-beast-modes.rb --convert' directly to see the manual " \
+                'convert_sql_to_sigma_formula + --converter-out fallback instructions')
+  end
+  fail_phase!('convert-beast-modes', "--convert step exited #{code}") unless ok
+
   pending_path = File.join(DISCOVERY, 'formulas.pending.json')
   pending = begin
     JSON.parse(File.read(pending_path))
@@ -379,21 +517,29 @@ def phase_convert_beast_modes!(opts)
     []
   end
   unresolved = pending.count { |e| e['sigmaFormula'].nil? || e['sigmaFormula'].to_s.strip.empty? }
+  unreliable = pending.count { |e| e['converted'] == false }
   if unresolved.positive?
-    log "NOTE: #{unresolved} Beast Mode(s) still lack a sigmaFormula — normally filled by calling " \
-        'convert_sql_to_sigma_formula per pending entry (see the script header) before --lint. ' \
-        'Running --lint now anyway: unresolved entries are DROPPED from formulas.json (never shipped ' \
-        'silently as-is), so this phase is only fully complete once formulas.pending.json is filled in ' \
-        'and re-linted.'
+    log "NOTE: #{unresolved} Beast Mode(s) still lack a sigmaFormula after --convert — unexpected " \
+        '(lookConvertExpression is a total fallback that never returns nil); check ' \
+        "convert-beast-modes.rb --convert's stderr output above."
+  end
+  if unreliable.positive?
+    log "NOTE: #{unreliable} Beast Mode(s) flagged converted:false by --convert — has a sigmaFormula " \
+        '(never silently dropped) but still contains untranslated CASE/WHEN/THEN or an infix ' \
+        'LIKE/BETWEEN; review before shipping (discovery/formula-overrides.json can supply a ' \
+        'hand-authored replacement).'
   end
 
   ok, code, _out = run_script!('convert-beast-modes.rb', '--lint')
   fail_phase!('convert-beast-modes', "--lint step exited #{code}") unless ok
 
-  if unresolved.positive?
-    done_phase!('convert-beast-modes', "#{unresolved} Beast Mode(s) unresolved — see discovery/formulas.pending.json")
+  if unresolved.positive? || unreliable.positive?
+    done_phase!('convert-beast-modes',
+                "#{unresolved} unresolved, #{unreliable} unreliable (converted:false) — see " \
+                'discovery/formulas.pending.json')
   else
-    done_phase!('convert-beast-modes')
+    done_phase!('convert-beast-modes',
+                'no residual CASE/infix syntax detected — not a full validity guarantee')
   end
 end
 
@@ -408,6 +554,43 @@ def phase_build_workbook!(opts)
   ok, code, _out = run_script!('build-workbook.rb')
   fail_phase!('build-workbook', "build-workbook.rb exited #{code}") unless ok
   done_phase!('build-workbook')
+end
+
+# Source-derived presentation styling (card headers, compact KPI/axis formats,
+# categorical order) — the automation that replaces the hand-authored sidecars
+# the gold acceptance run first used. Runs BEFORE build-workbook (the builders
+# read these sidecars) and is a NICE-TO-HAVE refinement: a failure never fails
+# the run, and any operator-authored sidecar already on disk is preserved
+# (derive-presentation-overrides.rb only writes files that don't already exist
+# unless --force). In live mode collect-parity-expected.rb (Domo-only, no Sigma
+# dependency) runs first so the display-scaling decisions see real values;
+# offline/metadata-only still produces headers, KPI font sizing, and category
+# order from whatever the fixture carries.
+def phase_derive_presentation!(opts, collect_expected:)
+  hr('derive-presentation-overrides')
+  manifest = File.join(DISCOVERY, 'presentation-overrides.json')
+  if !opts[:force] && File.exist?(manifest)
+    log 'discovery/presentation-overrides.json already present — skip (idempotent; pass --force to rederive)'
+    skip_phase!('derive-presentation-overrides', 'already derived (idempotent skip)')
+    return
+  end
+  if collect_expected
+    expected_path = File.join(OUT, 'parity-expected.json')
+    if opts[:force] || !File.exist?(expected_path)
+      ok_e, code_e, _e = run_script!('collect-parity-expected.rb', '--workdir', OUT)
+      log "collect-parity-expected exited #{code_e} — deriving from metadata only" unless ok_e
+    end
+  end
+  args = ['--workdir', OUT, '--discovery', DISCOVERY]
+  args << '--force' if opts[:force]
+  ok, code, _out = run_script!('derive-presentation-overrides.rb', *args)
+  if ok
+    done_phase!('derive-presentation-overrides')
+  else
+    skip_phase!('derive-presentation-overrides',
+                "derive-presentation-overrides.rb exited #{code} — builders fall back to plain " \
+                'formatting; not fatal')
+  end
 end
 
 def phase_build_domo_layout!(opts)
@@ -450,6 +633,76 @@ def phase_write_2d_flag!
   flag
 end
 
+# bead B5: nothing upstream of this ever rendered a Sigma PNG, so
+# assert-phase6-ran.rb's gate 8 (requires <out>/sigma-render.png or a
+# screenshots manifest) deterministically exit-10'd on every LIVE run. Render
+# the posted workbook's first visible page via the existing sigma-export-png.py
+# (the /v2/workbooks/{id}/export REST contract — see its header for the
+# POST-then-poll shape); non-fatal on a genuinely-absent prerequisite (no
+# page to render, or no python3 on PATH), but a real export failure still
+# fails the phase — a render that silently never happened is exactly the bug
+# this closes.
+def phase_render_visual!(opts, workbook_id, wb_ids)
+  hr('render-visual (Phase 6f render — gate 8)')
+  render_path = File.join(OUT, 'sigma-render.png')
+  if !opts[:force] && File.exist?(render_path)
+    log 'sigma-render.png already present — skip (idempotent; pass --force to re-render)'
+    skip_phase!('render-visual', 'already rendered (idempotent skip)')
+    return
+  end
+  page = render_target_page(wb_ids)
+  if page.nil?
+    skip_phase!('render-visual', 'wb-ids.json has no non-Data page to render (only the hidden master page exists)')
+    return
+  end
+  ok, code, _out = run_py_script!('sigma-export-png.py', '--workbook', workbook_id, '--page', page['id'], '--out', render_path)
+  if code.nil?
+    skip_phase!('render-visual', 'python3 not found on PATH — cannot run sigma-export-png.py; render by ' \
+                                  "hand per refs/layout-visual-qa.md (--out #{render_path}), then re-run")
+    return
+  end
+  fail_phase!('render-visual', "sigma-export-png.py exited #{code}") unless ok
+  done_phase!('render-visual', "rendered page #{page['id'].inspect} -> #{render_path}")
+end
+
+# bead B5 (continued): gate 8b needs a RECORDED source-vs-target verdict, not
+# just a render — but record-visual-check.rb (a) hard-requires parity-final.json
+# to already exist (it merges into it; never creates it from nothing — see its
+# own "run finalize first" abort) and (b) refuses to accept a --verdict pass
+# from a caller that has no image input (its VISION PRECONDITION). This
+# orchestrator is an unattended Ruby process — it cannot itself read
+# sigma-render.png against the source, so recording a fabricated pass would be
+# exactly the false attestation record-visual-check.rb exists to prevent.
+# --verdict not-executable is the ONLY honest verdict available here: it is
+# genuinely recorded (never silently omitted), and gate 8b will correctly keep
+# failing on it until a vision-capable agent reads the render and re-records
+# pass/divergent (or the operator names an explicit --skip-visual-comparison
+# waiver at the gate).
+def phase_record_visual_check!(_opts)
+  hr('record-visual-check (Phase 6f verdict — gate 8b)')
+  parity_final_path = File.join(OUT, 'parity-final.json')
+  unless File.exist?(parity_final_path)
+    skip_phase!('record-visual-check',
+                'no parity-final.json yet — verify-parity ran without a --parity-plan (nothing to ' \
+                'record the visual verdict onto). Once a plan is supplied, read ' \
+                "#{File.join(OUT, 'sigma-render.png')} against the source and record the real verdict " \
+                "by hand: ruby scripts/record-visual-check.rb --workdir #{OUT} --agent-vision true --verdict pass ...")
+    return
+  end
+  render_path = File.join(OUT, 'sigma-render.png')
+  ok, code, _out = run_script!('record-visual-check.rb', '--workdir', OUT, '--agent-vision', 'false',
+                                '--verdict', 'not-executable',
+                                '--notes', 'migrate-domo.rb is an unattended orchestrator with no image ' \
+                                           "input and cannot itself judge #{render_path} against the source " \
+                                           'dashboard (record-visual-check.rb VISION PRECONDITION); a ' \
+                                           'vision-capable agent must read it and re-record --verdict ' \
+                                           'pass|divergent, or the operator must waive gate 8b explicitly via ' \
+                                           'assert-phase6-ran.rb --skip-visual-comparison "<reason>".')
+  fail_phase!('record-visual-check', "record-visual-check.rb exited #{code}") unless ok
+  done_phase!('record-visual-check',
+              'recorded not-executable — a vision-capable agent must re-judge and re-record before gate 8b can pass')
+end
+
 # ---------------------------------------------------------------------------
 # offline driver
 
@@ -476,6 +729,7 @@ def run_offline!(opts)
   skip_phase!('capture-visuals', 'offline: PNG assets (if any) are pre-seeded by the fixture at png/cards/*.png; no live render')
 
   phase_convert_beast_modes!(opts)
+  phase_derive_presentation!(opts, collect_expected: false)
   phase_build_workbook!(opts)
 
   hr('build-workbook-spec')
@@ -503,7 +757,8 @@ def run_offline!(opts)
   layout_xml = phase_build_dashboard_layout!(opts, wb_ids_path)
 
   hr('put-layout')
-  if !opts[:force] && (JSON.parse(File.read(spec_path))['layout'])
+  existing_document = Sigma::CodeRep.document(JSON.parse(File.read(spec_path)))
+  if !opts[:force] && !existing_document['layout'].to_s.strip.empty?
     log 'workbook-spec.json already has a layout — skip (idempotent; pass --force to rebuild)'
     skip_phase!('put-layout', 'already merged (idempotent skip)')
   else
@@ -514,8 +769,14 @@ def run_offline!(opts)
 
   phase_write_2d_flag!
 
+  hr('render-visual')
+  skip_phase!('render-visual', 'offline: no live posted workbook to render (see --offline header note)')
+
   hr('verify-parity')
   skip_phase!('verify-parity', 'offline: no live Sigma query results to compare against')
+
+  hr('record-visual-check')
+  skip_phase!('record-visual-check', 'offline: no live render / parity-final.json to record a verdict onto')
 
   hr('assert-phase6-ran')
   skip_phase!('assert-phase6-ran', 'offline: gate requires a live posted workbook + source parity; not applicable to --offline')
@@ -572,6 +833,41 @@ def run_live!(opts)
     log 'discovery/dm-spec.json already present — skip (idempotent; pass --force to rebuild)'
     skip_phase!('build-dm', 'already built (idempotent skip)')
   else
+    # Column pre-flight (bead m655): only meaningful once dataset-map.json is
+    # human-resolved — the FIRST build-dm.rb attempt below (no dataset-map.json
+    # yet) writes dataset-map.template.json and fails, same as before this
+    # bead; there is nothing to pre-flight until a human finishes that file.
+    map_path = File.join(DISCOVERY, 'dataset-map.json')
+    if File.exist?(map_path)
+      hr('preflight-columns (Domo columns vs the real warehouse schema)')
+      # Unlike other idempotent phases in this file, this one is NOT skipped
+      # just because its output file already exists: dataset-map.json is
+      # human-editable between runs (a newly-resolved connectionId, a fix via
+      # excludeColumns/columnOverrides), and a stale column-preflight.json
+      # would either silently re-admit a gap that was never actually
+      # re-checked, or permanently deadlock the fix-and-re-run loop (the
+      # operator's fix is never validated). The live check itself is cheap
+      # (a couple of Sigma API calls per dataset), so always re-running it
+      # here is the safe default.
+      pf_ok, pf_code, _pf_out = run_script!('preflight-columns.rb')
+      skip_env = ENV['SIGMA_SKIP_COLUMN_PREFLIGHT'].to_s.strip
+      if !pf_ok
+        if skip_env.empty?
+          fail_phase!('preflight-columns',
+                      "preflight-columns.rb exited #{pf_code} — unresolved column(s) or a fetch error " \
+                      'found; see discovery/column-preflight.json for names + any auto-suggested ' \
+                      'columnOverrides, resolve via excludeColumns/columnOverrides in dataset-map.json, ' \
+                      'then re-run (or set SIGMA_SKIP_COLUMN_PREFLIGHT="<reason>" to waive, same as ' \
+                      "build-dm.rb's gate)")
+        else
+          skip_phase!('preflight-columns',
+                      "unresolved columns found but WAIVED via SIGMA_SKIP_COLUMN_PREFLIGHT=#{skip_env.inspect}")
+        end
+      else
+        done_phase!('preflight-columns')
+      end
+    end
+
     # --folder-id must reach build-dm too, not just build-workbook-spec: the DM
     # spec itself needs a folderId or POST /v2/dataModels/spec 400s with
     # "Expecting UUID at 0.folderId" (live-validated 2026-07-30).
@@ -592,12 +888,23 @@ def run_live!(opts)
     log 'dm-ids.json already present — skip (idempotent; pass --force to re-post)'
     skip_phase!('post-and-readback-dm', 'already posted (idempotent skip)')
   else
+    dm_spec = JSON.parse(File.read(dm_spec_path))
+    grounding = DomoWarehouseColumnRefs.apply!(
+      dm_spec,
+      requester: ->(method, path, **kwargs) { Sigma.request(method, path, **kwargs) },
+      lister: ->(path) { Sigma.list_entries(path) }
+    )
+    File.write(dm_spec_path, JSON.pretty_generate(dm_spec))
+    modes = grounding[:connection_modes].map { |id, friendly| "#{id}=#{friendly ? 'friendly' : 'physical'}" }.join(', ')
+    log "connection naming: #{modes}; grounded #{grounding[:rewritten]} formula(s), " \
+        "re-keyed #{grounding[:rekeyed]} id(s), re-prefixed #{grounding[:reprefixed]} ref(s)"
     ok, code, _out = run_script!('post-and-readback.rb', '--type', 'datamodel', '--spec', dm_spec_path,
                                   '--out', dm_ids_path, '--workdir', OUT)
     fail_phase!('post-and-readback-dm', "post-and-readback.rb --type datamodel exited #{code}") unless ok
     done_phase!('post-and-readback-dm')
   end
 
+  phase_derive_presentation!(opts, collect_expected: !tier_b)
   phase_build_workbook!(opts)
 
   hr('build-workbook-spec')
@@ -641,15 +948,189 @@ def run_live!(opts)
   done_phase!('put-layout')
 
   phase_write_2d_flag!
+  phase_render_visual!(opts, workbook_id, wb_ids)
+
+  # ---- coverage census ----------------------------------------------------
+  # Emits coverage.json: which source cards produced NO Sigma element.
+  #
+  # This is the ONLY route by which a dropped Domo card can reach the degradation
+  # ledger. DegradationLedger.scope_cuts derives scope-cuts from just two places
+  # — coverage.json, and parity-final.json's `tile_census` — and domo can never
+  # fill the second, because `tile_census` is reserved for tableau's ZONE shape
+  # (publishing anything else there turns gate 5's honest SKIP into a vacuous
+  # "0 zones, 0 unmatched"; caught in review on #631, hence `parity_tile_census`).
+  #
+  # Until now domo emitted no coverage.json at all, so a card that never became
+  # an element was invisible to the ledger — and since GREEN requires an EMPTY
+  # ledger, a run that silently dropped cards could still be declared GREEN.
+  # phase6-parity-domo.rb's census does not cover this: its denominator is
+  # elements in workbook-spec.json, so a card missing from the spec entirely is
+  # missing from the census too.
+  #
+  # Verified by planting a drop: removing one card's elements yields 35/36, one
+  # scope-cut, and a verdict of PARTIAL where an empty ledger gives GREEN.
+  hr('coverage-census')
+  ok_cov, code_cov, _cov = run_script!('build-coverage-census.rb', '--workdir', OUT)
+  if ok_cov
+    done_phase!('coverage-census')
+  else
+    # Not fatal — but say plainly what was lost, because the ledger will now be
+    # silent about dropped cards rather than empty-because-clean.
+    skip_phase!('coverage-census',
+                "build-coverage-census.rb exited #{code_cov} — no coverage.json, so a dropped " \
+                'card cannot reach the degradation ledger; do not read a GREEN verdict as ' \
+                'evidence that every card was migrated')
+  end
+
+  # ---- parity oracle (gate 1) ---------------------------------------------
+  # DEFAULT-ON, same stance as gate 7b's --require-control-flip above, and for a
+  # blunter reason: WITHOUT A PLAN THIS RUN CANNOT REACH GOLD. With no
+  # --parity-plan the orchestrator auto-adds --skip-parity-gate below, and gate 1
+  # rejects that waiver with exit 18 unless a passing anchors-verdict.json
+  # already exists. So the historic default path was a guaranteed dead end that
+  # merely looked like a skip.
+  #
+  # build-parity-plan.rb emits the tile LIST but, by design, no values —
+  # verify-parity.rb is a pure differ needing BOTH sides pre-collected. The two
+  # collectors supply them:
+  #   collect-parity-expected.rb  Domo's own rendered card values
+  #   collect-parity-actuals.rb   the live Sigma element exports
+  #   build-parity-oracle.rb      joins them + writes the exclusion ledger
+  # Both sides are fetched inside THIS run so a card's relative date window is
+  # evaluated once (build-parity-oracle refuses a cross-UTC-day join).
+  #
+  # Waive with --skip-parity-oracle "<reason>" — which lands you back on the
+  # dead-end path, so the reason had better be good.
+  oracle_plan = nil
+  oracle_skip_reason = nil
+  if !opts[:parity_plan] && !opts[:skip_parity_oracle]
+    hr('parity-oracle')
+    plan_path = File.join(OUT, 'parity-plan.json')
+    # --workbook-spec, NOT --workbook-id: phase6-parity-domo.rb's anti-inflation
+    # census reads <workdir>/workbook-spec.json, so the plan must be built from
+    # the SAME document or the two disagree about what "chartable" means and the
+    # census fails on tiles that were never really missing (put-layout injects
+    # header elements into the live spec that the local one has no idea about).
+    ok, code, _o = run_script!('build-parity-plan.rb',
+                               '--workbook-spec', File.join(OUT, 'workbook-spec.json'),
+                               '--workbook-id', workbook_id,
+                               '--out', plan_path)
+    if !ok
+      # Exit 2 is build-parity-plan.rb's DELIBERATE "zero chartable elements".
+      # Anything else is a crash (it has no rescue around JSON.parse, so a
+      # truncated workbook-spec.json raises and exits 1). Reporting a crash as
+      # "no chartable tiles" is a lie that propagates: the same wording ends up
+      # in the --skip-parity-gate waiver text below, sending whoever debugs the
+      # non-GREEN run to look for an empty workbook instead of a broken artifact.
+      why = code == 2 ? 'build-parity-plan.rb found no chartable tiles (exit 2)'
+                      : "build-parity-plan.rb FAILED with exit #{code} — this is a crash, not an " \
+                        'empty workbook; check workbook-spec.json is complete and parseable'
+      oracle_skip_reason = why
+      skip_phase!('parity-oracle', why)
+    else
+      ok_e, code_e, _e = run_script!('collect-parity-expected.rb', '--workdir', OUT)
+      ok_a, code_a, _a = run_script!('collect-parity-actuals.rb',
+                                     '--plan', plan_path,
+                                     '--workbook-id', workbook_id,
+                                     '--out', File.join(OUT, 'parity-actuals.json'))
+      if !ok_e || !ok_a
+        # Deliberately a hard FAIL, not a skip. A half-collected oracle would
+        # join into a plan missing tiles, and a shrunken denominator reads
+        # exactly like a clean pass — the one failure mode this whole chain is
+        # built to refuse.
+        fail_phase!('parity-oracle',
+                    "collector failed (expected exit #{code_e}, actuals exit #{code_a}) — " \
+                    'refusing to build a partial plan')
+      end
+      # build-parity-exclusions.rb (#649) FIRST, so its construction-level
+      # exclusions exist before the join reads them. The two are complementary:
+      # #649 excludes tiles that can never agree (a refused date window — Domo
+      # aggregates over a window the Sigma tile lacks), while the join excludes
+      # tiles it could not COLLECT. Both write parity-plan-exclusions.json, so
+      # order decides who wins: run the join first and #649 overwrites its
+      # exclusions, after which the census sees collection-failed tiles as
+      # neither verified nor excluded and dies (exit 5). Run #649 first and the
+      # join carries its entries through, honouring them over verification —
+      # which matters, because such a tile IS collectable and would otherwise be
+      # "verified" into a guaranteed DIVERGE that says nothing about fidelity.
+      ok_x, code_x, _x = run_script!('build-parity-exclusions.rb', '--workdir', OUT)
+      fail_phase!('parity-oracle',
+                  "build-parity-exclusions.rb exited #{code_x} — either the runaway guard " \
+                  'tripped (fix the converter, do not widen exclusions) or the artifact is ' \
+                  'unreadable; continuing would hand the join a stale exclusions file') unless ok_x
+
+      ok_j, code_j, _j = run_script!('build-parity-oracle.rb', '--workdir', OUT)
+      fail_phase!('parity-oracle', "build-parity-oracle.rb exited #{code_j}") unless ok_j
+      oracle_plan = File.join(OUT, 'parity-plan-verified.json')
+      done_phase!('parity-oracle')
+    end
+  end
 
   hr('verify-parity')
+  opts[:parity_plan] ||= oracle_plan
   if opts[:parity_plan] && File.exist?(opts[:parity_plan])
-    ok, code, _out = run_script!('verify-parity.rb', '--plan', opts[:parity_plan])
-    fail_phase!('verify-parity', "verify-parity.rb exited #{code}") unless ok
+    # Bead 2tkm — finalize through phase6-parity-domo.rb, do NOT aim
+    # verify-parity.rb's --score-out at parity-final.json.
+    #
+    # B6 correctly spotted that --score-out was never plumbed through (without it
+    # verify-parity.rb only prints a report). But it aimed the score document at
+    # parity-final.json, which is the GATE'S contract file: assert-phase6-ran.rb
+    # reads charts_total/charts_pass/status, while --score-out writes
+    # tiles_total/tiles_pass/tiles_fail. So a flawless 65/65 run wrote a document
+    # in which the gate found none of its three keys, computed charts_total = 0,
+    # dropped into the anchors-oracle substitution branch, found no
+    # anchors-verdict.json, and exited 2 — a perfect parity run was
+    # indistinguishable from parity never having run.
+    #
+    # domo was the only converter of six with no phase6-parity-*.rb finalizer
+    # (tableau's phase6-parity.rb:344-382 is the reference). It now runs
+    # verify-parity.rb itself (--score-out -> parity-score.json), derives the
+    # gate contract into parity-final.json, and refuses to emit a contract when
+    # the plan silently omits chartable tiles.
+    # Generate parity-plan-exclusions.json FIRST — the finalizer's census consumes
+    # it, and #631 shipped the census with nothing writing the file it reads. The
+    # generator derives exclusions only from machine facts already in
+    # warnings.json (today: refused date windows, where Domo applies a window the
+    # Sigma tile lacks, so the two cannot agree by construction) and aborts rather
+    # than excluding a runaway share of the pool.
+    #
+    # A non-zero exit here is FATAL, not advisory: it means either the runaway
+    # guard tripped (fix the converter) or the artifact is unreadable — and
+    # continuing would hand the census a stale or absent exclusions file.
+    #
+    # SKIPPED when the oracle already ran it. The oracle path invokes this
+    # generator BEFORE the join so the join can carry its entries through
+    # (build-parity-oracle.rb honours prior exclusions over verification).
+    # Re-running it here would rewrite the file from warnings.json alone and
+    # discard every collection-failure exclusion the join added — after which the
+    # census sees those tiles as neither verified nor excluded and dies (exit 5).
+    # This branch therefore only serves the hand-supplied --parity-plan path,
+    # where no oracle ran and nothing else writes the file.
+    if oracle_plan
+      log 'exclusions: already generated before the oracle join (not re-running — it would ' \
+          'discard the join\'s collection-failure exclusions)'
+    else
+      ok, code, _out = run_script!('build-parity-exclusions.rb', '--workdir', OUT)
+      fail_phase!('verify-parity', "build-parity-exclusions.rb exited #{code}") unless ok
+    end
+
+    ok, code, _out = run_script!('phase6-parity-domo.rb',
+                                  '--workdir', OUT,
+                                  '--plan', opts[:parity_plan],
+                                  '--workbook-id', workbook_id,
+                                  '--score-out', File.join(OUT, 'parity-score.json'))
+    fail_phase!('verify-parity', "phase6-parity-domo.rb exited #{code}") unless ok
     done_phase!('verify-parity')
   else
-    skip_phase!('verify-parity', 'no --parity-plan supplied — run verify-parity.rb by hand before declaring GREEN')
+    skip_phase!('verify-parity',
+                opts[:skip_parity_oracle] ?
+                  "parity oracle waived (#{opts[:skip_parity_oracle]}) and no --parity-plan given — " \
+                  'gate 1 has no evidence; this run cannot be GREEN' :
+                  'no parity plan available (the oracle found no chartable tiles) — ' \
+                  'run verify-parity.rb by hand before declaring GREEN')
   end
+
+  phase_record_visual_check!(opts)
 
   hr('assert-phase6-ran')
   args = ['--workdir', OUT, '--workbook-id', workbook_id]
@@ -658,7 +1139,23 @@ def run_live!(opts)
   # looker reference; waive with --skip-control-flip "<reason>".
   args += ['--require-control-flip']
   args += ['--skip-visual-gate', 'Tier B — private render endpoint unavailable'] if tier_b
-  args += ['--skip-parity-gate', 'no --parity-plan supplied to migrate-domo.rb'] unless opts[:parity_plan]
+  # The reason must say what ACTUALLY happened — it is recorded as a waiver and
+  # read later by someone reconstructing why a run was not GREEN. "no
+  # --parity-plan supplied" was true when that was the only way to get a plan;
+  # now the oracle builds one by default, so the honest reason is whichever of
+  # these applies.
+  unless opts[:parity_plan]
+    why = if opts[:skip_parity_oracle]
+            "parity oracle waived via --skip-parity-oracle: #{opts[:skip_parity_oracle]}"
+          else
+            # Reuse the reason the oracle phase actually recorded, so a CRASH in
+            # build-parity-plan.rb is not laundered into the benign-sounding
+            # "found no chartable tiles". This text is the run's permanent record
+            # of why gate 1 had no evidence.
+            oracle_skip_reason || 'parity oracle produced no plan'
+          end
+    args += ['--skip-parity-gate', why]
+  end
   ok, code, _out = run_script!('assert-phase6-ran.rb', *args)
   fail_phase!('assert-phase6-ran', "assert-phase6-ran.rb exited #{code}") unless ok
   done_phase!('assert-phase6-ran')

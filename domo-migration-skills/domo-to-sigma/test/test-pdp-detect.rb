@@ -32,7 +32,8 @@ Dir.mktmpdir('domo-pdp') do |dir|
   # (connectionId/database/schema/table/name), NOT a nested path array.
   w.('dataset-map.json', { 'ds1' => { 'connectionId' => 'inode-CONN', 'database' => 'DB',
                                        'schema' => 'SCH', 'table' => 'ORDERS', 'name' => 'Orders' } })
-  env = { 'DOMO_DISCOVERY_DIR' => dir, 'SIGMA_SKIP_DOCTOR_GATE' => 'test' }
+  env = { 'DOMO_DISCOVERY_DIR' => dir, 'SIGMA_SKIP_DOCTOR_GATE' => 'test',
+          'SIGMA_SKIP_COLUMN_PREFLIGHT' => 'test: pdp detection under test, not column pre-flight' }
   system(env, 'ruby', File.expand_path('../scripts/build-dm.rb', __dir__), out: File::NULL, err: File::NULL)
   ok(File.exist?(File.join(dir, 'rls-todo.json')), 'rls-todo.json written for PDP dataset')
   todo = JSON.parse(File.read(File.join(dir, 'rls-todo.json')))

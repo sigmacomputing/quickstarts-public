@@ -16,13 +16,31 @@
 #              agent ASKS THE USER, then re-runs with --connection <id>.
 #              (We never guess among multiple, and never free-search per phase.)
 #
-#  2. RECORD RUN METADATA to <workdir>/intake.json: run_start (feeds telemetry
-#     duration), input_mode (live|file|both — feeds telemetry --mode), and the
-#     source tool/identifier. Prints an expectations banner for the mode.
+#  2. RECORD RUN METADATA to <workdir>/intake.json: run_start (run-duration /
+#     wall-clock audit), input_mode (live|file|both), and the source
+#     tool/identifier. Prints an expectations banner for the mode.
+#
+#  3. FRONT-DOOR TRIAGE (speed-review #6a): when an assessment's
+#     migration-plan.json is present (--plan PATH, or <workdir>/migration-plan.json),
+#     look up this run's --source workbook in it:
+#       - retire-tagged (zero usage)      -> REFUSE (exit 7). "The fastest
+#         migration is the one you don't do." Override with
+#         --triage-override "<who>: <why>" (or SIGMA_TRIAGE_OVERRIDE) — the
+#         override is recorded to <workdir>/offramps.jsonl, never silent.
+#       - ranked low (tier 'moderate' / score < 10 / path 'blocked')
+#                                          -> WARN with the plan's value/cost
+#         line and continue. No stop.
+#       - marked consolidate-into-primary  -> WARN (the user chose to convert
+#         the primary instead) and continue.
+#     No plan anywhere -> ONE offer line, never a block (ratified assumption:
+#     the plan is usually absent; the no-plan path stays friction-free).
+#     A malformed plan / missing --source / ambiguous name match -> one note
+#     line, triage skipped — the guard must not false-stop (≤5% budget).
 #
 # Usage:
 #   ruby scripts/intake.rb --workdir <dir> --tool tableau-to-sigma --mode live \
-#     [--connection <UUID>] [--name <connection-name-substring>] [--source "<wb name/app id>"]
+#     [--connection <UUID>] [--name <connection-name-substring>] [--source "<wb name/app id>"] \
+#     [--plan <migration-plan.json>] [--triage-override "<who>: <why>"]
 #
 # Exit codes:
 #   0  connection resolved (connection.json written) + intake.json written
@@ -30,6 +48,8 @@
 #   3  connection ambiguous — connection-candidates.json written; ask the user
 #   4  no connections found / API error while listing
 #   6  bootstrap sentinel missing/failed — run bootstrap first (PLAN-v3 PR-15)
+#   7  workbook is retire-tagged in migration-plan.json — refused; override
+#      with --triage-override "<who>: <why>" (recorded to offramps.jsonl)
 #   1  usage error
 
 require 'json'
@@ -50,6 +70,8 @@ OptionParser.new do |p|
   p.on('--connections-fixture FILE', 'TEST ONLY: read the connections list from FILE instead of the API') { |v| opts[:fixture] = v }
   p.on('--force', 'ignore a cached connection.json and re-resolve') { opts[:force] = true }
   p.on('--skip-bootstrap-gate REASON', 'waive the bootstrap-sentinel gate — REQUIRED reason; name it in your report') { |v| opts[:skip_bootstrap] = v }
+  p.on('--plan PATH', 'assessment migration-plan.json (default: <workdir>/migration-plan.json when present)') { |v| opts[:plan] = v }
+  p.on('--triage-override REASON', 'convert a retire-tagged workbook anyway — REQUIRED "<who>: <why>"; recorded to offramps.jsonl') { |v| opts[:triage_override] = v }
 end.parse!
 
 abort('[FAIL] intake: --workdir required') unless opts[:dir]
@@ -62,14 +84,25 @@ FileUtils.mkdir_p(opts[:dir])
 # it has run to doctor-green. The sentinel (bootstrap.json) is written by
 # scripts/bootstrap.sh / bootstrap.ps1 after they finish with a doctor run.
 _bs_skip = opts[:skip_bootstrap] || ENV['SIGMA_SKIP_BOOTSTRAP_GATE']
+# offramp.rb lives at scripts/lib/ in a vendored plugin copy and at ../lib/
+# from this file's shared/scripts/ canonical home — load from either, so the
+# audit trail works in both layouts.
+def require_offramp
+  [File.expand_path('lib', __dir__), File.expand_path('../lib', __dir__)].each do |p|
+    $LOAD_PATH.unshift(p) unless $LOAD_PATH.include?(p)
+  end
+  require 'offramp'
+  true
+rescue LoadError
+  false
+end
+
 if _bs_skip && !_bs_skip.to_s.empty?
   warn "[SKIP] intake: bootstrap gate WAIVED (#{_bs_skip}) — name this in your report."
-  begin
-    $LOAD_PATH.unshift File.expand_path('lib', __dir__)
-    require 'offramp'
+  if require_offramp
     Offramp.log(opts[:dir], kind: 'skip-flag-waived', reason: _bs_skip,
                 detail: '--skip-bootstrap-gate')
-  rescue LoadError
+  else
     warn '       WARN: lib/offramp.rb not vendored — the waiver could not be recorded to offramps.jsonl.'
   end
 else
@@ -89,6 +122,109 @@ else
     warn '       (or SIGMA_SKIP_BOOTSTRAP_GATE="<reason>").'
     exit 6
   end
+end
+
+# ── FRONT-DOOR TRIAGE (speed-review #6a) ────────────────────────────────────
+# Runs BEFORE connection resolution: a workbook the estate plan says to retire
+# should refuse before this run burns a single API call. Guard discipline
+# (ratified ≤5% false-stop budget): the ONLY stop is a matched retire tag with
+# no override; every degraded state (no plan, malformed plan, no --source, no
+# match, ambiguous name) is a one-line note and a normal proceed.
+
+# The plan's value/cost evidence, printed on every triage verdict that cites it.
+def triage_value_line(e)
+  parts = []
+  %w[score value cost accesses actors].each do |k|
+    parts << "#{k}=#{e[k]}" unless e[k].nil?
+  end
+  line = parts.empty? ? 'no usage/cost metrics recorded in the plan' : parts.join(', ')
+  blockers = e['blockers'].is_a?(Array) ? e['blockers'] : []
+  line += " — blockers: #{blockers.join('; ')}" unless blockers.empty?
+  line
+end
+
+triage = nil
+plan_path = opts[:plan] || File.join(opts[:dir], 'migration-plan.json')
+if opts[:plan] && !File.exist?(opts[:plan])
+  warn "[WARN] intake: --plan #{opts[:plan]} not found — triage skipped."
+elsif File.exist?(plan_path)
+  plan = (JSON.parse(File.read(plan_path, encoding: 'bom|utf-8')) rescue nil)
+  rows = if plan.is_a?(Hash) then (plan['workbooks'] || [])
+         elsif plan.is_a?(Array) then plan # shortlist.json-shaped input tolerated
+         else []
+         end
+  src = opts[:source].to_s.strip
+  if !(plan.is_a?(Hash) || plan.is_a?(Array))
+    warn "[WARN] intake: #{plan_path} is unreadable — triage skipped."
+  elsif src.empty?
+    warn "[NOTE] intake: migration plan present but no --source given — triage skipped (pass the workbook name or id)."
+  else
+    wb_id_of = lambda { |r| r['workbookId'] || r['luid'] || r['id'] }
+    entry = rows.find { |r| wb_id_of.call(r).to_s == src }
+    ambiguous = false
+    if entry.nil?
+      by_name = rows.select { |r| r['name'].to_s.downcase == src.downcase }
+      if by_name.size > 1
+        # Ambiguity is its own (accurate) note — the name WAS found, just not
+        # uniquely, so the not-found note below must stay silent.
+        ambiguous = true
+        warn "[NOTE] intake: #{by_name.size} plan entries share the name #{src.inspect} — triage skipped (re-run with --source <workbook id>)."
+      end
+      entry = by_name.first if by_name.size == 1
+    end
+    if entry.nil?
+      unless ambiguous
+        warn "[NOTE] intake: #{src.inspect} not found in #{plan_path} — triage skipped." \
+             ' (Converting outside the assessed set? Consider re-running the assessment.)'
+      end
+    else
+      tier  = (entry['priority_tier'] || entry['tag']).to_s
+      path_ = entry['recommended_path'].to_s
+      triage = { 'plan_path' => plan_path, 'workbook' => wb_id_of.call(entry) || entry['name'],
+                 'recommended_path' => path_, 'priority_tier' => tier }
+      if path_ == 'retire' || tier == 'retire'
+        override = opts[:triage_override] || ENV['SIGMA_TRIAGE_OVERRIDE']
+        if override && !override.to_s.strip.empty?
+          warn "[WARN] intake: #{src.inspect} is RETIRE-tagged in the migration plan — converting anyway (override: #{override})."
+          warn "       plan evidence: #{triage_value_line(entry)}"
+          triage['verdict'] = 'retire-overridden'
+          triage['override_reason'] = override.to_s.strip
+          if require_offramp
+            Offramp.log(opts[:dir], kind: 'triage-retire-override', reason: override.to_s.strip,
+                        detail: "#{src} (#{triage_value_line(entry)})")
+          else
+            warn '       WARN: lib/offramp.rb not vendored — the override could not be recorded to offramps.jsonl.'
+          end
+        else
+          warn "[FAIL] intake: #{src.inspect} is RETIRE-tagged in #{File.basename(plan_path)} — refusing to convert it."
+          warn "       plan evidence: #{triage_value_line(entry)}"
+          warn '       The fastest migration is the one you don\'t do: retiring unused content is the'
+          warn '       assessment\'s highest-value recommendation. If the customer still wants this'
+          warn '       workbook converted, re-run with an explicit, attributable override:'
+          warn '         --triage-override "<who>: <why>"   (or SIGMA_TRIAGE_OVERRIDE="<who>: <why>")'
+          warn '       The override is recorded to offramps.jsonl — never a silent proceed.'
+          exit 7
+        end
+      elsif tier == 'moderate' || path_ == 'blocked' ||
+            (entry['score'].is_a?(Numeric) && entry['score'] < 10)
+        warn "[WARN] intake: #{src.inspect} is ranked LOW in the migration plan (tier=#{tier.empty? ? '?' : tier}, path=#{path_.empty? ? '?' : path_})."
+        warn "       value/cost: #{triage_value_line(entry)}"
+        warn '       Higher-ranked workbooks convert first for a reason — proceeding, but consider the shortlist order.'
+        triage['verdict'] = 'low-value-warn'
+      elsif path_ == 'consolidate-into-primary'
+        primary = entry['consolidate_into']
+        warn "[WARN] intake: the plan folds #{src.inspect} into a consolidation primary#{primary ? " (#{primary})" : ''} — the recorded decision is to convert the PRIMARY plus a control, not this variant."
+        triage['verdict'] = 'consolidation-member-warn'
+      else
+        puts "[OK] intake: triage — #{src.inspect} #{tier.empty? ? '' : "tier=#{tier} "}path=#{path_.empty? ? '?' : path_} (#{triage_value_line(entry)})"
+        triage['verdict'] = 'proceed'
+      end
+    end
+  end
+else
+  # Ratified assumption: the plan is usually absent — ONE line, never a block.
+  puts '[TIP] intake: no migration-plan.json — converting without estate triage. To rank value/cost'
+  puts '      and retire-tags first, run the assessment skill and pass --plan <dir>/migration-plan.json.'
 end
 
 UUID_RE = /\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/
@@ -233,14 +369,16 @@ resolved['at'] = Time.now.utc.iso8601
 write_json(conn_path, resolved)
 File.delete(cand_path) if File.exist?(cand_path)   # resolved now; clear stale candidates
 
-# Run metadata for telemetry + audit.
+# Run metadata for run-duration + audit.
 mode = %w[live file both].include?(opts[:mode]) ? opts[:mode] : 'unknown'
-write_json(intake_path, {
+intake_rec = {
   'run_start'  => Time.now.utc.iso8601,
   'input_mode' => mode,
   'tool'       => opts[:tool],
   'source'     => opts[:source],
-})
+}
+intake_rec['triage'] = triage if triage # plan consulted → verdict on the audit record
+write_json(intake_path, intake_rec)
 
 puts "[OK] intake: connection #{resolved['connection_id']} (#{resolved['name'] || '?'}) via #{resolved_via} → #{conn_path}"
 puts "[OK] intake: mode=#{mode}, tool=#{opts[:tool] || '?'} → #{intake_path}"
@@ -261,6 +399,6 @@ when 'file'
 when 'both', 'live'
   puts "     INPUT MODE = #{mode}. Live source available — full source-side parity verification applies."
 else
-  puts '     INPUT MODE = unknown. Pass --mode live|file|both so telemetry + the raw-mode banner are accurate.'
+  puts '     INPUT MODE = unknown. Pass --mode live|file|both so the raw-mode banner is accurate.'
 end
 exit 0

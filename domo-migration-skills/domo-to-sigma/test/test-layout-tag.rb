@@ -6,7 +6,7 @@
 # emits for build-workbook.rb's build_kpi. build-domo-layout.rb's kind_hint
 # (scripts/build-domo-layout.rb:33) used to stamp 'kpi-chart' onto the zone,
 # so a Domo KPI tile that failed the plain size heuristic silently missed
-# KPI-row detection instead of grouping into one GridContainer.
+# KPI-row detection instead of grouping into one Container.
 #   ruby test/test-layout-tag.rb
 require 'stringio'
 require 'tmpdir'

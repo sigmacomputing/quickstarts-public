@@ -65,6 +65,7 @@
 #       dropped (#415); only full ISO-8601 UTC timestamps
 #       ("2026-01-01T00:00:00Z") round-trip.
 require 'json'
+require_relative 'code_rep'
 
 AGG = /\A\s*(Sum|Avg|Count|CountDistinct|CountIf|SumIf|Min|Max|Median|Percentile|StdDev|Variance|VariancePop|GrandTotal)\s*\(/i
 PLAIN_REF = /\A\s*\[[^\]]+\]\s*\z/   # a bare column reference, e.g. [Table/Region]
@@ -74,7 +75,7 @@ LISTY = %w[list segmented hierarchy].freeze
 # orchestrator round-trip to discover) are caught pre-POST. Canary-verified
 # server-side 2026-07-11 (see refs/composition-recipe.md).
 CONTROL_TYPES = %w[checkbox switch text text-area number number-range date date-range
-                   list segmented hierarchy slider range-slider].freeze
+                   list segmented hierarchy slider range-slider legend drill].freeze
 # controlTypes that REQUIRE a `mode` operator — absent/empty → Sigma 400s the spec.
 MODE_REQUIRED = %w[switch checkbox text number date slider].freeze
 MODE_HINT = {
@@ -173,16 +174,14 @@ ISO_UTC_DATETIME = /\A\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\
 BARE_PREDICATE = /\b(If)\s*\(\s*(\[[^\]]+\])\s*[,)]/i
 
 def lint(spec)
+  spec = Sigma::CodeRep.document(spec)
   errs = []
   cols_by_id = {}
-  pages = spec['pages'] || []
-  pages.each do |pg|
-    (pg['elements'] || []).each do |el|
-      (el['columns'] || []).each { |c| cols_by_id[c['id']] = c }
-    end
+  elements = Sigma::CodeRep.workbook_elements(spec)
+  elements.each do |el|
+    (el['columns'] || []).each { |c| cols_by_id[c['id']] = c }
   end
-  pages.each do |pg|
-    (pg['elements'] || []).each do |el|
+  elements.each do |el|
       kind = el['kind']
       name = el['name'] || el['id'] || '(unnamed)'
       cols = el['columns'] || []
@@ -319,7 +318,6 @@ def lint(spec)
           end
         end
       end
-    end
   end
   errs
 end
@@ -342,9 +340,9 @@ A3_LISTY = %w[list segmented hierarchy].freeze
 # catches the precise "decode column exists but the control targets the raw
 # column instead" mis-wire from the spec alone.
 def lint_warnings(spec, scope: nil)
+  spec = Sigma::CodeRep.document(spec)
   warns = []
-  (spec['pages'] || []).each do |pg|
-    (pg['elements'] || []).each do |el|
+  Sigma::CodeRep.workbook_elements(spec).each do |el|
       kind = el['kind']
       name = el['name'] || el['id'] || '(unnamed)'
 
@@ -360,6 +358,20 @@ def lint_warnings(spec, scope: nil)
         c['formula'].to_s.scan(BARE_PREDICATE) do |fn, ref|
           warns << "I1 column '#{c['name'] || c['id']}' on element '#{name}': #{fn}(#{ref}, ...) uses a bare column ref as the predicate — integer predicates fail at render ('Invalid Query'). Use an explicit comparison, e.g. #{fn}(#{ref} = 1, ...)."
         end
+      end
+
+      # N2: a column display name containing '/' is ambiguous against the
+      # [Element/Column] path syntax every cross-element formula ref uses —
+      # downstream refs to it split on the slash and resolve a fragment
+      # (Sigma-side 'dependency not found', false PASS/FAIL in ref checks),
+      # and converters DROP such columns from derived elements. WARN, not a
+      # violation: a slash-named column nothing references cross-element is
+      # harmless, so failing the POST for it would be a false stop.
+      ((el['columns'] || []) + (el['metrics'] || [])).each do |c|
+        next unless c.is_a?(Hash) && c['name'].to_s.include?('/')
+        warns << "N2 column '#{c['name']}' on element '#{name}': display name contains '/' — ambiguous against " \
+                 "the [Element/Column] reference path syntax; cross-element refs to it mis-resolve and derived " \
+                 'elements drop it. Rename the column (remove the slash) before wiring anything to it.'
       end
 
       next unless kind == 'control'
@@ -391,7 +403,6 @@ def lint_warnings(spec, scope: nil)
                    'the default in the Sigma UI (record it in POSTPUBLISH_GUIDE.md).'
         end
       end
-    end
   end
 
   # A3 (PR-18): integer-coded dimension control without a Text() decode helper.
@@ -401,7 +412,7 @@ def lint_warnings(spec, scope: nil)
   # (control-parity.md "list-control targets on NUMERIC columns are silently
   # stripped"). The fix is a `Text([<col>])` decode column the control binds to.
   # This catches a REGRESSION of the auto-decode routing. Advisory only.
-  all_els = (spec['pages'] || []).flat_map { |pg| pg['elements'] || [] }
+  all_els = Sigma::CodeRep.workbook_elements(spec)
   els_by_id = all_els.each_with_object({}) { |e, h| (id = e['id'] || e['elementId']) && (h[id] = e) }
   # controlId -> scope record (integer_dim / decode annotations).
   scope_by_cid = {}

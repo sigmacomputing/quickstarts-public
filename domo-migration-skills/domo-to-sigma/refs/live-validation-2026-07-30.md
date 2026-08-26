@@ -292,15 +292,19 @@ is the fix.
 > found a third page style, **v4-inline**, where geometry is readable and exact:
 > `pageLayoutV4.standard.template[]`, joined to `content[]` on `contentKey`, gives
 > real `x`/`y`/`width`/`height` per card (grid is 60-wide, so Domo → Sigma scales
-> ×0.4), including positioned `HEADER` section dividers.
+> ×0.4). (`content[]` also carries positioned `HEADER` section dividers, but
+> those are not yet surfaced as section titles/dividers in the composed
+> dashboard — `merge_pagelayoutv4_geometry` discards any `content[]` entry
+> without a `cardId`, which is every `HEADER` entry; see `refs/page-layout-v4.md`'s
+> caveat.)
 >
 > So the claim below in Consequence 1 — that card *size, position and order* are
 > UI-only — is a **narrowing, not a reversal**: still true for a page with no
 > `pageLayoutV4`, not true in general. `refs/page-layout-v4.md` also records two
-> defects in our own code (`domo_rest.rb`'s `cards_for_page` never requests the v4
-> payload; `domo_sigma_util.rb:151` digs a `pageLayoutV4.cards` key that doesn't
-> exist) that must be fixed before any of this is usable. Read it for the full
-> page-style taxonomy.
+> defects in our own code (`domo_rest.rb`'s `cards_for_page` never requested the
+> v4 payload; `domo_sigma_util.rb`'s v4 branch dug a `pageLayoutV4.cards` key
+> that didn't exist) that have since been fixed. Read it for the full page-style
+> taxonomy.
 
 Probed exhaustively on a live instance. For a **classic** Domo page there is no way
 to read OR write layout geometry:

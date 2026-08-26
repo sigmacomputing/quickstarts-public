@@ -13,7 +13,8 @@
 # Usage:
 #   ruby scripts/build-parity-plan.rb --workbook-id <wb> --out <wd>/parity-plan.json \
 #     [--workbook-spec <wd>/wb-readback.json]   # use this spec instead of GET /spec
-#     [--emit-spec <wd>/wb-readback.json]        # also write the spec here ({pages:[...]})
+#     [--emit-spec <wd>/wb-readback.json]        # also write the spec here (unwrapped
+#                                                 # document: {schemaVersion, pages, elements, kind, layout})
 #
 # Output parity-plan.json: { "charts": [ { chart, sigma_element_id, sigma_kind,
 #   sigma_columns:[<plotted column ids>] }, ... ] } — one entry per VISIBLE chart
@@ -25,6 +26,9 @@ require 'json'
 require 'optparse'
 require 'set'
 
+$LOAD_PATH.unshift File.expand_path('lib', __dir__)
+require 'code_rep'
+
 opts = {}
 OptionParser.new do |p|
   p.on('--workbook-id ID')     { |v| opts[:wb] = v }
@@ -35,15 +39,20 @@ end.parse!
 abort 'missing --out' unless opts[:out]
 abort 'missing --workbook-id (or --workbook-spec)' unless opts[:wb] || opts[:spec]
 
-# Load the spec: from a file if given, else from the live workbook.
+# Load the spec: from a file if given, else from the live workbook. Either
+# source may be the live nested shape (POST/GET /v2/workbooks/.../spec nests
+# pages/layout/schemaVersion/kind under a top-level `document` key, verified
+# live 2026-08-03/04) or a legacy flat artifact (committed fixtures, older
+# wb-readback.json snapshots) — Sigma::CodeRep.document() accepts both and
+# always hands back the plain workbook document.
 if opts[:spec] && File.exist?(opts[:spec])
-  spec = JSON.parse(File.read(opts[:spec]))
+  spec = Sigma::CodeRep.document(JSON.parse(File.read(opts[:spec])))
 else
-  $LOAD_PATH.unshift File.expand_path('lib', __dir__)
   require 'sigma_rest'
   resp = Sigma.request(:get, "/v2/workbooks/#{opts[:wb]}/spec")
   # /spec may wrap the spec under a key; accept either shape.
-  spec = resp.is_a?(Hash) && resp['spec'] ? resp['spec'] : resp
+  raw = resp.is_a?(Hash) && resp['spec'] ? resp['spec'] : resp
+  spec = Sigma::CodeRep.document(raw)
 end
 
 # Non-data element kinds we never verify (controls, text, images, containers).
@@ -82,22 +91,19 @@ def plotted_column_ids(el)
   ids.compact.uniq.select { |i| own.include?(i) }
 end
 
-pages = spec['pages'] || []
 charts = []
-pages.each do |pg|
-  (pg['elements'] || []).each do |el|
-    next unless chartable?(el)
-    # `name` can be a visibility hash on hidden-title elements (put-layout) —
-    # recover the text, else fall through to title/id.
-    ename = el['name'].is_a?(Hash) ? el['name']['text'] : el['name']
-    ename = nil if ename.to_s.empty?
-    charts << {
-      'chart'            => (ename || el['title'] || el['id']).to_s,
-      'sigma_element_id' => el['id'],
-      'sigma_kind'       => el['kind'],
-      'sigma_columns'    => plotted_column_ids(el),
-    }
-  end
+Sigma::CodeRep.workbook_elements(spec).each do |el|
+  next unless chartable?(el)
+  # `name` can be a visibility hash on hidden-title elements (put-layout) —
+  # recover the text, else fall through to title/id.
+  ename = el['name'].is_a?(Hash) ? el['name']['text'] : el['name']
+  ename = nil if ename.to_s.empty?
+  charts << {
+    'chart'            => (ename || el['title'] || el['id']).to_s,
+    'sigma_element_id' => el['id'],
+    'sigma_kind'       => el['kind'],
+    'sigma_columns'    => plotted_column_ids(el),
+  }
 end
 
 if charts.empty?
@@ -107,7 +113,11 @@ if charts.empty?
 end
 
 File.write(opts[:out], JSON.pretty_generate('charts' => charts))
-File.write(opts[:emit], JSON.pretty_generate('pages' => pages)) if opts[:emit]
+# Write the UNWRAPPED document (not just {pages:[...]}) — blind_grade.rb,
+# verify-anchors.rb's offline mode, and record-visual-check.rb all read
+# wb-readback.json expecting a plain pages/elements/layout document at the top level;
+# CodeRep.document() has already stripped the transport envelope above.
+File.write(opts[:emit], JSON.pretty_generate(spec)) if opts[:emit]
 
 puts "build-parity-plan: #{charts.size} visible chart element(s) → #{opts[:out]}"
 puts "  (wb-readback spec → #{opts[:emit]})" if opts[:emit]

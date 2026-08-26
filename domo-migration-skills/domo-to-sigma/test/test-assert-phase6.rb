@@ -16,15 +16,6 @@
 #     — unlike 3/4 — do NOT fail closed without creds: they print a [SKIP]
 #     WARN and continue. Already covered (against the libs directly) by
 #     test-green-gates.rb; this harness only relies on their offline no-op.
-#   - Gate 10 (telemetry) delegates to scripts/assert-telemetry-ran.rb.
-#     write_good_fixtures seeds a telemetry-sent.json marker (status
-#     "declined") so this gate is satisfied at ZERO waiver-budget cost
-#     regardless of whether the delegate script happens to be vendored
-#     alongside this gate: an unconditional WARN no-op where it is absent
-#     (e.g. domo-to-sigma's copy), a genuine marker-satisfied pass where it
-#     IS vendored (e.g. this canonical's own location, and most other
-#     plugins' copies) — either way every scenario below reaches its own
-#     targeted gate, never gate 10's exit 12.
 #   - Gate 14 (visual-similarity) needs scripts/visual-similarity.py plus a
 #     real python3 + image pair; no scenario below ever supplies BOTH a
 #     source dashboard PNG AND reaches this gate without exiting earlier
@@ -102,14 +93,6 @@ def write_good_fixtures(dir)
     f.write("\x89PNG\r\n\x1a\n".b)
     f.write("\x00".b * 6_000)
   end
-  # Gate 10 (telemetry consent decision) — satisfied via the marker file
-  # itself, at ZERO waiver-budget cost, rather than via --skip-telemetry-gate.
-  # assert-telemetry-ran.rb requires BOTH the marker's existence AND a
-  # status of sent/declined/skipped; harmless where the delegate script is
-  # not vendored alongside this gate (an unconditional WARN no-op there, as
-  # in domo-to-sigma's copy) and correctly satisfies it where it IS vendored
-  # (e.g. the shared canonical's own location, and most other plugins' copies).
-  write_json(dir, 'telemetry-sent.json', 'status' => 'declined')
 end
 
 # Every offline scenario needs gates 3 (--skip-column-check) and 4
@@ -319,14 +302,6 @@ if $failures.zero? then puts 'ALL PASS'; exit 0 else puts "#{$failures} FAILURE(
 #     harness only relies on their credential-less no-op (implicit in every
 #     scenario above, since SIGMA_BASE_URL/TOKEN are always forced empty and
 #     none of the scenarios ever fail at gate 6 or 7).
-#   - Gate 10 (telemetry): satisfied above via the telemetry-sent.json
-#     fixture in write_good_fixtures (zero waiver-budget cost), not by
-#     asserting a specific WARN-vs-pass behavior — that behavior legitimately
-#     differs by copy (WARN no-op where scripts/assert-telemetry-ran.rb is
-#     absent, e.g. domo-to-sigma; a real marker-satisfied pass where it is
-#     vendored, e.g. this canonical and most other plugins' copies). Both
-#     paths are exercised implicitly (every scenario below reaches its own
-#     targeted gate either way); nothing further to assert.
 #   - Gate 14 (visual-similarity floor): stays an inert [SKIP] N/A in every
 #     scenario above regardless of whether scripts/visual-similarity.py is
 #     vendored in this copy, because no scenario supplies both a source

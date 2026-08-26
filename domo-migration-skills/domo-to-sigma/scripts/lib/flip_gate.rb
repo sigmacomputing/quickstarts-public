@@ -70,4 +70,22 @@ module FlipGate
     return nil unless row.is_a?(Hash)
     row[key] || row[key.to_sym]
   end
+
+  # Re-derive probe-controls.rb's exit code from its result ROWS (A6, wave-1
+  # review — the gate-7b recorded-evidence acceptance previously consumed the
+  # ledger-recorded `probe_rc`, the one datum in that path NOT covered by the
+  # probe-results.json sha). The mapping mirrors the script's own exit logic
+  # exactly: any FAIL row → 1 (every `failures += 1` there appends a FAIL
+  # row); no PASS row either → 2 (nothing reached the flip — probed controls
+  # always append PASS or FAIL); else 0. An aborted probe (rc 1 with no FAIL
+  # rows) is NOT reproducible from rows alone — it derives to 2/:advisory,
+  # which the acceptance path treats as ambiguous and re-probes live: the
+  # conservative direction.
+  def self.derive_rc(results)
+    rows = results.is_a?(Array) ? results : []
+    verdicts = rows.map { |r| val(r, 'result').to_s }
+    return 1 if verdicts.include?('FAIL')
+    return 2 unless verdicts.include?('PASS')
+    0
+  end
 end

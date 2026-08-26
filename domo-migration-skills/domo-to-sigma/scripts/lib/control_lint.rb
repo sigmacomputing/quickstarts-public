@@ -98,6 +98,7 @@
 #   ruby scripts/lib/control_lint.rb <spec.json|spec.yaml> [control-scope.json]
 require 'json'
 require 'set'
+require_relative 'code_rep'
 
 module ControlLint
   QUERYABLE = %w[
@@ -109,17 +110,18 @@ module ControlLint
 
   module_function
 
-  # { element_id => {el:, page:, kind:, name:, srcel:} } for every element.
+  # { element_id => {el:, page:, page_id:, kind:, name:, srcel:} } for every
+  # flat workbook element. Page membership comes only from required layout XML;
+  # pages[] is metadata and does not own elements.
   def elements(spec)
     out = {}
-    (spec['pages'] || []).each do |pg|
-      (pg['elements'] || []).each do |el|
-        eid = el['id'] || el['elementId']
-        next unless eid
-        out[eid] = { el: el, page: pg['name'] || pg['id'],
-                     kind: (el['kind'] || el['type']).to_s,
-                     name: el['name'], srcel: source_element_id(el) }
-      end
+    Sigma::CodeRep.workbook_elements_with_pages(spec).each do |el, pg|
+      eid = el['id'] || el['elementId']
+      next unless eid
+      out[eid] = { el: el, page: pg && (pg['name'] || pg['id']),
+                   page_id: pg && pg['id'],
+                   kind: (el['kind'] || el['type']).to_s,
+                   name: el['name'], srcel: source_element_id(el) }
     end
     out
   end
@@ -180,7 +182,8 @@ module ControlLint
       roots   = (live + frefs).uniq
       reach   = roots.empty? ? Set.new : closure(elems, roots)
       page_q  = elems.select do |qid, i|
-        qid != eid && i[:page] == info[:page] && QUERYABLE.include?(i[:kind])
+        qid != eid && info[:page_id] && i[:page_id] == info[:page_id] &&
+          QUERYABLE.include?(i[:kind])
       end.keys
       rows << { control_element_id: eid, control_id: cid, name: info[:name],
                 page: info[:page], control_type: el['controlType'],
@@ -225,16 +228,14 @@ module ControlLint
   # call site.
   def column_alias_groups(spec)
     out = {}
-    (spec['pages'] || []).each do |pg|
-      (pg['elements'] || []).each do |el|
-        next unless el.is_a?(Hash) && el['kind'].to_s == 'table' && el['id']
-        by_formula = Hash.new { |h, k| h[k] = [] }
-        (el['columns'] || []).each do |c|
-          next unless c.is_a?(Hash) && c['id'] && c['formula'].is_a?(String)
-          by_formula[c['formula'].strip.gsub(/\s+/, ' ')] << c['id']
-        end
-        out[el['id']] = by_formula
+    Sigma::CodeRep.workbook_elements(spec).each do |el|
+      next unless el.is_a?(Hash) && el['kind'].to_s == 'table' && el['id']
+      by_formula = Hash.new { |h, k| h[k] = [] }
+      (el['columns'] || []).each do |c|
+        next unless c.is_a?(Hash) && c['id'] && c['formula'].is_a?(String)
+        by_formula[c['formula'].strip.gsub(/\s+/, ' ')] << c['id']
       end
+      out[el['id']] = by_formula
     end
     out
   end
@@ -259,16 +260,17 @@ module ControlLint
         next unless target && cid
         next unless elems.key?(target) # ghost target — owned by check (a)
         alias_key = (alias_groups[target] || {}).find { |_f, ids| ids.include?(cid) }&.first || cid
-        entries << { eid: eid, control_id: el['controlId'] || eid, page: info[:page],
+        entries << { eid: eid, control_id: el['controlId'] || eid,
+                     page: info[:page], page_id: info[:page_id],
                      target: target, alias_key: alias_key, defaults: defaults.to_set }
       end
     end
 
     violations = []
     entries.group_by { |e| [e[:target], e[:alias_key]] }.each_value do |group|
-      next if group.map { |e| e[:page] }.uniq.size < 2
+      next if group.map { |e| e[:page_id] }.compact.uniq.size < 2
       group.combination(2).each do |a, b|
-        next if a[:page] == b[:page]
+        next if !a[:page_id] || !b[:page_id] || a[:page_id] == b[:page_id]
         next if (a[:defaults] & b[:defaults]).any? # overlapping => satisfiable, not impossible
         ca  = "control #{label(elems, a[:eid])} [#{a[:control_id]}]"
         cb  = "control #{label(elems, b[:eid])} [#{b[:control_id]}]"

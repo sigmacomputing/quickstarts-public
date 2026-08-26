@@ -102,6 +102,19 @@ module Sigma
     ENV.fetch('SIGMA_BASE_URL') { raise Error, 'SIGMA_BASE_URL not set' }
   end
 
+  # Security (A2): only transmit Sigma credentials to an https://
+  # sigmacomputing.com host. A poisoned SIGMA_BASE_URL would otherwise
+  # exfiltrate the client id/secret. Opt out (self-hosted/dev) with
+  # SIGMA_ALLOW_INSECURE_BASE_URL=1 (loud warning).
+  def self.validate_base_url!(base)
+    if ENV['SIGMA_ALLOW_INSECURE_BASE_URL'] == '1'
+      warn "WARNING: SIGMA_ALLOW_INSECURE_BASE_URL=1 — skipping SIGMA_BASE_URL validation (#{base})"; return
+    end
+    u = (URI.parse(base) rescue nil); host = u&.host&.downcase
+    abort "FATAL: SIGMA_BASE_URL must use https:// (got '#{base}') — refusing to send Sigma credentials." unless u&.scheme == 'https'
+    abort "FATAL: SIGMA_BASE_URL host '#{host}' is not a sigmacomputing.com host — refusing to send Sigma credentials. Set SIGMA_ALLOW_INSECURE_BASE_URL=1 to override." unless host == 'sigmacomputing.com' || host&.end_with?('.sigmacomputing.com')
+  end
+
   # Return a token that is safe to use RIGHT NOW.
   #   - No token anywhere → mint one.
   #   - Known mint time (this process minted it, a parent surfaced
@@ -149,6 +162,7 @@ module Sigma
     begin
       cid    = ENV.fetch('SIGMA_CLIENT_ID')     { raise AuthError, 'SIGMA_CLIENT_ID not set' }
       secret = ENV.fetch('SIGMA_CLIENT_SECRET') { raise AuthError, 'SIGMA_CLIENT_SECRET not set' }
+      Sigma.validate_base_url!(base_url)
       creds = Base64.strict_encode64("#{cid}:#{secret}")
       uri = URI("#{base_url}/v2/auth/token")
       req = Net::HTTP::Post.new(uri)
@@ -183,20 +197,62 @@ module Sigma
   # (field case: a 599-column workbook whose error-column audit saw only the
   # first page). `path` may already carry a query string. The nextPage token
   # is opaque (URL-encoded on reuse); a repeated token or a non-Hash body ends
-  # the loop defensively rather than spinning.
+  # the loop defensively rather than spinning — and the repeated-token stop
+  # names itself on stderr, because a silent defensive stop is invisible
+  # truncation, the exact bug class this helper exists to remove.
+  #
+  # An optional block receives each page's parsed body as it arrives; callers
+  # use it for page-level observability (e.g. announcing a multi-page fetch on
+  # stderr) without re-implementing the loop.
+  # Sigma's list endpoints use TWO different pagination conventions, and the
+  # cursor field name and the query-param name must be matched as a PAIR:
+  #   `nextPage`      -> send back as `page=`        (most /v2 list endpoints)
+  #   `nextPageToken` -> send back as `pageToken=`   (e.g. the columns endpoint,
+  #                                                   /v2/connections/tables/{inodeId}/columns)
+  # Handling only the first convention is a SILENT TRUNCATION, not an error: the
+  # second-convention endpoints simply never expose `nextPage`, so the loop ends
+  # after page 1 and returns exactly the server's default page size (50) with no
+  # warning. Measured live on a real 149-column table: 50 of 149 columns
+  # returned, which surfaced downstream as 99 phantom "missing" columns in the
+  # domo column pre-flight — and, far worse, would let assert-phase6-ran.rb's
+  # error-column audit inspect only the first 50 columns of a wide table and
+  # still report clean (bead 0h11; same class as bf1f, different endpoint).
+  # Mixing the pair is its own trap: feeding a `nextPageToken` back as `page=`
+  # makes the server re-serve page 1 forever, so the repeated-cursor guard below
+  # is what keeps a half-fix from becoming an infinite loop.
   def list_entries(path, limit: 1000, http: nil)
     entries = []
-    page = nil
+    cursor = nil
+    cursor_param = nil
     seen = {}
+    pages = 0
     loop do
       qs = "limit=#{limit.to_i}"
-      qs += "&page=#{URI.encode_www_form_component(page)}" if page
+      qs += "&#{cursor_param}=#{URI.encode_www_form_component(cursor)}" if cursor
       data = request(:get, "#{path}#{path.include?('?') ? '&' : '?'}#{qs}", http: http)
       break unless data.is_a?(Hash)
+      pages += 1
+      yield data if block_given?
       entries.concat(data['entries'] || [])
-      page = data['nextPage']
-      break if page.nil? || page.to_s.empty? || seen[page]
-      seen[page] = true
+
+      # Read whichever cursor this endpoint actually returned, and remember the
+      # param it must be sent back as.
+      if !data['nextPage'].nil? && !data['nextPage'].to_s.empty?
+        cursor = data['nextPage']
+        cursor_param = 'page'
+      elsif !data['nextPageToken'].nil? && !data['nextPageToken'].to_s.empty?
+        cursor = data['nextPageToken']
+        cursor_param = 'pageToken'
+      else
+        break
+      end
+
+      if seen[cursor]
+        warn "#{path}: server repeated #{cursor_param} cursor #{cursor.inspect} — " \
+             "stopping after #{pages} page(s) to avoid an infinite loop (list may be incomplete)"
+        break
+      end
+      seen[cursor] = true
     end
     entries
   end

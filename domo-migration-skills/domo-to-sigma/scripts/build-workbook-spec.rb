@@ -38,11 +38,15 @@
 # the YAML explicitly.
 
 require 'json'
+require 'set'
 require 'yaml'
 require 'optparse'
 require 'net/http'
 require 'uri'
 require 'base64'
+$LOAD_PATH.unshift File.expand_path('lib', __dir__)
+require 'code_rep'
+require 'layout'
 
 opts = { mode: 'page-per-worksheet' }
 OptionParser.new do |p|
@@ -83,7 +87,26 @@ target = if opts[:dm_el_name]
            width = ->(e) { (e['columnLabels'] || e['columns'] || []).size }
            bearing = dm_elements.select { |e| width.call(e).positive? }
            bearing = dm_elements if bearing.empty?
-           bearing.find { |e| !(e['name'] || '').end_with?(' Dim') } || bearing.first
+           # PREFER the element build-workbook.rb identified as the DOMINANT
+           # dataset's. Falling straight through to "first non-Dim" is only
+           # correct when the dominant dataset happens to be the data model's
+           # first element — true for the single-fact Orders pages, FALSE on a
+           # real multi-dataset page. Measured on the 36-card cold run: Master
+           # bound to PDP_EXAMPLE_DATASET (element 0, 11 columns) while the
+           # dominant dataset was SALESFORCE (element 7, 15 columns), and there
+           # was no sub-master for SALESFORCE because it was supposed to BE the
+           # Master. That is a SILENT wrong-data bug, not just a 400: it only
+           # errored on a column name absent from PDP ('Close Date'); every
+           # card referencing a name present in BOTH tables would have POSTed
+           # fine and rendered the wrong table's numbers. Bead 0ku5.
+           dominant_id = specs['dominant_dm_element_id']
+           dominant = dominant_id && bearing.find { |e| e['id'] == dominant_id }
+           if dominant_id && !dominant
+             warn "  ⚠ chart-specs names DM element #{dominant_id.inspect} as the dominant " \
+                  "dataset's, but it is not among the data model's column-bearing elements — " \
+                  "falling back to positional selection (bead 0ku5)."
+           end
+           dominant || bearing.find { |e| !(e['name'] || '').end_with?(' Dim') } || bearing.first
          end
 dm_el_id   = target['id']
 dm_el_name = target['name']
@@ -95,7 +118,6 @@ dm_el_name = target['name']
 #   • warehouse-table  → the table's last path segment (e.g. an extract-landed
 #                        or direct-table element: MY_SCHEMA.MY_TABLE → "MY_TABLE")
 #   • everything else  → "Custom SQL" (SQL / published-DS elements)
-$LOAD_PATH.unshift File.expand_path('lib', __dir__)
 require 'sigma_rest'
 spec = Sigma.request(:get, "/v2/dataModels/#{dm_id}/spec")
 el = spec['pages'].flat_map { |p| p['elements'] }.find { |e| e['id'] == dm_el_id }
@@ -168,9 +190,16 @@ warn "  Data page: + #{helper_elements.size} hidden helper element(s) [#{helper_
 visible_pages = []
 if specs.is_a?(Hash) && specs['pages']
   specs['pages'].each do |p|
-    slug = p['name'].to_s.downcase
-    %w[ / ( ) %].each { |ch| slug = slug.tr(ch, '-') }
-    slug = slug.tr(' ', '-').gsub(/-+/, '-').sub(/^-/, '').sub(/-$/, '')[0..40]
+    # Sigma enforces /^[a-zA-Z0-9_-]{1,64}$/ on a page id. Squash anything
+    # outside that set — an ALLOWLIST, not a denylist: the previous
+    # hand-picked "/ ( ) %" list let other punctuation straight through, and a
+    # real Domo page title ("Sample DataSets + Cards") 400'd the whole workbook
+    # POST with `Invalid id format: 'page-sample-datasets-+-cards'`. Only
+    # surfaced once the page id started deriving from the REAL title instead of
+    # the hardcoded "Overview" placeholder.
+    slug = p['name'].to_s.downcase.gsub(/[^a-z0-9]+/, '-')
+                    .gsub(/-+/, '-').sub(/\A-/, '').sub(/-\z/, '')[0..40].to_s
+    slug = 'page' if slug.empty?   # a title of pure punctuation still needs an id
     visible_pages << {
       'id'       => "page-#{slug}",
       'name'     => p['name'],
@@ -239,27 +268,130 @@ def derive_theme(layout)
   theme
 end
 
+# GUARD (bead 0ku5): every reference into the primary Master must name a column
+# the Master actually has. This exists because binding Master to the WRONG data
+# model element failed SILENTLY — the POST only errored on a column name absent
+# from the wrong table, so any card using a name present in both tables would
+# have rendered the wrong table's numbers with no error at all. Catch it here,
+# at build time, instead of trusting a POST-succeeds signal.
+#
+# Only the bare [Master/...] namespace is checked; a sub-master reference
+# ([Master (TABLE)/...]) is validated by its own element's column list.
+master_el = ([data_page] + visible_pages).flat_map { |pg| pg['elements'] || [] }
+            .find { |e| e['id'] == 'master' }
+if master_el
+  have = (master_el['columns'] || []).map { |c| c['name'].to_s.downcase }.to_set
+  missing = Hash.new { |h, k| h[k] = [] }
+  ([data_page] + visible_pages).each do |pg|
+    (pg['elements'] || []).each do |el|
+      next if el['id'] == 'master'
+      (el['columns'] || []).each do |c|
+        c['formula'].to_s.scan(/\[Master\/([^\[\]\/]+)\]/) do |(col)|
+          missing[col] << (el['name'] || el['id']) unless have.include?(col.to_s.downcase)
+        end
+      end
+    end
+  end
+  unless missing.empty?
+    warn "\n  MASTER REFERENCE CHECK FAILED — #{missing.size} column(s) referenced on the primary"
+    warn "  Master that it does not have. The Master is bound to DM element #{dm_el_id.inspect}"
+    warn "  (#{dm_el_name.inspect}); if that is not the dominant dataset's table, THAT is the bug"
+    warn "  (bead 0ku5) — a wrong binding renders the wrong table's data, mostly WITHOUT erroring."
+    missing.each { |col, els| warn "    #{col.inspect} <- #{els.uniq.first(4).join(', ')}" }
+    warn "  Master has: #{(master_el['columns'] || []).map { |c| c['name'] }.join(', ')}"
+    abort('  aborting before POST rather than shipping a workbook that reads the wrong table')
+  end
+end
+
 wb = {
-  'name'          => opts[:name],
-  'schemaVersion' => 1,
-  'folderId'      => opts[:folder_id],
-  'pages'         => [data_page] + visible_pages
+  'name' => opts[:name],
+  'folderId' => opts[:folder_id]
 }
 wb['description'] = opts[:description] if opts[:description]
+
+# The released workbook representation differs from the unchanged data-model
+# representation: pages are metadata only, elements are document-global, and
+# layout is the sole authority for page membership. Add released auto
+# navigation only when the Domo source really has multiple pages.
+if visible_pages.size > 1
+  page_labels = visible_pages.each_with_object({}) { |page, labels| labels[page['id']] = page['name'] }
+  visible_pages.each do |page|
+    page['elements'].unshift(
+      'id' => "nav-#{page['id']}",
+      'kind' => 'navigation',
+      'mode' => 'auto',
+      'pageLabels' => page_labels
+    )
+  end
+end
+
+page_records = [data_page] + visible_pages
+flat_elements = page_records.flat_map { |page| page['elements'] || [] }
+layout_pages = page_records.map do |page|
+  row = 1
+  children = (page['elements'] || []).map do |element|
+    height = case element['kind']
+             when 'page-break' then 1
+             when 'control', 'text', 'navigation', 'progress', 'image', 'divider' then 3
+             when 'kpi-chart' then 6
+             when 'table', 'pivot-table' then 12
+             else 10
+             end
+    xml = SigmaLayout.le(element['id'], 1, 25, row, row + height)
+    row += height
+    xml
+  end
+  SigmaLayout.page_xml(page['id'], children.join("\n"))
+end
+
+document = {
+  'schemaVersion' => 1,
+  'kind' => 'workbook',
+  'pages' => page_records.map do |page|
+    metadata = page.reject { |key, _| key == 'elements' }
+    metadata['visibility'] = 'hidden' if page['id'] == 'page-data'
+    metadata
+  end,
+  'elements' => flat_elements,
+  'layout' => SigmaLayout.assemble(*layout_pages),
+  'panels' => [],
+  'overlays' => []
+}
+if visible_pages.size > 1
+  document['settings'] = { 'navigation' => { 'pageTabsInViewMode' => 'shown' } }
+end
 
 # Phase-1 theme (D1 palette + Pass-7 canvas), when a --layout was provided.
 if opts[:layout]
   theme = derive_theme(JSON.parse(File.read(opts[:layout])))
   unless theme.empty?
-    wb['themeName'] = 'Light'
     overrides = {}
     overrides['colorOverrides'] = { 'backgroundCanvas' => theme['backgroundCanvas'] } if theme['backgroundCanvas']
     overrides['categoricalScheme'] = theme['categoricalScheme'] if theme['categoricalScheme']
-    wb['themeOverrides'] = overrides unless overrides.empty?
+    # Live since 2026-08: themeName/themeOverrides moved to
+    # document.settings.theme.{name,overrides} (shared/lib/code_rep.rb
+    # DOC_KEYS) — a flat top-level themeName/themeOverrides is invalid on
+    # write and gets silently dropped by the code-rep wrapper.
+    Sigma::CodeRep.set_theme(document, name: 'Light', overrides: overrides) unless overrides.empty?
     warn "  theme: canvas=#{theme['backgroundCanvas'] || '(default)'}, categoricalScheme=#{(theme['categoricalScheme'] || []).size} color(s)"
   end
+else
+  # Domo's default card palette, observed across the live gold page. Without a
+  # parsed layout palette Sigma falls back to saturated blue/orange, changing
+  # almost every multi-series card. Preserve Domo's blue/green/orange/red order
+  # and its light-gray dashboard canvas.
+  Sigma::CodeRep.set_theme(
+    document,
+    name: 'Light',
+    overrides: {
+      'colorOverrides' => { 'backgroundCanvas' => '#F4F4F4' },
+      'categoricalScheme' => %w[#82BADF #8BC34A #F3A24F #D95C59 #C8E5A3 #7FB4D3 #F8DFA0 #8BBF78]
+    }
+  )
+  warn '  theme: Domo default canvas + 8-color categorical scheme'
 end
 
+wb = Sigma::CodeRep.wrap(document, extra: wb)
 File.write(opts[:out], JSON.pretty_generate(wb))
 warn "wrote #{opts[:out]}"
 warn "  mode: #{opts[:mode]}"

@@ -173,9 +173,38 @@ def resolve_dataset_id(raw, card_meta = nil)
     (card_meta.is_a?(Hash) && (card_meta['dataSetId'] || card_meta['dataSourceId']))
 end
 
-def norm_columns(component, formulas: nil)
+
+# Beast Mode formula lookup shared by norm_columns and the two filter-
+# extraction paths in normalize_card below: {id.to_s => formula object},
+# built from whichever formulas[] the caller has (dataset-scope map values
+# don't go through this — only card-local/inline formulas do). Keyed by
+# String so a stray Symbol/Integer id can never silently miss a real match.
+def formulas_by_id(formulas)
   by_id = {}
   Array(formulas).each { |f| by_id[f['id'].to_s] = f if f.is_a?(Hash) && f['id'] }
+  by_id
+end
+
+# Beast-Mode id resolution shared by norm_columns AND the two filter-
+# extraction paths below (B3, live-validated 2026-08-05). Domo represents a
+# reference to a Beast Mode as the literal string "calculation_<uuid>" —
+# card COLUMNS sometimes carry it as `column`'s value DIRECTLY, and so does a
+# card FILTER (confirmed live: {"column":"calculation_ea1150fd-…",
+# "operator":"LEGACY","values":[""]}, real Beast Mode name "State"). Either
+# way the id is meaningless to Sigma — only the Beast Mode's real NAME (the
+# name its future DM calc column gets) is bindable. Left unresolved on a
+# filter, a control ends up bound to a column that doesn't exist. Never
+# invents a name it can't back up: a calc id absent from `by_id` (this
+# card's own formulas[]/calculatedFields[]) is returned UNCHANGED so
+# downstream at least sees the raw id instead of a silently wrong name.
+def resolve_calc_ref(raw, by_id)
+  return raw unless raw.to_s.start_with?(CALC_PREFIX)
+  f = by_id[raw.to_s]
+  f ? f['name'] : raw
+end
+
+def norm_columns(component, formulas: nil)
+  by_id = formulas_by_id(formulas)
 
   Array(component && component['columns']).map do |c|
     raw = c['column'] || c['dataColumn'] || c['field']
@@ -194,6 +223,10 @@ def norm_columns(component, formulas: nil)
     if raw.to_s.empty? && calc_id && (f = by_id[calc_id.to_s])
       raw = f['name']
     end
+    # B3: the OTHER live shape — `column` carries the calc id DIRECTLY
+    # (non-empty), same as a filter's `column`. Route it through the identical
+    # by_id lookup so this case resolves too, not just the empty+formulaId one.
+    raw = resolve_calc_ref(raw, by_id)
 
     {
       'column'      => raw,
@@ -303,8 +336,18 @@ def normalize_card(raw, card_id, card_meta: nil)
               card_meta.dig('metadata', 'title')))
     columns = norm_columns((main.empty? ? nil : { 'columns' => main['columns'] }),
                            formulas: defn['formulas'])
+    # B3: filters carry the SAME "calculation_<uuid>" column shape as chart-
+    # body columns — route through the identical by_id resolution (see
+    # resolve_calc_ref) instead of copying f['column'] verbatim.
+    calc_by_id = formulas_by_id(defn['formulas'])
+    # Prefer `operand` (the write-shape field Shape A already prefers) over
+    # `filterType`. Live Shape-B payloads often carry BOTH: the real operator
+    # in `operand` and an opaque/collapsed `filterType` (commonly "LEGACY").
+    # Preferring filterType made 7/20 live filters emit the wrong Sigma
+    # filter — including 3 as their exact inverse (NOT_IN → include).
     filters = Array(main['filters']).map do |f|
-      { 'column' => f['column'], 'operator' => f['filterType'] || f['operator'],
+      { 'column' => resolve_calc_ref(f['column'], calc_by_id),
+        'operator' => f['operand'] || f['operator'] || f['filterType'],
         'values' => f['values'] }.compact
     end
     {
@@ -332,15 +375,20 @@ def normalize_card(raw, card_id, card_meta: nil)
       'filters'            => filters,
       'conditionalFormats' => Array(defn['conditionalFormats']),
       'cardFormulas'       => Array(defn['formulas']),  # {id,name,columnPositions,...}
+      'allowTableDrill'     => defn['allowTableDrill'] || raw['allowTableDrill'],
+      'drillPath'           => defn['drillPath'] || defn['drillpath'] ||
+                               raw['drillPath'] || raw['drillpath'],
       '_metadata'          => (meta.empty? ? nil : meta),
       '_shape'             => 'B',
     }.compact
   else
     # ---- Shape A (official CardDefinition) ----
     body = raw['chartBody'] || {}
+    # B3: same calc-id resolution as Shape B above (see resolve_calc_ref).
+    calc_by_id = formulas_by_id(raw['calculatedFields'])
     filters = Array(body['filters']).map do |f|
-      { 'column' => f['column'], 'operator' => f['operand'] || f['operator'],
-        'values' => f['values'] }.compact
+      { 'column' => resolve_calc_ref(f['column'], calc_by_id),
+        'operator' => f['operand'] || f['operator'], 'values' => f['values'] }.compact
     end
     {
       'id'                 => card_id,
@@ -363,6 +411,8 @@ def normalize_card(raw, card_id, card_meta: nil)
       'filters'            => filters,
       'conditionalFormats' => Array(raw['conditionalFormats']),
       'cardFormulas'       => Array(raw['calculatedFields']),  # {formula,id,name,saveToDataSet}
+      'allowTableDrill'     => raw['allowTableDrill'],
+      'drillPath'           => raw['drillPath'] || raw['drillpath'],
       '_metadata'          => (meta.empty? ? nil : meta),
       '_shape'             => 'A',
     }.compact
@@ -470,6 +520,22 @@ def dig_beast_modes(card, ds_formula_map, template_cache)
              'cardId' => card['id'] }
   end
   out
+end
+
+# F6 (live-validated 2026-08-05): de-dupe the ACCUMULATED beast_out array by
+# id ALONE, not [id, scope]. A Beast Mode inlined at BOTH dataset scope
+# (ds_formula_map, above) and card scope (cardFormulas, above) for the SAME
+# card survives as TWO rows under an [id, scope] key — confirmed live:
+# calculation_443eb18b appears with scope:"dataset" AND scope:"card", and a
+# real 36-card page's beast-modes.json came out 148 rows / 81 unique ids.
+# It's the same calc either way; every downstream join is on id, never on
+# scope, so the duplicate row buys nothing and only risks a stale second
+# copy if the two scopes' formula text ever diverges. `uniq` keeps the FIRST
+# occurrence, which is the dataset-scope entry whenever one exists
+# (dig_beast_modes appends dataset-scope entries before card-scope ones) —
+# the richer record, since it also carries dataSourceId.
+def dedupe_beast_modes(beast_modes)
+  Array(beast_modes).uniq { |b| b['id'] }
 end
 
 def fetch_template(fn_id, cache)
@@ -628,6 +694,85 @@ def merge_dataset_schemas(datasets, schema_cache)
   [merged, out]
 end
 
+# B1 (live-validated 2026-08-05): GET /v1/datasets/{id} (the call
+# merge_dataset_schemas' cache above gets fed from) returned NO 'schema' key
+# at all for 9 of the 10 real DataSets a live page's cards referenced — only
+# the one dataset carrying an actual PDP policy happened to have one. Without
+# a fallback, build-dm.rb (build-dm.rb:205-212) raises ArgumentError the
+# instant it tries to build columns for any of those 9.
+#
+# Falls back to deriving the schema from a live
+# `Domo.query_dataset(id, 'SELECT * FROM table LIMIT 1')` probe — the SAME
+# oracle domo-import-to-snowflake/scripts/lib/domo_extract.rb already uses as
+# its ONLY source of column types, for the identical reason (its own comment:
+# "Domo.dataset(id)['schema']['columns'] was found empty for 9 of 10 real
+# sample DataSets"). That response shape is CONFIRMED live:
+#   {"columns"=>[names...], "metadata"=>[{"type"=>"STRING"|"LONG"|...}, ...], "rows"=>[...]}
+# with `metadata` PARALLEL-indexed to `columns` — zipped here into the SAME
+# {'columns'=>[{'name','type'}]} shape build-dm.rb expects from
+# Domo.dataset(id)['schema'] so no build-dm.rb change is needed (its
+# type_format already upcases and handles this exact STRING/LONG/DECIMAL/
+# DOUBLE/DATE/DATETIME vocabulary).
+#
+# Tolerant by construction: returns nil (never raises) when NEITHER path
+# resolves, so one unreachable/malformed dataset degrades instead of
+# aborting discovery for the other 9. The caller is responsible for warning
+# loudly, by id, when this comes back nil.
+def resolve_dataset_schema(ds_id)
+  pub = (Domo.dataset(ds_id) rescue nil)
+  sch = pub['schema'] if pub.is_a?(Hash)
+  return sch if sch.is_a?(Hash) && sch['columns'].is_a?(Array) && !sch['columns'].empty?
+
+  probe = (Domo.query_dataset(ds_id, 'SELECT * FROM table LIMIT 1') rescue nil)
+  return nil unless probe.is_a?(Hash) && probe['columns'].is_a?(Array) && !probe['columns'].empty?
+  names = probe['columns']
+  metadata = probe['metadata']
+
+  # Blocker 4 (2026-08-05 batch-verify): `metadata` absent, or shorter than
+  # `columns` (both observed live — the probe response shape is confirmed,
+  # not guaranteed complete), used to zip silently into `type: nil` for every
+  # name past metadata's own length via `types[i]` (nil when out of range).
+  # type_format(nil) (build-dm.rb) then emits NO format at all — the exact
+  # "a missing format on a DATE column killed the whole DM POST" failure
+  # class build-dm.rb:175-177 documents, just reached via a different silent
+  # path. Never guess a column's type from nothing: warn LOUDLY, naming the
+  # dataset id, and fall through to nil (this fallback did NOT resolve) —
+  # the SAME "schema unresolved" outcome the caller already handles for a
+  # totally-absent schema (it warns again and leaves the dataset without
+  # schema.columns, which build-dm.rb's own build_element hard-fails on BY
+  # NAME rather than silently posting a typeless/malformed DM).
+  unless metadata.is_a?(Array) && metadata.size >= names.size
+    warn "  ⚠ dataset #{ds_id.inspect}: query_dataset() LIMIT-1 probe returned #{names.size} " \
+         "column name(s) but only #{metadata.is_a?(Array) ? metadata.size : 0} metadata entry(ies) " \
+         '— refusing to emit columns with a guessed/blank type; treating this schema fallback as ' \
+         'unresolved rather than risk a DATE column silently losing its format.'
+    return nil
+  end
+
+  cols = names.each_with_index.map do |name, i|
+    { 'name' => name, 'type' => (metadata[i].is_a?(Hash) ? metadata[i]['type'] : nil) }
+  end
+  { 'columns' => cols }
+end
+
+# B1: guarantee EVERY dataset id referenced by a discovered card has a record
+# in datasets.json to merge onto — even when the PUBLIC LIST endpoint never
+# surfaced that id AT ALL (live-validated: 9 of the 10 DataSets a real page's
+# cards reference are absent from GET /v1/datasets entirely; it isn't only
+# that their schema was missing). merge_dataset_schemas/
+# merge_dataset_permissions above only merge onto an id already present in
+# `datasets`, so without this step a used-but-unlisted id would successfully
+# get a schema fetched above and then have nowhere to land — silently
+# dropped from datasets.json no matter how good the fetch was. Synthesizes a
+# minimal {'id'=>...} record for any used id not already present.
+# Pure/side-effect-free, same shape as the two merge_* functions above.
+def ensure_dataset_records(existing, used_ids)
+  existing = Array(existing)
+  present = existing.map { |d| d['id'] if d.is_a?(Hash) }.compact
+  added = used_ids.uniq - present
+  [added, existing + added.map { |i| { 'id' => i } }]
+end
+
 # ---------------------------------------------------------------------------
 
 opts = {}
@@ -736,6 +881,12 @@ if opts[:pages]
     # also carries this page's sizes[]/collections[] for the Bug 5 geometry
     # merge below.
     card_ids, card_meta_by_id, stacks = enumerate_page_cards(pid)
+    if stacks.is_a?(Hash)
+      layout_content = pagelayoutv4_content(stacks, pid)
+      page['_layoutContent'] = layout_content unless layout_content.empty?
+      analyzer = stacks['pageAnalyzerSettings']
+      page['_pageAnalyzerSettings'] = analyzer if analyzer.is_a?(Hash)
+    end
     page_cards = []
 
     card_ids.each do |cid|
@@ -756,13 +907,19 @@ if opts[:pages]
           ds_formula_cache[dsid] = det&.dig('properties', 'formulas', 'formulas') || {}
           ds_permission_cache[dsid] = det['permission'] if det.is_a?(Hash) && det['permission']
 
-          # The PRIVATE detail above does NOT carry the documented column schema,
-          # and the PUBLIC LIST endpoint only reports a column COUNT — so fetch
-          # the PUBLIC per-dataset detail once per USED dataset to get
-          # schema.columns[]. build-dm.rb hard-fails without it rather than
-          # posting a column-less data model (see merge_dataset_schemas).
-          pub = (Domo.dataset(dsid) rescue nil)
-          ds_schema_cache[dsid] = pub['schema'] if pub.is_a?(Hash) && pub['schema'].is_a?(Hash)
+          # B1 (live-validated 2026-08-05): GET /v1/datasets/{id} came back
+          # with NO 'schema' key at all for 9 of the 10 real DataSets these
+          # cards reference — resolve_dataset_schema falls back to a live
+          # query_dataset LIMIT-1 probe for those. Degrade LOUDLY by id
+          # rather than crash: one dataset with no schema anywhere must never
+          # abort discovery for the other 9 (see merge_dataset_schemas).
+          sch = resolve_dataset_schema(dsid)
+          if sch
+            ds_schema_cache[dsid] = sch
+          else
+            warn "  ⚠ dataset #{dsid.inspect}: schema unresolved via Domo.dataset() AND the " \
+                 'Domo.query_dataset() LIMIT-1 fallback — build-dm.rb will have no schema.columns for it.'
+          end
         end
 
         card['beastModes'] = dig_beast_modes(card, ds_formula_cache[dsid], template_cache)
@@ -785,8 +942,7 @@ if opts[:pages]
     cards_out.concat(merge_geometry(page_cards, layout, stacks: stacks))
   end
 
-  # De-dupe Beast Modes by id (a dataset formula shared by many cards appears once).
-  beast_out.uniq! { |b| [b['id'], b['scope']] }
+  beast_out = dedupe_beast_modes(beast_out)
 
   # C9/PDP: merge captured `permission` data onto datasets.json (this run's
   # in-memory list if --datasets ran too, else re-read the file from a prior
@@ -797,17 +953,19 @@ if opts[:pages]
   if ds_permission_cache.any? || ds_schema_cache.any?
     ds_path  = File.join(OUT, 'datasets.json')
     existing = datasets_snapshot || (JSON.parse(File.read(ds_path)) rescue nil)
+    used_ids = (ds_schema_cache.keys + ds_permission_cache.keys).uniq
 
-    # `--pages` without a prior `--datasets` leaves no merge target. Rather than
-    # emit an un-buildable discovery set, synthesize minimal records for exactly
-    # the datasets this page set actually uses.
-    unless existing.is_a?(Array)
-      ids = (ds_schema_cache.keys + ds_permission_cache.keys).uniq
-      if ids.any?
-        existing = ids.map { |i| { 'id' => i } }
-        warn "  datasets.json absent — synthesized #{existing.size} record(s) for the " \
-             'dataset(s) used by these pages so the schema/permission merge has a target.'
-      end
+    # B1: `--pages` without a prior `--datasets` leaves no merge target at
+    # all — AND, separately, even WITH a prior `--datasets` run the public
+    # LIST endpoint can simply never surface an id a card actually uses (9 of
+    # 10 on a real instance; see ensure_dataset_records). Either way,
+    # synthesize a minimal record for exactly the used ids missing from
+    # `existing` so the schema/permission merge below has somewhere to land.
+    if existing.is_a?(Array) || used_ids.any?
+      added_ids, existing = ensure_dataset_records(existing, used_ids)
+      warn "  #{added_ids.size} dataset(s) used by discovered cards are absent from " \
+           'datasets.json entirely (not just missing a schema) — synthesized minimal ' \
+           "record(s) so the schema/permission merge has a target: #{added_ids.join(', ')}" if added_ids.any?
     end
 
     if existing.is_a?(Array)

@@ -28,8 +28,10 @@ import base64
 import json
 import os
 import re
+import shlex
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 NEUTRAL_ENV = os.path.expanduser("~/.sigma-migration/env")
@@ -79,6 +81,22 @@ def _die(msg):
     sys.exit(1)
 
 
+def _validate_base_url(base):
+    """Security (A2): only transmit Sigma credentials to an https://
+    sigmacomputing.com host. A poisoned SIGMA_BASE_URL would otherwise
+    exfiltrate the client id/secret. Opt out (self-hosted/dev) with
+    SIGMA_ALLOW_INSECURE_BASE_URL=1 (loud warning)."""
+    if os.environ.get("SIGMA_ALLOW_INSECURE_BASE_URL") == "1":
+        print(f"WARNING: SIGMA_ALLOW_INSECURE_BASE_URL=1 — skipping SIGMA_BASE_URL validation ({base})", file=sys.stderr)
+        return
+    p = urllib.parse.urlparse(base or "")
+    host = (p.hostname or "").lower()
+    if p.scheme != "https":
+        _die(f"FATAL: SIGMA_BASE_URL must use https:// (got '{base}') — refusing to send Sigma credentials.")
+    if not (host == "sigmacomputing.com" or host.endswith(".sigmacomputing.com")):
+        _die(f"FATAL: SIGMA_BASE_URL host '{host}' is not a sigmacomputing.com host — refusing to send Sigma credentials. Set SIGMA_ALLOW_INSECURE_BASE_URL=1 to override (self-hosted/dev).")
+
+
 def mint_token():
     _load_neutral_env()
     base = os.environ.get("SIGMA_BASE_URL")
@@ -90,6 +108,9 @@ def mint_token():
             "  Run 'ruby scripts/setup.rb' once (writes ~/.sigma-migration/env),\n"
             "  or set SIGMA_BASE_URL / SIGMA_CLIENT_ID / SIGMA_CLIENT_SECRET in the environment."
         )
+
+    # Security (A2): validate the base URL BEFORE the client id/secret leaves this process.
+    _validate_base_url(base)
 
     # Pre-flight sanity (POSTMORTEM 2026-06-18): the #1 hard blocker was a
     # settings.json where SIGMA_CLIENT_SECRET was a COPY of SIGMA_CLIENT_ID.
@@ -131,6 +152,10 @@ def mint_token():
     token = payload.get("access_token")
     if not token:
         _die("Token exchange failed — response did not contain access_token")
+    # Security: the token is emitted for `eval "$(... --print-export)"`; reject any
+    # non-token characters so a poisoned/MITM'd endpoint cannot inject shell.
+    if not re.fullmatch(r"[A-Za-z0-9._~+/=-]+", token):
+        _die("access_token contains unexpected characters — refusing (possible poisoned SIGMA_BASE_URL)")
     return base, token
 
 
@@ -161,13 +186,13 @@ def main():
         wrote = True
 
     if args.print_export:
-        print(f"export SIGMA_API_TOKEN={token}")
+        print(f"export SIGMA_API_TOKEN={shlex.quote(token)}")
     elif args.print_token:
         print(token)
     elif not wrote:
         # Default with no flags: behave like get-token.sh so `eval "$(...)"`
         # keeps working in bash and nobody's muscle memory breaks.
-        print(f"export SIGMA_API_TOKEN={token}")
+        print(f"export SIGMA_API_TOKEN={shlex.quote(token)}")
 
 
 if __name__ == "__main__":

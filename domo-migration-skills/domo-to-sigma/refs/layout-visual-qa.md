@@ -34,7 +34,7 @@ migration done.
    below (source-fidelity → structural → design-quality, in that order).
 3. **Fix** any failure (re-band, resize, move a control into its chart's container, shorten a
    map title) by editing the spec — for large multi-page workbooks use
-   `sigma-skills/sigma-workbooks/scripts/wb-rep.rb` (pull → edit element files → push) — then
+   the companion **sigma-workbooks** skill's `scripts/wb-rep.rb` (full-clone path: `plugins/sigma-authoring/skills/sigma-workbooks/scripts/wb-rep.rb`; pull → edit element files → push) — then
    **re-render and re-read**.
 4. **Loop until the render passes inspection.** Declare the migration done on a *clean render*,
    never on an HTTP 200.
@@ -163,11 +163,11 @@ PLAN-v3 PR-14 and is not built yet; until then the budget is the cap.
 
 ## Building clean in the first place (so the gate rarely fails)
 
-Group every page into horizontal **band containers** — never a flat list of `<LayoutElement>`s:
+Group every page into horizontal **band containers** — never a flat list of `<Element>`s:
 header band → control band → KPI band → chart rows → detail row. Verified container contract:
 
 - Spec side: a `kind: container` placeholder element per band.
-- Layout side: a `<GridContainer>` (NOT `<LayoutElement type="grid">`, which silently drops
+- Layout side: a `<Container>` (NOT `<Element type="grid">`, which silently drops
   children); child `gridRow`/`gridColumn` are **container-relative** (restart at 1);
   `gridTemplateRows="auto"`; every `elementId` must match a real spec element (mismatch =
   silent drop); GET before a layout PUT (POST reassigns ids; PUT preserves them).

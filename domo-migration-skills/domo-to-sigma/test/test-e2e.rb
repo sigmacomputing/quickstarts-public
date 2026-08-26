@@ -21,7 +21,8 @@ Dir.mktmpdir('domo-e2e') do |dir|
   # build LOGIC, not the environment, so waive it explicitly — keeps the suite
   # hermetic on a machine (e.g. CI) that never ran the doctor.
   env = { 'DOMO_DISCOVERY_DIR' => dir,
-          'SIGMA_SKIP_DOCTOR_GATE' => 'e2e: environment not under test' }
+          'SIGMA_SKIP_DOCTOR_GATE' => 'e2e: environment not under test',
+          'SIGMA_SKIP_COLUMN_PREFLIGHT' => 'e2e: build LOGIC under test, not the live warehouse check' }
   w = ->(name, obj) { File.write(File.join(dir, name), JSON.generate(obj)) }
   run = ->(script, *args) { system(env, 'ruby', File.join(SCRIPTS, script), *args, out: File::NULL, err: File::NULL) }
 
@@ -74,8 +75,20 @@ Dir.mktmpdir('domo-e2e') do |dir|
   ok(bar['columns'][1]['name'] == 'Sales', '#4 measure label uses Domo alias')
   tbl = els.find { |e| e['id'] == 'el-t1' }
   ok(tbl['columns'].any? { |c| c.dig('style', 'textWrap') == 'wrap' }, '#5 table text column wraps')
-  ctrl = els.find { |e| e['kind'] == 'control' }
-  ok(ctrl && ctrl['filters'][0]['source']['elementId'] == 'master', '#2 control fans out via master')
+  # B4 (2026-08-05 batch-verify blocker 2): this used to assert that b1's
+  # `filters:[{"column"=>"region","operator"=>"IN","values"=>["West"]}]`
+  # produced a page-level 'control' element fanning out via 'master' — that
+  # was itself bug #2 (a card-level filter clause manufactured into a
+  # workbook-wide control with NO values, silently shipping b1 unfiltered).
+  # build_controls is now a deliberate no-op (see build-workbook.rb) and card
+  # filters become ELEMENT filters on the card's own element instead
+  # (apply_card_filters!) — assert THAT real behavior instead of the bug.
+  ok(!els.any? { |e| e['kind'] == 'control' }, '#2 no page control manufactured from a card-level filter (B4)')
+  flt = bar['filters'] && bar['filters'][0]
+  ok(flt && flt['kind'] == 'list' && flt['mode'] == 'include' && flt['values'] == ['West'],
+     "#2 card filter (region IN West) lands as an element filter on el-b1 itself, not a page control — got #{bar['filters'].inspect}")
+  ok(flt && bar['columns'].any? { |c| c['id'] == flt['columnId'] },
+     '#2 the element filter targets an existing column on el-b1 (reuses the plotted region dimension, no duplicate column)')
   warns = JSON.parse(File.read(File.join(dir, 'warnings.json')))
   ok(warns.any? { |x| x['warning'].include?('row-key') }, '#1 COUNT-of-id KPI surfaced as a warning')
 

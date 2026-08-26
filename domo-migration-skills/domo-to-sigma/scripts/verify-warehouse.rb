@@ -32,6 +32,12 @@ require 'csv'
 require 'optparse'
 require 'time'
 
+begin
+  require_relative 'lib/code_rep'
+rescue LoadError
+  require_relative '../lib/code_rep'
+end
+
 opts = { pool: 5, timeout: 120 }
 OptionParser.new do |p|
   p.on('--plan PATH')          { |v| opts[:plan] = v }
@@ -52,7 +58,8 @@ end
 plan = JSON.parse(File.read(opts[:plan]))
 charts = plan.is_a?(Hash) ? (plan['charts'] || []) : plan
 spec = JSON.parse(File.read(opts[:spec]))
-elements = (spec['pages'] || []).flat_map { |pg| pg['elements'] || [] }
+spec = Sigma::CodeRep.document(spec)
+elements = Sigma::CodeRep.workbook_elements(spec)
 el_by_id = elements.each_with_object({}) { |e, h| h[e['id']] = e }
 
 # Pull one element's CSV — from the fixture (tests) or the live export API.

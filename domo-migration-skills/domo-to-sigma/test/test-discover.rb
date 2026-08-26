@@ -146,6 +146,26 @@ eq(b['groupBy'], ['project_id'], 'groupBy flattened (Shape B)')
 eq(b['cardFormulas'].first['name'], 'Days Open', 'card formulas from definition.formulas')
 eq(b['limit'], 25, 'limit carried through Shape B normalization (bead 2ef7)')
 
+puts "== normalize_card: Shape B prefers operand over conflicting filterType =="
+shape_b_operand_wins = {
+  'chartType' => 'badge_bar', 'dataSetId' => 'ds-2b',
+  'definition' => {
+    'title' => 'Exclude Midwest',
+    'subscriptions' => { 'main' => {
+      'columns' => [{ 'column' => 'region' }],
+      # Live Shape-B often carries BOTH: real operator in `operand`, opaque
+      # collapsed token in `filterType`. operand must win or NOT_IN becomes
+      # LEGACY→include (exact inverse).
+      'filters' => [{ 'column' => 'region', 'operand' => 'NOT_IN',
+                     'filterType' => 'LEGACY', 'values' => ['Midwest'] }],
+    } },
+  },
+}
+b_op = normalize_card(shape_b_operand_wins, 'card-B-operand')
+eq(b_op['filters'],
+   [{ 'column' => 'region', 'operator' => 'NOT_IN', 'values' => ['Midwest'] }],
+   'Shape B: operand wins over conflicting filterType (NOT_IN not collapsed to LEGACY)')
+
 puts "== normalize_card: no limit declared -> key absent, not zero =="
 no_limit = normalize_card({ 'chartType' => 'badge_table', 'chartBody' => { 'columns' => [{ 'column' => 'x' }] } }, 'card-C')
 ok(!no_limit.key?('limit'), 'no limit key when the source declared none (compact drops nil, never defaults to 0)')
@@ -447,6 +467,269 @@ envelope = { 'image' => { 'data' => Base64.strict_encode64('PNGDATA'), 'notAllDa
 render_res = FakeRenderResponse.new(JSON.generate(envelope))
 eq(Domo.decode_render(render_res), 'PNGDATA',
    'image.data extracted correctly even though json["image"] is a Hash, not a bare base64 string')
+
+# ===========================================================================
+# B1 (AUDIT-SYNTHESIS.md): datasets.json has no schema for 9 of 10 used
+# datasets on a real live instance -> build-dm.rb raises. resolve_dataset_schema
+# falls back from Domo.dataset(id)['schema'] to a query_dataset LIMIT-1 probe;
+# ensure_dataset_records guarantees a used-but-unlisted id still gets a record.
+# ===========================================================================
+puts "== B1: resolve_dataset_schema — Domo.dataset()['schema'] used when present =="
+with_domo_stub(:dataset, ->(_id) { { 'id' => 'ds-has-schema', 'schema' => { 'columns' => [{ 'name' => 'ORDER_ID', 'type' => 'STRING' }] } } }) do
+  with_domo_stub(:query_dataset, ->(*_a) { raise 'query_dataset should NOT be called when dataset() already has a schema' }) do
+    sch = resolve_dataset_schema('ds-has-schema')
+    eq(sch, { 'columns' => [{ 'name' => 'ORDER_ID', 'type' => 'STRING' }] }, 'schema taken straight from Domo.dataset() when present and non-empty')
+  end
+end
+
+puts "== B1: resolve_dataset_schema — falls back to a query_dataset LIMIT-1 probe when dataset() has NO schema =="
+with_domo_stub(:dataset, ->(_id) { { 'id' => 'ds-no-schema', 'name' => 'publicsampledata Orders' } }) do
+  with_domo_stub(:query_dataset, ->(_id, sql) {
+    eq(sql, 'SELECT * FROM table LIMIT 1', 'the exact confirmed-live probe query is issued')
+    { 'columns' => %w[ORDER_ID SHIP_DATE AMOUNT],
+      'metadata' => [{ 'type' => 'STRING' }, { 'type' => 'DATETIME' }, { 'type' => 'DECIMAL' }],
+      'rows' => [['1001', '2026-01-01T00:00:00Z', '19.99']] }
+  }) do
+    sch = resolve_dataset_schema('ds-no-schema')
+    eq(sch, { 'columns' => [
+      { 'name' => 'ORDER_ID',  'type' => 'STRING' },
+      { 'name' => 'SHIP_DATE', 'type' => 'DATETIME' },
+      { 'name' => 'AMOUNT',    'type' => 'DECIMAL' },
+    ] }, 'columns/metadata zipped into the same {name,type} shape build-dm.rb expects from Domo.dataset()[\'schema\']')
+  end
+end
+
+puts "== B1: resolve_dataset_schema — empty schema.columns[] on dataset() is treated as absent, still falls back =="
+with_domo_stub(:dataset, ->(_id) { { 'schema' => { 'columns' => [] } } }) do
+  with_domo_stub(:query_dataset, ->(*_a) { { 'columns' => ['x'], 'metadata' => [{ 'type' => 'LONG' }], 'rows' => [] } }) do
+    sch = resolve_dataset_schema('ds-empty-schema')
+    eq(sch, { 'columns' => [{ 'name' => 'x', 'type' => 'LONG' }] }, 'an empty columns[] array does not count as a usable schema — falls through to the probe')
+  end
+end
+
+puts "== B1: resolve_dataset_schema — neither path resolves -> nil, never raises (tolerant degrade) =="
+with_domo_stub(:dataset, ->(_id) { raise 'network down' }) do
+  with_domo_stub(:query_dataset, ->(*_a) { raise 'network down' }) do
+    sch = nil
+    threw = false
+    begin
+      sch = resolve_dataset_schema('ds-unreachable')
+    rescue
+      threw = true
+    end
+    eq(threw, false, 'resolve_dataset_schema never raises even when BOTH underlying calls raise')
+    eq(sch, nil, 'nil signals "unresolved" to the caller, which is responsible for warning loudly')
+  end
+end
+
+puts "== B1: resolve_dataset_schema — malformed query_dataset response (no columns) -> nil, not a crash =="
+with_domo_stub(:dataset, ->(_id) { {} }) do
+  with_domo_stub(:query_dataset, ->(*_a) { { 'rows' => [] } }) do
+    eq(resolve_dataset_schema('ds-malformed'), nil, 'a query_dataset response missing \'columns\' degrades to nil, not a raise')
+  end
+end
+
+# ===========================================================================
+# Blocker 4 (2026-08-05 batch-verify): the query_dataset LIMIT-1 fallback used
+# to zip `columns` against `metadata` positionally with no length check —
+# a `metadata` absent, or shorter than `columns`, silently produced
+# `type: nil` for every name past metadata's own length (types[i] is nil when
+# i is out of range). build-dm.rb's type_format(nil) then emits NO format at
+# all — exactly the "a DATE column silently losing its format killed the
+# whole DM POST" class build-dm.rb:175-177 already documents, just reached
+# via a different silent path. Fixed: refuse to emit ANY columns from this
+# probe when metadata doesn't cover every column name — warn loudly, by
+# dataset id, and return nil (same "unresolved" signal as every other nil
+# path above, which the caller already turns into a loud by-id warning of
+# its own, and which build-dm.rb hard-fails on rather than posting a
+# typeless DM).
+# ===========================================================================
+puts "== Blocker 4: resolve_dataset_schema — metadata SHORTER than columns -> nil + a loud by-id warning, never a guessed type =="
+with_domo_stub(:dataset, ->(_id) { {} }) do
+  with_domo_stub(:query_dataset, ->(*_a) {
+    { 'columns' => %w[ORDER_ID SHIP_DATE AMOUNT],
+      'metadata' => [{ 'type' => 'STRING' }], # only 1 of 3 — SHIP_DATE/AMOUNT would have zipped to type:nil
+      'rows' => [] }
+  }) do
+    short_meta_result = nil
+    out = capture_stderr { short_meta_result = resolve_dataset_schema('ds-short-metadata') }
+    eq(short_meta_result, nil, 'a metadata array shorter than columns is refused entirely, not partially zipped with nil types')
+    ok(out.include?('ds-short-metadata'), 'the warning names the specific dataset id, not a generic message')
+    ok(out.include?('3') && out.include?('1'), 'the warning states both counts (3 column names, 1 metadata entry)')
+  end
+end
+
+puts "== Blocker 4: resolve_dataset_schema — metadata KEY ABSENT entirely (not just short) -> nil + warning =="
+with_domo_stub(:dataset, ->(_id) { {} }) do
+  with_domo_stub(:query_dataset, ->(*_a) { { 'columns' => %w[ORDER_ID SHIP_DATE], 'rows' => [] } }) do
+    absent_meta_result = :unset
+    out = capture_stderr { absent_meta_result = resolve_dataset_schema('ds-no-metadata-key') }
+    eq(absent_meta_result, nil, 'no metadata key at all is refused the same way as a too-short one')
+    ok(out.include?('ds-no-metadata-key'), 'the warning names the dataset id')
+  end
+end
+
+puts "== Blocker 4: resolve_dataset_schema — metadata covers every column (equal length) still resolves normally =="
+with_domo_stub(:dataset, ->(_id) { {} }) do
+  with_domo_stub(:query_dataset, ->(*_a) {
+    { 'columns' => %w[ORDER_ID SHIP_DATE],
+      'metadata' => [{ 'type' => 'STRING' }, { 'type' => 'DATE' }],
+      'rows' => [] }
+  }) do
+    sch = resolve_dataset_schema('ds-full-metadata')
+    eq(sch, { 'columns' => [{ 'name' => 'ORDER_ID', 'type' => 'STRING' }, { 'name' => 'SHIP_DATE', 'type' => 'DATE' }] },
+       'metadata that covers every column name still resolves exactly as before (no false-positive refusal)')
+  end
+end
+
+puts "== Blocker 4: resolve_dataset_schema — metadata LONGER than columns (extra trailing entries) still resolves =="
+with_domo_stub(:dataset, ->(_id) { {} }) do
+  with_domo_stub(:query_dataset, ->(*_a) {
+    { 'columns' => %w[ORDER_ID],
+      'metadata' => [{ 'type' => 'STRING' }, { 'type' => 'DATE' }],
+      'rows' => [] }
+  }) do
+    sch = resolve_dataset_schema('ds-extra-metadata')
+    eq(sch, { 'columns' => [{ 'name' => 'ORDER_ID', 'type' => 'STRING' }] },
+       'metadata longer than columns is not a rejection case — every column name still has a real type')
+  end
+end
+
+puts "== B1: ensure_dataset_records — synthesizes a minimal record for a used id absent from the list entirely =="
+existing_5 = [
+  { 'id' => '021e123b', 'name' => 'Orders Fact' },
+  { 'id' => '1252fb63', 'name' => 'PDP Example DataSet' },
+]
+used_10 = %w[021e123b 1252fb63 f64df8eb a30c23f7 1eb93e0f]
+added, out = ensure_dataset_records(existing_5, used_10)
+eq(added.sort, %w[a30c23f7 f64df8eb 1eb93e0f].sort, 'only the used ids NOT already present are reported as added')
+eq(out.size, 5, 'existing 2 + 3 synthesized = 5 total records')
+eq(out.map { |d| d['id'] }.sort, (existing_5.map { |d| d['id'] } + added).sort, 'every used id now has SOME record')
+eq(out.find { |d| d['id'] == '021e123b' }, { 'id' => '021e123b', 'name' => 'Orders Fact' }, 'a pre-existing record is left untouched, not flattened to {id}')
+eq(out.find { |d| d['id'] == 'f64df8eb' }, { 'id' => 'f64df8eb' }, 'a synthesized record is minimal ({id} only) so the schema merge still has somewhere to land it')
+
+puts "== B1: ensure_dataset_records — datasets.json entirely absent (nil) -> synthesizes ALL used ids =="
+added2, out2 = ensure_dataset_records(nil, %w[ds-a ds-b])
+eq(added2.sort, %w[ds-a ds-b], 'both used ids reported as added when there was nothing to start from')
+eq(out2, [{ 'id' => 'ds-a' }, { 'id' => 'ds-b' }], 'synthesized records are the entire result')
+
+puts "== B1: ensure_dataset_records — nothing used, nothing added (no-op) =="
+added3, out3 = ensure_dataset_records(existing_5, [])
+eq(added3, [], 'no used ids means nothing gets synthesized')
+eq(out3, existing_5, 'existing records pass through unchanged')
+
+puts "== B1 end-to-end: a used id missing from the public LIST still ends up in datasets.json WITH a usable schema =="
+# Mirrors the real cold-run shape: datasets.json (from --datasets) has only
+# 5 records; cards reference 10 ids; 9 of them (including this one) are
+# absent from that list AND have no schema on Domo.dataset().
+ensure_added, ensured = ensure_dataset_records(existing_5, ['f64df8eb'])
+sch = { 'columns' => [{ 'name' => 'Region', 'type' => 'STRING' }] }
+merged_count, merged = merge_dataset_schemas(ensured, { 'f64df8eb' => sch })
+eq(ensure_added, ['f64df8eb'], 'the missing id was flagged as synthesized')
+eq(merged_count, 1, 'exactly one record received the schema merge')
+final_record = merged.find { |d| d['id'] == 'f64df8eb' }
+ok(final_record['schema']['columns'].is_a?(Array) && !final_record['schema']['columns'].empty?,
+   'the dataset that was absent from the public LIST entirely now has usable schema.columns in datasets.json — ' \
+   'the exact gap that used to make build-dm.rb raise ArgumentError')
+
+# ===========================================================================
+# B3 (AUDIT-SYNTHESIS.md): a filter on a Beast Mode keeps the raw
+# "calculation_<uuid>" id instead of resolving to the Beast Mode's real name
+# -> a control binds to a column that doesn't exist. Real example in the
+# data: calculation_ea1150fd-... resolves to "State".
+# ===========================================================================
+puts "== B3: resolve_calc_ref — resolves a calc id to the Beast Mode's real name =="
+calc_by_id = { 'calculation_ea1150fd' => { 'id' => 'calculation_ea1150fd', 'name' => 'State' } }
+eq(resolve_calc_ref('calculation_ea1150fd', calc_by_id), 'State', 'the real live example: calculation_ea1150fd-... -> "State"')
+eq(resolve_calc_ref('Country', calc_by_id), 'Country', 'a plain (non-calc) column is passed through unchanged')
+eq(resolve_calc_ref('calculation_does_not_exist', calc_by_id), 'calculation_does_not_exist',
+   'an unresolvable calc id is returned UNCHANGED, never invents a name it can\'t back up')
+eq(resolve_calc_ref(nil, calc_by_id), nil, 'a nil column value is passed through unchanged (no crash on nil.to_s)')
+
+puts "== B3: normalize_card Shape B — a filter on a Beast Mode resolves to its real name, not the raw calc id =="
+shape_b_filter = {
+  'chartType' => 'badge_map', 'dataSetId' => 'ds-3',
+  'definition' => {
+    'title' => 'US Map',
+    'subscriptions' => { 'main' => {
+      'columns' => [{ 'column' => 'metric' }],
+      'filters' => [{ 'column' => 'calculation_ea1150fd', 'filterType' => 'LEGACY', 'values' => [''] }],
+    } },
+    'formulas' => [{ 'id' => 'calculation_ea1150fd', 'name' => 'State', 'formula' => "CONCAT(`a`,`b`)" }],
+  },
+}
+card_b_filter = normalize_card(shape_b_filter, 'card-B-filter')
+eq(card_b_filter['filters'], [{ 'column' => 'State', 'operator' => 'LEGACY', 'values' => [''] }],
+   'Shape B filter column resolved to the Beast Mode\'s real name "State" (was the raw calc id before B3)')
+
+puts "== B3: normalize_card Shape A — a filter on a Beast Mode resolves to its real name, not the raw calc id =="
+shape_a_filter = {
+  'title' => 'Regional Map', 'chartType' => 'badge_map', 'dataSetId' => 'ds-4',
+  'chartBody' => {
+    'columns' => [{ 'column' => 'metric' }],
+    'filters' => [{ 'column' => 'calculation_443eb18b', 'operand' => 'LEGACY', 'values' => ['Midwest'] }],
+  },
+  'calculatedFields' => [{ 'id' => 'calculation_443eb18b', 'name' => 'US Regions', 'formula' => "CASE WHEN 1 THEN 'x' END" }],
+}
+card_a_filter = normalize_card(shape_a_filter, 'card-A-filter')
+eq(card_a_filter['filters'], [{ 'column' => 'US Regions', 'operator' => 'LEGACY', 'values' => ['Midwest'] }],
+   'Shape A filter column resolved to the Beast Mode\'s real name "US Regions" (was the raw calc id before B3)')
+
+puts "== B3: normalize_card — a filter on a Beast Mode with NO matching formula degrades to the raw id, never crashes =="
+shape_b_unresolved_filter = {
+  'chartType' => 'badge_table',
+  'definition' => {
+    'title' => 'Mystery',
+    'subscriptions' => { 'main' => {
+      'columns' => [{ 'column' => 'x' }],
+      'filters' => [{ 'column' => 'calculation_ghost', 'filterType' => 'IN', 'values' => %w[a] }],
+    } },
+    'formulas' => [],
+  },
+}
+card_b_unresolved = normalize_card(shape_b_unresolved_filter, 'card-B-unresolved')
+eq(card_b_unresolved['filters'], [{ 'column' => 'calculation_ghost', 'operator' => 'IN', 'values' => %w[a] }],
+   'no matching formula -> raw calc id passed through unchanged, not a crash or a nil column')
+
+puts "== B3: norm_columns — a column whose value IS the calc id directly (not via empty+formulaId) also resolves =="
+resolved_cols = norm_columns(
+  { 'columns' => [{ 'column' => 'calculation_ea1150fd' }] },
+  formulas: [{ 'id' => 'calculation_ea1150fd', 'name' => 'State' }]
+)
+eq(resolved_cols.first['column'], 'State', 'the same calc-id-as-column-value shape used by filters now resolves for chart-body columns too')
+
+# ===========================================================================
+# F6 (AUDIT-SYNTHESIS.md): beast-modes.json double-counts — a calc present at
+# BOTH dataset and card scope for the same card survives twice under the old
+# [id, scope] dedupe key (148 rows / 81 unique ids on a real 36-card page).
+# ===========================================================================
+puts "== F6: dedupe_beast_modes — a calc present at both dataset AND card scope collapses to ONE row =="
+dupe_calc = 'calculation_443eb18b'
+beast_modes_with_dupe = [
+  { 'id' => dupe_calc, 'name' => 'US Regions', 'sql' => 'x', 'scope' => 'dataset', 'class' => 'projection', 'dataSourceId' => 'ds-1', 'cardId' => 'c-1' },
+  { 'id' => dupe_calc, 'name' => 'US Regions', 'sql' => 'x', 'scope' => 'card',    'class' => 'projection', 'cardId' => 'c-1' },
+  { 'id' => 'calculation_other', 'name' => 'Other', 'sql' => 'y', 'scope' => 'dataset', 'class' => 'aggregate', 'cardId' => 'c-2' },
+]
+deduped = dedupe_beast_modes(beast_modes_with_dupe)
+eq(deduped.size, 2, 'the [id, scope]-dupe collapses to one row; the distinct id is untouched (3 rows -> 2)')
+eq(deduped.map { |b| b['id'] }.sort, %w[calculation_443eb18b calculation_other], 'both surviving rows are one-per-unique-id')
+kept = deduped.find { |b| b['id'] == dupe_calc }
+eq(kept['scope'], 'dataset', 'the FIRST occurrence (dataset scope, the richer record with dataSourceId) is the one kept')
+eq(kept['dataSourceId'], 'ds-1', 'the kept row still carries dataSourceId — nothing was lost by keeping the first, not an arbitrary, occurrence')
+
+puts "== F6: dedupe_beast_modes — measured regression check: 148 rows collapse to 81 unique ids (real cold-run shape) =="
+# Reproduce the MEASURED real-instance shape: 67 ids duplicated across dataset
+# + card scope (67*2=134 rows) plus 14 ids appearing only once = 148 rows / 81
+# unique ids total (67 + 14 = 81) — the exact numbers from AUDIT-SYNTHESIS.md.
+synthetic_148 = []
+67.times { |i| 2.times { |j| synthetic_148 << { 'id' => "calculation_dupe_#{i}", 'scope' => j.zero? ? 'dataset' : 'card' } } }
+14.times { |i| synthetic_148 << { 'id' => "calculation_single_#{i}", 'scope' => 'dataset' } }
+eq(synthetic_148.size, 148, 'synthetic fixture reproduces the measured 148-row shape')
+eq(dedupe_beast_modes(synthetic_148).size, 81, 'dedupe_beast_modes collapses it to the measured 81 unique ids')
+
+puts "== F6: dedupe_beast_modes — no dupes at all is a no-op =="
+no_dupes = [{ 'id' => 'a' }, { 'id' => 'b' }, { 'id' => 'c' }]
+eq(dedupe_beast_modes(no_dupes), no_dupes, 'nothing to collapse -> array passes through unchanged')
 
 puts
 if $failures.zero?

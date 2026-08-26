@@ -405,9 +405,10 @@ esac
 
 # --- machine-readable fingerprint (doctor.json) ----------------------------
 # Written so (a) the run-state / preflight GATE can refuse to proceed on a
-# broken environment instead of letting the agent improvise, and (b) telemetry
-# can group next event's failures by environment class. Human output above is
-# unchanged. Always to ~/.sigma-migration/doctor.json; also to <WORKDIR> if given.
+# broken environment instead of letting the agent improvise, and (b) a run's
+# failures can be grouped by environment class (os/shell/runtimes present).
+# Human output above is unchanged. Always to ~/.sigma-migration/doctor.json;
+# also to <WORKDIR> if given.
 jstr() { local s="${1:-}"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; printf '%s' "$s"; }
 
 RUBY_OK=false; RUBY_V=""
