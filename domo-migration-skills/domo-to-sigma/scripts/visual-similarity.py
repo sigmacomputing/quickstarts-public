@@ -17,7 +17,8 @@ Contract (consumed by the Phase 6 gate):
         --source <src.png> --render <render.png> --json-out <out.json> \
         [--tiles <tiles.json>]
 
-Writes JSON: {"score_layout": float, "score_ink": float,
+Writes JSON: {"source_health": object, "render_health": object,
+              "score_layout": float, "score_ink": float,
               "score_overall": float, "pass": bool, "threshold": float,
               "notes": [str, ...]}
 With --tiles, three keys are ADDED (absent otherwise — the no-tiles output
@@ -100,6 +101,13 @@ import argparse
 import json
 import os
 import sys
+
+# Keep the sibling import reliable when this script is loaded via
+# importlib.util.spec_from_file_location by another tool.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+import png_health
 
 REMEDIATION = (
     "visual-similarity.py requires Pillow and numpy. "
@@ -342,9 +350,22 @@ def _blank_tile_names(per_tile):
 def compare(source_path, render_path, tiles=None):
     """Compute the similarity-floor verdict for one source/render pair.
 
-    tiles: optional output of parse_tiles(); None preserves the exact
-    pre-tiles verdict (keys, values, notes — byte-identical JSON).
+    tiles: optional output of parse_tiles(); None omits only the tile-specific
+    verdict keys. Source/render health objects are always included.
     """
+    source_health = png_health.analyze_image(source_path)
+    render_health = png_health.analyze_image(render_path)
+    health_errors = [
+        "%s: %s" % (label, "; ".join(health["reasons"]))
+        for label, health in (
+            ("source", source_health),
+            ("render", render_health),
+        )
+        if health["status"] == "ERROR"
+    ]
+    if health_errors:
+        raise ValueError("image health check failed (%s)" % "; ".join(health_errors))
+
     gray_s, aspect_s = _load_gray(source_path)
     gray_r, aspect_r = _load_gray(render_path)
     ink_s, edge_s = _ink_maps(gray_s)
@@ -432,6 +453,17 @@ def compare(source_path, render_path, tiles=None):
             % (score_overall, THRESHOLD)
         )
 
+    for label, health in (
+        ("source", source_health),
+        ("render", render_health),
+    ):
+        if health["status"] != "PASS":
+            passed = False
+            notes.append(
+                "%s image health %s: %s"
+                % (label, health["status"], "; ".join(health["reasons"]))
+            )
+
     result = {
         "score_layout": score_layout,
         "score_ink": score_ink,
@@ -439,6 +471,8 @@ def compare(source_path, render_path, tiles=None):
         "pass": passed,
         "threshold": THRESHOLD,
         "notes": notes,
+        "source_health": source_health,
+        "render_health": render_health,
         "components": {
             "coverage": round(cov, 4),
             "band_balance": round(bal, 4),

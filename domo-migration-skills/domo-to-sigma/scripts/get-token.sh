@@ -17,6 +17,23 @@ fi
 : "${SIGMA_CLIENT_ID:?Run scripts/setup.rb to configure credentials}"
 : "${SIGMA_CLIENT_SECRET:?Run scripts/setup.rb to configure credentials}"
 
+# Security (A2): only transmit Sigma credentials to an https:// sigmacomputing.com
+# host. A poisoned SIGMA_BASE_URL would otherwise exfiltrate the client id/secret.
+# Opt out (self-hosted/dev) with SIGMA_ALLOW_INSECURE_BASE_URL=1 (loud warning).
+_sbu_scheme="${SIGMA_BASE_URL%%://*}"
+_sbu_rest="${SIGMA_BASE_URL#*://}"; _sbu_hostport="${_sbu_rest%%/*}"
+_sbu_host="${_sbu_hostport##*@}"; _sbu_host="${_sbu_host%%:*}"
+_sbu_host="$(printf '%s' "$_sbu_host" | tr 'A-Z' 'a-z')"
+if [ "${SIGMA_ALLOW_INSECURE_BASE_URL:-}" = "1" ]; then
+  echo "WARNING: SIGMA_ALLOW_INSECURE_BASE_URL=1 — skipping SIGMA_BASE_URL validation ($SIGMA_BASE_URL)" >&2
+else
+  [ "$_sbu_scheme" = "https" ] || { echo "FATAL: SIGMA_BASE_URL must use https:// (got '$SIGMA_BASE_URL') — refusing to send credentials." >&2; exit 1; }
+  case "$_sbu_host" in
+    sigmacomputing.com|*.sigmacomputing.com) : ;;
+    *) echo "FATAL: SIGMA_BASE_URL host '$_sbu_host' is not a sigmacomputing.com host — refusing to send credentials. Set SIGMA_ALLOW_INSECURE_BASE_URL=1 to override (self-hosted/dev)." >&2; exit 1 ;;
+  esac
+fi
+
 # Pre-flight credential sanity (POSTMORTEM 2026-06-18): the #1 hard blocker was a
 # settings.json where SIGMA_CLIENT_SECRET had been pasted with a COPY of
 # SIGMA_CLIENT_ID. Sigma then returns the opaque "client secret provided is
@@ -57,4 +74,13 @@ if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
   exit 1
 fi
 
-echo "export SIGMA_API_TOKEN=${TOKEN}"
+# Security: the emitted line is consumed via `eval "$(scripts/get-token.sh)"`, so a
+# token from a poisoned/MITM'd endpoint could otherwise inject shell. Reject any
+# non-token characters, then emit shell-quoted (%q) so eval can never execute it.
+case "$TOKEN" in
+  *[!A-Za-z0-9._~+/=-]*)
+    echo "FATAL: access_token contains unexpected characters — refusing to emit (possible poisoned SIGMA_BASE_URL)." >&2
+    exit 1 ;;
+esac
+
+printf 'export SIGMA_API_TOKEN=%q\n' "$TOKEN"

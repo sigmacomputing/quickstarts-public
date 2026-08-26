@@ -37,6 +37,7 @@ require 'json'
 require 'fileutils'
 require_relative 'lib/domo_sigma_util'
 require_relative 'lib/domo_rest'   # auto-fill's thin network seam — see fetch_stream_config
+require_relative 'lib/column_preflight' # shared SENTINEL_SOURCES — see the "needs review" warning below
 include DomoSigma   # display_name, rand_id, inode_id — shared with build-workbook.rb
 
 OUT = ENV['DOMO_DISCOVERY_DIR'] || File.expand_path('../discovery', __dir__)
@@ -256,7 +257,7 @@ def build_element(ds, map_entry, projection_bms)
       col = { 'id' => id, 'name' => display_name(raw), 'formula' => ov['formula'].to_s }
       derived << raw
     else
-      col = { 'id' => id, 'formula' => "[#{table}/#{display_name(raw)}]" }
+      col = { 'id' => id, 'formula' => "[#{table}/#{column_ref_name(raw)}]" }
     end
     fmt = ov.is_a?(Hash) && ov['format'] ? ov['format'] : type_format(c['type'])
     col['format'] = fmt if fmt
@@ -376,6 +377,55 @@ if $PROGRAM_NAME == __FILE__
     exit 2
   end
 
+  # Column pre-flight gate (bead m655): refuse to build a DM spec until every
+  # used dataset's Domo columns are confirmed resolvable against the mapped
+  # warehouse table (or already excludeColumns/columnOverrides'd) — see
+  # docs/superpowers/specs/2026-07-31-domo-dm-column-preflight-design.md and
+  # scripts/preflight-columns.rb. Runs here (after dataset-map.json is
+  # confirmed to exist, before elements are built) — NOT before the C3
+  # reuse-shortcut above, which exits before building anything new and has
+  # nothing to pre-flight. Waivable the same way the doctor-gate above is:
+  # name a reason.
+  preflight_path = File.join(OUT, 'column-preflight.json')
+  preflight_skip = ENV['SIGMA_SKIP_COLUMN_PREFLIGHT'].to_s.strip
+  if preflight_skip.empty?
+    unless File.exist?(preflight_path)
+      abort "  build-dm.rb aborted: discovery/column-preflight.json not found — run " \
+            'scripts/preflight-columns.rb first (checks Domo dataset columns against the ' \
+            'real warehouse table before this build). Waive with ' \
+            'SIGMA_SKIP_COLUMN_PREFLIGHT="<reason>" ruby scripts/build-dm.rb'
+    end
+    if File.mtime(preflight_path) < File.mtime(map_path)
+      abort "  build-dm.rb aborted: discovery/column-preflight.json predates discovery/dataset-map.json " \
+            '(the mapping changed since the last pre-flight check) — re-run ' \
+            'scripts/preflight-columns.rb to regenerate it, then re-run this.'
+    end
+    preflight_report = begin
+      JSON.parse(File.read(preflight_path))
+    rescue JSON::ParserError => e
+      abort "  build-dm.rb aborted: discovery/column-preflight.json exists but failed to parse " \
+            "(#{e.message}) — re-run scripts/preflight-columns.rb to regenerate it."
+    end
+    unless preflight_report.is_a?(Hash)
+      abort "  build-dm.rb aborted: discovery/column-preflight.json did not parse to a Hash " \
+            "(got #{preflight_report.class}) — re-run scripts/preflight-columns.rb to regenerate it."
+    end
+    unresolved = preflight_report.select { |_, v| !(v['missing'] || []).empty? || v['error'] }
+    unless unresolved.empty?
+      warn "  build-dm.rb aborted: #{unresolved.size} dataset(s) still have unresolved columns " \
+           '(see discovery/column-preflight.json for names + any auto-suggested columnOverrides):'
+      unresolved.each do |id, v|
+        detail = v['error'] || (v['missing'] || []).join(', ')
+        warn "    #{id} (#{v['table']}): #{detail}"
+      end
+      abort '  Resolve via excludeColumns/columnOverrides in dataset-map.json, then re-run ' \
+            'scripts/preflight-columns.rb.'
+    end
+  else
+    warn "  ⚠ column pre-flight gate WAIVED (SIGMA_SKIP_COLUMN_PREFLIGHT=#{preflight_skip.inspect}) — " \
+         'unresolved columns may still 400 at DM POST time.'
+  end
+
   # Projection Beast Modes grouped by dataset (only these become DM calc columns).
   proj_by_ds = Hash.new { |h, k| h[k] = [] }
   formulas.each do |f|
@@ -418,7 +468,7 @@ if $PROGRAM_NAME == __FILE__
   warn "  wrote #{File.join(OUT, 'dm-spec.json')} (#{elements.size} element(s))"
   missing = ds_map.select { |_, v| v['connectionId'].to_s.empty? }.keys
   warn "  ⚠ #{missing.size} dataset(s) have no connectionId — fill dataset-map.json: #{missing.join(', ')}" unless missing.empty?
-  needs_review = ds_map.select { |_, v| %w[domo-stream-config-query-only domo-landed-data].include?(v['_source']) }.keys
+  needs_review = ds_map.select { |_, v| ColumnPreflight::SENTINEL_SOURCES.include?(v['_source']) }.keys
   unless needs_review.empty?
     warn "  ⚠ #{needs_review.size} dataset(s) need human review before this DM is posted (query-only " \
          'stream or no warehouse source at all — see "_source"/"_note" in dataset-map.json, and the ' \

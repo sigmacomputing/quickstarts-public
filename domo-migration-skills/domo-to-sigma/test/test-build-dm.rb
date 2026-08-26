@@ -3,9 +3,13 @@
 #   ruby test/test-build-dm.rb
 
 require_relative '../scripts/build-dm'
+require 'tmpdir'
+
+SKILL_ROOT = File.expand_path('..', __dir__)
 
 $failures = 0
 def eq(a, b, m) if a == b then puts "  ok: #{m}" else $failures += 1; puts "  FAIL: #{m}\n    exp #{b.inspect}\n    got #{a.inspect}" end end
+def ok(c, m) if c then puts "  ok: #{m}" else $failures += 1; puts "  FAIL: #{m}" end end
 
 puts "== display_name (fixes raw snake_case labels) =="
 eq(display_name('order_date'), 'Order Date', 'snake_case → Title Case')
@@ -14,6 +18,14 @@ eq(display_name('project_id'), 'Project Id', 'project_id → Project Id')
 eq(display_name('FY2024'),     'FY 2024',    'letter/digit boundary')
 eq(display_name('HTMLParser'), 'HTML Parser','acronym boundary')
 eq(display_name(display_name('order_date')), 'Order Date', 'idempotent (case-safe sibling refs)')
+# bead xo56 — a DOT is not a split boundary, so a dotted column stays one token.
+# String#capitalize would lowercase its remainder ('Account.Billing' ->
+# 'Account.billing'), emitting a formula reference Sigma cannot resolve and
+# 400ing the whole data-model POST. Live-found on the 36-card cold run.
+eq(display_name('Account.BillingState'), 'Account Billing State', 'dot is a word separator — no dot survives (xo56)')
+eq(display_name('Account.BillingCountry'), 'Account Billing Country', 'second dotted camelCase column')
+eq(display_name('Account.Name'), 'Account Name', 'dotted single-word column loses its dot too')
+eq(display_name('IsWon'), 'Is Won', 'plain camelCase still splits (Sigma does too)')
 
 puts "== build_element =="
 ds = { 'id' => 'ds-1', 'name' => 'Orders',
@@ -118,6 +130,135 @@ el_query  = build_element(ds, entry_query,  [])
 el_landed = build_element(ds, entry_landed, [])
 eq(el_query['source']['path'].last,  '<TABLE:QUERY_ONLY_NEEDS_HUMAN>',        'query-only entry -> unmistakable sentinel, not a guessed table')
 eq(el_landed['source']['path'].last, '<TABLE:LANDED_DATA_NO_WAREHOUSE_SOURCE>', 'landed-data entry -> unmistakable sentinel, not the DataSet display name')
+
+puts '== column-preflight gate: build-dm.rb aborts when discovery/column-preflight.json is missing =='
+Dir.mktmpdir('build-dm-gate') do |dir|
+  File.write(File.join(dir, 'datasets.json'), JSON.generate([
+    { 'id' => 'ds-1', 'name' => 'Orders', 'schema' => { 'columns' => [{ 'name' => 'ORDER_ID', 'type' => 'LONG' }] } },
+  ]))
+  File.write(File.join(dir, 'cards.json'), JSON.generate([{ 'datasetId' => 'ds-1' }]))
+  File.write(File.join(dir, 'dataset-map.json'), JSON.generate(
+    'ds-1' => { 'connectionId' => 'conn-1', 'database' => 'DB', 'schema' => 'SCH', 'table' => 'ORDER_FACT' }
+  ))
+  env = { 'DOMO_DISCOVERY_DIR' => dir, 'SIGMA_FOLDER_ID' => 'folder-1',
+          'SIGMA_SKIP_DOCTOR_GATE' => 'unit test: environment not under test' }
+  out = IO.popen(env, ['ruby', File.join(SKILL_ROOT, 'scripts', 'build-dm.rb')], err: [:child, :out], &:read)
+  ok(!$?.success?, 'build-dm.rb fails when column-preflight.json is absent')
+  ok(out.include?('preflight-columns.rb'), "the failure names the script to run first, got:\n#{out}")
+end
+
+puts '== column-preflight gate: a corrupted (unparsable) column-preflight.json is a LOUD failure, never a silent pass =='
+Dir.mktmpdir('build-dm-gate') do |dir|
+  File.write(File.join(dir, 'datasets.json'), JSON.generate([
+    { 'id' => 'ds-1', 'name' => 'Orders', 'schema' => { 'columns' => [{ 'name' => 'ORDER_ID', 'type' => 'LONG' }] } },
+  ]))
+  File.write(File.join(dir, 'cards.json'), JSON.generate([{ 'datasetId' => 'ds-1' }]))
+  File.write(File.join(dir, 'dataset-map.json'), JSON.generate(
+    'ds-1' => { 'connectionId' => 'conn-1', 'database' => 'DB', 'schema' => 'SCH', 'table' => 'ORDER_FACT' }
+  ))
+  File.write(File.join(dir, 'column-preflight.json'), '{not valid json')
+  env = { 'DOMO_DISCOVERY_DIR' => dir, 'SIGMA_FOLDER_ID' => 'folder-1',
+          'SIGMA_SKIP_DOCTOR_GATE' => 'unit test: environment not under test' }
+  out = IO.popen(env, ['ruby', File.join(SKILL_ROOT, 'scripts', 'build-dm.rb')], err: [:child, :out], &:read)
+  ok(!$?.success?, 'build-dm.rb fails when column-preflight.json fails to parse (never a silent pass)')
+  ok(out.include?('column-preflight.json'), "the failure names column-preflight.json, got:\n#{out}")
+  ok(out.include?('preflight-columns.rb'), "the failure names the script to re-run, got:\n#{out}")
+end
+
+puts '== column-preflight gate: build-dm.rb aborts when the report shows unresolved columns =='
+Dir.mktmpdir('build-dm-gate') do |dir|
+  File.write(File.join(dir, 'datasets.json'), JSON.generate([
+    { 'id' => 'ds-1', 'name' => 'Orders', 'schema' => { 'columns' => [{ 'name' => 'ORDER_ID', 'type' => 'LONG' }] } },
+  ]))
+  File.write(File.join(dir, 'cards.json'), JSON.generate([{ 'datasetId' => 'ds-1' }]))
+  File.write(File.join(dir, 'dataset-map.json'), JSON.generate(
+    'ds-1' => { 'connectionId' => 'conn-1', 'database' => 'DB', 'schema' => 'SCH', 'table' => 'ORDER_FACT' }
+  ))
+  File.write(File.join(dir, 'column-preflight.json'), JSON.generate(
+    'ds-1' => { 'table' => 'ORDER_FACT', 'missing' => ['ORDER_ID'], 'resolved_by_exclude' => [],
+                'resolved_by_override' => [], 'suggested_overrides' => {} }
+  ))
+  env = { 'DOMO_DISCOVERY_DIR' => dir, 'SIGMA_FOLDER_ID' => 'folder-1',
+          'SIGMA_SKIP_DOCTOR_GATE' => 'unit test: environment not under test' }
+  out = IO.popen(env, ['ruby', File.join(SKILL_ROOT, 'scripts', 'build-dm.rb')], err: [:child, :out], &:read)
+  ok(!$?.success?, 'build-dm.rb fails when column-preflight.json reports a missing column')
+  ok(out.include?('ORDER_ID'), "the failure names the specific unresolved column, got:\n#{out}")
+end
+
+puts '== column-preflight gate: a clean report lets build-dm.rb proceed =='
+Dir.mktmpdir('build-dm-gate') do |dir|
+  File.write(File.join(dir, 'datasets.json'), JSON.generate([
+    { 'id' => 'ds-1', 'name' => 'Orders', 'schema' => { 'columns' => [{ 'name' => 'ORDER_ID', 'type' => 'LONG' }] } },
+  ]))
+  File.write(File.join(dir, 'cards.json'), JSON.generate([{ 'datasetId' => 'ds-1' }]))
+  File.write(File.join(dir, 'dataset-map.json'), JSON.generate(
+    'ds-1' => { 'connectionId' => 'conn-1', 'database' => 'DB', 'schema' => 'SCH', 'table' => 'ORDER_FACT' }
+  ))
+  File.write(File.join(dir, 'column-preflight.json'), JSON.generate(
+    'ds-1' => { 'table' => 'ORDER_FACT', 'missing' => [], 'resolved_by_exclude' => [],
+                'resolved_by_override' => [], 'suggested_overrides' => {} }
+  ))
+  env = { 'DOMO_DISCOVERY_DIR' => dir, 'SIGMA_FOLDER_ID' => 'folder-1',
+          'SIGMA_SKIP_DOCTOR_GATE' => 'unit test: environment not under test' }
+  out = IO.popen(env, ['ruby', File.join(SKILL_ROOT, 'scripts', 'build-dm.rb')], err: [:child, :out], &:read)
+  ok($?.success?, "build-dm.rb succeeds when column-preflight.json is clean, got:\n#{out unless $?.success?}")
+  ok(File.exist?(File.join(dir, 'dm-spec.json')), 'dm-spec.json was written')
+end
+
+puts '== column-preflight gate: SIGMA_SKIP_COLUMN_PREFLIGHT waives it, same as the doctor-gate convention =='
+Dir.mktmpdir('build-dm-gate') do |dir|
+  File.write(File.join(dir, 'datasets.json'), JSON.generate([
+    { 'id' => 'ds-1', 'name' => 'Orders', 'schema' => { 'columns' => [{ 'name' => 'ORDER_ID', 'type' => 'LONG' }] } },
+  ]))
+  File.write(File.join(dir, 'cards.json'), JSON.generate([{ 'datasetId' => 'ds-1' }]))
+  File.write(File.join(dir, 'dataset-map.json'), JSON.generate(
+    'ds-1' => { 'connectionId' => 'conn-1', 'database' => 'DB', 'schema' => 'SCH', 'table' => 'ORDER_FACT' }
+  ))
+  # deliberately no column-preflight.json at all
+  env = { 'DOMO_DISCOVERY_DIR' => dir, 'SIGMA_FOLDER_ID' => 'folder-1',
+          'SIGMA_SKIP_COLUMN_PREFLIGHT' => 'unit test waiver',
+          'SIGMA_SKIP_DOCTOR_GATE' => 'unit test: environment not under test' }
+  out = IO.popen(env, ['ruby', File.join(SKILL_ROOT, 'scripts', 'build-dm.rb')], err: [:child, :out], &:read)
+  ok($?.success?, "build-dm.rb succeeds when the gate is waived, got:\n#{out unless $?.success?}")
+  ok(out.include?('WAIVED'), "the waiver is loudly logged, not silent, got:\n#{out}")
+end
+
+puts '== column-preflight gate: the C3 reuse-shortcut path is NEVER gated (nothing new is being built) =='
+Dir.mktmpdir('build-dm-gate') do |dir|
+  # No datasets.json/cards.json/dataset-map.json/column-preflight.json at all —
+  # a confirmed auto-pick must short-circuit before any of that is read.
+  File.write(File.join(dir, 'dm-match.json'), JSON.generate(
+    'recommended_dm_id' => 'dm-existing-123', 'auto_picked' => true
+  ))
+  env = { 'DOMO_DISCOVERY_DIR' => dir, 'SIGMA_SKIP_DOCTOR_GATE' => 'unit test: environment not under test' }
+  out = IO.popen(env, ['ruby', File.join(SKILL_ROOT, 'scripts', 'build-dm.rb')], err: [:child, :out], &:read)
+  ok($?.success?, "build-dm.rb succeeds via the reuse shortcut with NO column-preflight.json present, got:\n#{out unless $?.success?}")
+  ok(File.exist?(File.join(dir, 'dm-reuse.json')), 'dm-reuse.json was written (the reuse path actually ran)')
+  ok(!out.include?('column-preflight'), "the reuse shortcut never even mentions the pre-flight gate, got:\n#{out}")
+end
+
+puts '== column-preflight gate: a report older than dataset-map.json is stale — aborts, never silently trusted =='
+Dir.mktmpdir('build-dm-gate') do |dir|
+  File.write(File.join(dir, 'datasets.json'), JSON.generate([
+    { 'id' => 'ds-1', 'name' => 'Orders', 'schema' => { 'columns' => [{ 'name' => 'ORDER_ID', 'type' => 'LONG' }] } },
+  ]))
+  File.write(File.join(dir, 'cards.json'), JSON.generate([{ 'datasetId' => 'ds-1' }]))
+  preflight_path = File.join(dir, 'column-preflight.json')
+  File.write(preflight_path, JSON.generate(
+    'ds-1' => { 'table' => 'ORDER_FACT', 'missing' => [], 'resolved_by_exclude' => [],
+                'resolved_by_override' => [], 'suggested_overrides' => {} }
+  ))
+  old = Time.now - 3600
+  File.utime(old, old, preflight_path) # explicitly backdate the "clean" report
+  File.write(File.join(dir, 'dataset-map.json'), JSON.generate(
+    'ds-1' => { 'connectionId' => 'conn-1', 'database' => 'DB', 'schema' => 'SCH', 'table' => 'ORDER_FACT' }
+  ))
+  env = { 'DOMO_DISCOVERY_DIR' => dir, 'SIGMA_FOLDER_ID' => 'folder-1', 'SIGMA_SKIP_DOCTOR_GATE' => 'unit test' }
+  out = IO.popen(env, ['ruby', File.join(SKILL_ROOT, 'scripts', 'build-dm.rb')], err: [:child, :out], &:read)
+  ok(!$?.success?, "build-dm.rb fails when column-preflight.json predates dataset-map.json, got:\n#{out unless $?.success?}")
+  ok(out.include?('predates') && out.include?('preflight-columns.rb'),
+     "the failure explains the report is stale and names the fix, got:\n#{out}")
+end
 
 puts
 if $failures.zero? then puts "ALL PASS"; exit 0 else puts "#{$failures} FAILURE(S)"; exit 1 end

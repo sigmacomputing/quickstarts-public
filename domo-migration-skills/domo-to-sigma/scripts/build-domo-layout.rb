@@ -144,6 +144,7 @@ OUT = ENV['DOMO_DISCOVERY_DIR'] || File.expand_path('../discovery', __dir__)
 def kind_hint(chart_type)
   t = chart_type.to_s.downcase
   return 'filter'       if t.include?('filter')
+  return 'progress'     if t.include?('gauge')
   return 'kpi'          if t.include?('singlevalue') || t.include?('summary') || t == 'badge'
   return 'table'        if t.include?('datagrid') || t.include?('table')
   return 'bar-chart'    if t.include?('bar')
@@ -151,6 +152,24 @@ def kind_hint(chart_type)
   return 'donut-chart'  if t.include?('pie') || t.include?('donut')
   return 'scatter-chart' if t.include?('scatter') || t.include?('bubble')
   'bar-chart'
+end
+
+# Zone caption for a card. KPI-kind cards must match the name build_kpi
+# (build-workbook.rb) will actually give the built Sigma element -- it prefers
+# the card's Summary Number label over the card's own title (Domo lets an
+# author label a tile differently from the card's title; the label is what
+# actually renders ON the KPI). Every zone-building path in this file used the
+# card's title unconditionally, so a KPI whose summaryNumber.label differs
+# from its title (e.g. a card titled "Units Ordered" labeled "Units" on the
+# tile itself) got a zone build-dashboard-layout.rb's name-based matcher could
+# never find, silently dropping it into the generic bottom-band fallback
+# (bead wmkf).
+def zone_caption_for(card, chart_kind)
+  if chart_kind == 'kpi'
+    label = card['summaryNumber'] && card['summaryNumber']['label']
+    return label unless label.to_s.strip.empty?
+  end
+  card['title']
 end
 
 # Build one dashboard's zone tree from its own geometry-bearing cards (already
@@ -166,7 +185,7 @@ def build_dashboard(name, cards)
   max_x = 1.0 if max_x.zero?
   max_y = 1.0 if max_y.zero?
   zones = cards.map do |c|
-    kh = kind_hint(c['chartType'])
+    kh = c['sigmaKindHint'].to_s.empty? ? kind_hint(c['chartType']) : c['sigmaKindHint']
     is_filter = kh == 'filter'
     {
       'id'        => c['id'],
@@ -175,7 +194,7 @@ def build_dashboard(name, cards)
       'w_pct'     => (c['w'].to_f * 100.0 / max_x).round(2),
       'h_pct'     => (c['h'].to_f * 100.0 / max_y).round(2),
       'kind'      => is_filter ? 'filter' : 'chart',
-      'caption'   => c['title'],
+      'caption'   => zone_caption_for(c, kh),
       'chart_kind'=> is_filter ? nil : kh,
       # non-empty so ZoneCensus.plots? counts a data card as a real tile
       'measures'  => is_filter ? [] : ['value'],
@@ -237,6 +256,12 @@ end
 def build_dashboard_with_observed(name, cards, observed, kind_map)
   observed_cards, unobserved_cards = cards.partition { |c| observed.key?(c['id'].to_s) }
   return nil if observed_cards.empty?
+  attached_companions, unobserved_cards = unobserved_cards.partition do |c|
+    c['_primary_card_id'] && observed.key?(c['_primary_card_id'].to_s)
+  end
+  companions_by_primary = attached_companions.each_with_object({}) do |c, out|
+    out[c['_primary_card_id'].to_s] = c
+  end
 
   unless unobserved_cards.empty?
     warn "  ⚠ discovery/layout-observed.json covers #{observed_cards.length} of #{cards.length} " \
@@ -248,27 +273,41 @@ def build_dashboard_with_observed(name, cards, observed, kind_map)
     o = observed[c['id'].to_s]
     kh = zone_chart_kind_for(c, kind_map)
     is_filter = kh == 'filter'
+    companion = companions_by_primary[c['id'].to_s]
+    companion_share = companion ? 0.24 : 0.0
     {
       'id'         => c['id'],
       'x_pct'      => (o['x'].to_f * 100.0).round(2),
-      'y_pct'      => (o['y'].to_f * 100.0).round(2),
+      'y_pct'      => ((o['y'].to_f + o['h'].to_f * companion_share) * 100.0).round(2),
       'w_pct'      => (o['w'].to_f * 100.0).round(2),
-      'h_pct'      => (o['h'].to_f * 100.0).round(2),
+      'h_pct'      => (o['h'].to_f * (1.0 - companion_share) * 100.0).round(2),
       'kind'       => is_filter ? 'filter' : 'chart',
-      'caption'    => c['title'],
+      'caption'    => zone_caption_for(c, kh),
       'chart_kind' => is_filter ? nil : kh,
       'measures'   => is_filter ? [] : ['value'],
       'children'   => [],
       '_source'    => 'observed-from-screenshot',
     }.compact
   end
+  companion_zones = attached_companions.map do |c|
+    o = observed[c['_primary_card_id'].to_s]
+    {
+      'id' => c['id'], 'kind' => 'chart', 'caption' => c['title'],
+      'chart_kind' => 'kpi', 'measures' => ['value'], 'children' => [],
+      'x_pct' => (o['x'].to_f * 100.0).round(2),
+      'y_pct' => (o['y'].to_f * 100.0).round(2),
+      'w_pct' => (o['w'].to_f * 100.0).round(2),
+      'h_pct' => (o['h'].to_f * 0.24 * 100.0).round(2),
+      '_source' => 'observed-from-screenshot-summary',
+    }
+  end
 
   # Optional 'section' grouping (schema note above): one thin heading zone per
   # named group, at that group's own topmost observed y — no reflow.
-  sections_seen = []
-  observed_cards.each do |c|
-    s = observed[c['id'].to_s]['section']
-    sections_seen << s if s && !sections_seen.include?(s)
+  sections_seen = observed_cards.map { |c| observed[c['id'].to_s]['section'] }.compact.uniq
+                                .sort_by do |sec|
+    observed_cards.select { |c| observed[c['id'].to_s]['section'] == sec }
+                  .map { |c| observed[c['id'].to_s]['y'].to_f }.min
   end
   hdr_zones = sections_seen.each_with_index.map do |sec, i|
     members_y = observed_cards.select { |c| observed[c['id'].to_s]['section'] == sec }
@@ -280,7 +319,7 @@ def build_dashboard_with_observed(name, cards, observed, kind_map)
     }
   end
 
-  zones = obs_zones + hdr_zones
+  zones = obs_zones + companion_zones + hdr_zones
   observed_max_y_pct = obs_zones.map { |z| z['y_pct'] + z['h_pct'] }.max
 
   unless unobserved_cards.empty?
@@ -597,7 +636,7 @@ end
 # convention for a card-derived element (confirmed against a live chart-specs
 # capture: card id 390868622 -> element id "el-390868622").
 def element_kind_for(card, kind_map)
-  resolved = kind_map["el-#{card['id']}"].to_s
+  resolved = (kind_map[card['id'].to_s] || kind_map["el-#{card['id']}"]).to_s
   return resolved unless resolved.empty?
   hint = card['sigmaKindHint'].to_s
   return hint unless hint.empty?
@@ -811,7 +850,7 @@ def build_dashboard_from_collections(name, cards, kind_map = {})
       row_h = rg['height'] || row.map { |c, _x, _w, _ck, _f| card_height_units(c) }.max
       row.each do |c, x, w, chart_kind, is_filter|
         raw << {
-          'kind' => is_filter ? 'filter' : 'chart', 'id' => c['id'], 'caption' => c['title'],
+          'kind' => is_filter ? 'filter' : 'chart', 'id' => c['id'], 'caption' => zone_caption_for(c, chart_kind),
           'chart_kind' => is_filter ? nil : chart_kind, 'x' => x, 'y' => y, 'w' => w, 'h' => row_h,
           'measures' => is_filter ? [] : ['value'],
         }
@@ -868,7 +907,7 @@ def build_stack_fallback(name, cards)
       'w_pct'      => 100.0,
       'h_pct'      => (100.0 / n).round(2),
       'kind'       => is_filter ? 'filter' : 'chart',
-      'caption'    => c['title'],
+      'caption'    => zone_caption_for(c, kh),
       'chart_kind' => is_filter ? nil : kh,
       'measures'   => is_filter ? [] : ['value'],
       'children'   => [],
@@ -950,6 +989,39 @@ def build_dashboard_for_page(name, cards, kind_map = {}, observed = {})
   build_stack_fallback(name, cards) # rung 3: last resort, warns loudly
 end
 
+# F3 (blocker 3, 2026-08-05 batch-verify): this MUST resolve a page's default
+# name IDENTICALLY to build-workbook.rb's own group_cards_by_page — a
+# mismatch here silently drops layout zones. load_chart_specs_companions /
+# load_chart_specs_controls (above) key the companion-KPI/control lookup by
+# page NAME, and build-dashboard-layout.rb matches a workbook page to a
+# layout dashboard by that same name; if this file falls back to the literal
+# 'Overview' while build-workbook.rb attributes the same cardIds-less page to
+# its REAL title, every companion/control lookup here misses. Measured on the
+# real cold run (page 'Sample DataSets + Cards', pages.json's cardIds: []):
+# name-matched = 50 zones with the 5 real bead-08sf companion KPIs; as-landed
+# (this file still hard-coded 'Overview') = 45 zones, 0 companion KPIs — all 5
+# companion elements POSTed but invisible, no layout zone at all. Verbatim
+# same default-name resolution as build-workbook.rb's group_cards_by_page
+# (kept as a separate function, not a shared require, matching this
+# codebase's existing per-script duplication of small helpers); see
+# test/test-build-domo-layout.rb's cross-file consistency test, which calls
+# both functions with the same inputs and asserts they agree.
+def group_cards_by_page_for_layout(cards, pages)
+  by_page = Hash.new { |h, k| h[k] = [] }
+  card_page = {}
+  pages.each do |p|
+    Array(p['cardIds'] || p['cards']).each { |cid| card_page[cid.to_s] = p['title'] || p['name'] || p['id'] }
+  end
+  default_name =
+    if pages.size == 1
+      pages.first['title'] || pages.first['name'] || pages.first['id'].to_s
+    else
+      'Overview'
+    end
+  cards.each { |c| by_page[card_page[c['id'].to_s] || default_name] << c }
+  by_page
+end
+
 if $PROGRAM_NAME == __FILE__
   cards = JSON.parse(File.read(File.join(OUT, 'cards.json'))) rescue []
   pages = JSON.parse(File.read(File.join(OUT, 'pages.json'))) rescue []
@@ -975,15 +1047,10 @@ if $PROGRAM_NAME == __FILE__
     end
   end
 
-  # Group cards by page — same membership resolution build-workbook.rb uses,
-  # so a page's layout dashboard and its workbook page carry the SAME cards.
-  card_page = {}
-  pages.each do |p|
-    pname = p['title'] || p['name'] || p['id']
-    Array(p['cardIds'] || p['cards']).each { |cid| card_page[cid.to_s] = pname }
-  end
-  by_page = Hash.new { |h, k| h[k] = [] }
-  cards.each { |c| by_page[card_page[c['id'].to_s] || 'Overview'] << c }
+  # Group cards by page — same membership resolution (AND the same default-
+  # name fallback — F3/blocker 3) build-workbook.rb uses, so a page's layout
+  # dashboard and its workbook page carry the SAME cards under the SAME name.
+  by_page = group_cards_by_page_for_layout(cards, pages)
 
   # Synthesize a pseudo-card for any chart-specs.json 'control' element that
   # has NO backing card at all (file header "2a" note — a page-level filter
@@ -1005,6 +1072,25 @@ if $PROGRAM_NAME == __FILE__
   # express. Landing in the KPI band (a real, deliberate placement) beats not
   # landing anywhere at all.
   orphan_companions_by_page = load_chart_specs_companions(OUT)
+  # PageLayoutV4 non-card content is authored page content, not furniture:
+  # discovery preserved HEADER/PAGE_BREAK geometry on pages.json and
+  # build-workbook emitted matching text/page-break elements with these ids.
+  pages.each do |page|
+    pname = page['title'] || page['name'] || page['id'].to_s
+    Array(page['_layoutContent']).each do |content|
+      next unless %w[header page-break].include?(content['type'])
+      title = content['text'].to_s.strip
+      title = 'Page break' if title.empty?
+      by_page[pname] << {
+        'id' => content['id'],
+        'title' => title,
+        'chartType' => content['type'],
+        'sigmaKindHint' => (content['type'] == 'header' ? 'text' : 'page-break'),
+        'x' => content['x'], 'y' => content['y'], 'w' => content['w'], 'h' => content['h'],
+        '_synthesized' => true
+      }
+    end
+  end
   by_page.each do |pname, pcards|
     card_el_ids = pcards.map { |c| "el-#{c['id']}" }
     Array(orphan_controls_by_page[pname]).each do |ctl|
@@ -1014,8 +1100,10 @@ if $PROGRAM_NAME == __FILE__
     end
     Array(orphan_companions_by_page[pname]).each do |comp|
       next if card_el_ids.include?(comp['id'])
+      primary_card_id = comp['id'].to_s[/\Ael-(.+)-summary\z/, 1]
       pcards << { 'id' => comp['id'], 'title' => comp['name'], 'chartType' => 'badge_singlevalue',
-                  'sigmaKindHint' => 'kpi-chart', '_size' => '', '_pageOrder' => -1, '_synthesized' => true }
+                  'sigmaKindHint' => 'kpi-chart', '_size' => '', '_pageOrder' => -1,
+                  '_synthesized' => true, '_primary_card_id' => primary_card_id }
     end
   end
 

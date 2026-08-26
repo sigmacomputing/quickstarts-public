@@ -250,7 +250,10 @@ module SigmaLayout
     'table'       => 10, # header row + a few data rows
     'pivot-table' => 10,
     'control'     => 2,  # one input strip; 2 rows keeps the label visible
-    'text'        => 2
+    'text'        => 2,
+    'navigation'  => 2,
+    'progress'    => 3,
+    'page-break'  => 1
   }.freeze
 
   # Minimum grid-row span for a Sigma element kind (see KIND_MIN_ROWS).
@@ -274,6 +277,8 @@ module SigmaLayout
     has_signal = z.key?('measures') || z.key?('rows_shelf') || z.key?('cols_shelf')
     return KIND_MIN_ROWS['text'] if has_signal && !ZoneCensus.plots?(z)
     ck = z['chart_kind'].to_s
+    return KIND_MIN_ROWS['page-break'] if ck == 'page-break'
+    return KIND_MIN_ROWS['progress'] if ck == 'progress'
     return KIND_MIN_ROWS['kpi-chart'] if ck == 'kpi'
     return KIND_MIN_ROWS['table'] if ck == 'table' || ck == 'pivot-table'
     KIND_MIN_ROWS['chart']

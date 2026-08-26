@@ -285,13 +285,13 @@ instance (2026-07-30 validation, 48 cards / 22 distinct chartTypes). Sigma
 | `badge_treemap` | `bar-chart` | ❌ **no native equivalent** | see below. |
 | `badge_word_cloud` | `table` | ❌ **no native equivalent** | see below. |
 | `badge_calendar` | `table` | ❌ **no native equivalent** | see below. |
-| `badge_filledgauge` | `kpi-chart` | ❌ **no native equivalent** | see below. |
+| `badge_filledgauge` | `progress` or `kpi-chart` | ✅ conditional released mapping | Emit ring `progress` only when explicit `CURRENT` + `TARGET` roles ground value/max and no card-local filter/date window would be lost; otherwise retain KPI + warn. |
 | `badge_pop_bar_line` | `combo-chart` | ❌ **no native equivalent** | see below. |
 | `badge_vert_symbol_overlay` | `combo-chart` | ❌ **no native equivalent** | see below. |
 
 ### No native Sigma equivalent — do not silently substitute a bar chart
 
-Six observed tokens have **no true Sigma equivalent**. `CHART_TYPE_MAP` in
+Five observed tokens have **no true Sigma equivalent**. `CHART_TYPE_MAP` in
 `build-workbook.rb` still names the closest honest degradation (never a bare,
 unexplained bar chart), and `build_element` **always** emits a specific, loud
 Phase-5e warning naming the card and the gap — this is a hard requirement, not
@@ -302,12 +302,11 @@ a nice-to-have:
 | `badge_treemap` | No `treemap` kind was found anywhere in the sigma-workbooks skill (not in its documented kinds, and not in the confirmed-invalid list either — it is simply **unverified**; do not assume it exists). | `bar-chart`, sorted descending by measure — keeps relative magnitude, loses the area-proportional hierarchy. |
 | `badge_word_cloud` | No word-cloud kind exists. | A flat term + frequency `table`. |
 | `badge_calendar` | No calendar-heatmap kind exists. | A flat date + value `table`. |
-| `badge_filledgauge` | `gauge` is **confirmed invalid** — probing the workbook spec API returns `400 "Invalid kind"` (see `docs/sigma-trellis-chart-support.md` in sigma-workbooks: `box`, `heatmap`, `gauge`, `funnel`, `waterfall`, `single-value`, `geography`, `map` are all confirmed not part of the spec API). | `kpi-chart` on the CURRENT value; bind TARGET as a KPI `comparisonColumn` if present. |
 | `badge_pop_bar_line` | Sigma has no automatic period-over-period comparison primitive. | `combo-chart` (bar = current period, line = prior period) — the two periods must be modeled as two explicit measures; the automatic date-shift is lost. |
 | `badge_vert_symbol_overlay` | No actual-vs-target dial/overlay kind exists (and `gauge` itself is invalid — see above). | `combo-chart` (bar + a `scatter` marker series) approximates the visual; a true actual-vs-target dial is not representable. |
 
 **Follow-up, not handled by this converter today:** closing this gap for real —
-a genuine treemap, word cloud, calendar heatmap, or gauge/dial rendered in
+a genuine treemap, word cloud, calendar heatmap, or unsupported dial rendered in
 Sigma — is a candidate for a **Sigma custom plugin** (see the
 `sigma-plugin-development` skill for how those are built). That is tracked as
 future work, not something `build-workbook.rb` attempts; its job is to degrade
@@ -323,7 +322,8 @@ to the PNG:
 | Domo card (what the PNG shows) | Sigma element `kind` | Notes |
 |---|---|---|
 | Heatmap | `pivot-table` w/ conditional format | Sigma has no standalone `heatmap` kind (confirmed invalid). |
-| Funnel / Waterfall / Sunburst / Sankey | closest Sigma kind + **warn** | `funnel`/`waterfall` are also confirmed-invalid Sigma kinds; treat like the no-native-equivalent table above. |
+| Funnel / Sunburst / Sankey | closest Sigma kind + **warn** | No grounded released mapping in this converter; treat like the no-native-equivalent table above. |
+| Waterfall | reviewed fallback + **warn** | Sigma now publishes `waterfall-chart`, but this converter has no confirmed Domo `chartType` token and role payload for it. Do not guess a token or emit native waterfall from PNG appearance alone. |
 | Text / Title card | text element | |
 | Image / logo / drawing (static asset, no data columns) | `image` | Inline data-URI: `{id, kind:'image', url:"data:image/png;base64,<b64>"}` from the staged capture (`discovery/png/cards/<cardId>.png`, written by `domo-capture-visuals.rb`'s `capture_card`/`render_card_png`; `card['_pngPath']` overrides). No hosting needed — mirrors the tableau pattern (`build-charts-from-signals.rb:6655`); PNG/JPEG data-URIs POST + render cleanly. **Do not** also key off "no data columns + a staged PNG exists" — capture-visuals renders a PNG for every card on a page (filter widgets, text/title cards included), so that combination silently misroutes non-image cards. `richtext` is excluded (stays a text element — see the Text/Title row above). Tier B / PNG not captured, or chartType doesn't match → falls back to the text-placeholder path + a Phase-5e warning ("export from Domo UI and embed manually") — never ship an empty/broken image element. |
 
@@ -401,7 +401,7 @@ Never emit the raw `column` when an `alias` exists.
 Long-text table cells that overflow are fixable in the spec — this is **not**
 UI-only. Set it per-column or via the theme default:
 - Per column: `columns[].style.textWrap: "wrap"` (enum `wrap | clip`).
-- Theme default: `themeOverrides.tableStyles.textStyles.*.textWrap`.
+- Theme default: `settings.theme.overrides.tableStyles.textStyles.*.textWrap`.
 
 Set `"wrap"` on long-text columns so they don't clip.
 
@@ -490,7 +490,9 @@ Add these to the mandatory layout-visual-qa gate:
 - [ ] **`chartType` was matched EXACTLY**, never by substring — spot-check a
       `badge_line_bar` (combo) and a `badge_symbol_bar` (combo) card didn't get
       mis-routed to `line-chart` / `bar-chart` respectively.
-- [ ] Every card whose `chartType` is one of the six no-native-equivalent tokens
-      (`badge_treemap`, `badge_word_cloud`, `badge_calendar`, `badge_filledgauge`,
+- [ ] Every card whose `chartType` is one of the five no-native-equivalent tokens
+      (`badge_treemap`, `badge_word_cloud`, `badge_calendar`,
       `badge_pop_bar_line`, `badge_vert_symbol_overlay`) carries a Phase-5e
       warning naming the gap — never a silent, unexplained bar chart.
+- [ ] Every `badge_filledgauge` either has explicit `CURRENT` + `TARGET` roles
+      and emitted native `progress`, or carries the named KPI-fallback warning.

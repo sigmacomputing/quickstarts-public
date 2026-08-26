@@ -59,6 +59,16 @@ eq(r[:exit], 0, 'collision correctly resolved case-insensitively -> exit 0')
 eq(r[:score]['tiles_pass'], 1, 'collision correctly resolved -> tile PASSes')
 eq(r[:score]['tiles'][0]['score'], 1.0, 'collision correctly resolved -> exact score (no cell silently dropped)')
 
+puts '== blank Domo dimension and null Sigma dimension are one missing-value bucket =='
+blank_null_plan = [
+  { 'chart' => 'Top Performing Subjects',
+    'expected' => [['', 133_798, 95_912, 83_725]],
+    'actual' => { 'rows' => [[nil, 133_798, 95_912, 83_725]] } },
+]
+r = run_parity(blank_null_plan)
+eq(r[:exit], 0, 'blank vs null representation exits 0')
+eq(r[:score]['tiles_pass'], 1, 'blank vs null representation PASSes')
+
 puts "== silently-missing column is a LOUD failure, never a quiet skip/match =="
 missing_plan = [
   { 'chart' => 'Broken Chart',

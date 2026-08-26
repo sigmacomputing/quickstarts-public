@@ -58,6 +58,7 @@ FileUtils.mkdir_p(opts[:workdir])
 $LOAD_PATH.unshift File.expand_path('lib', __dir__)
 require 'sigma_rest'
 require 'dm_quarantine'
+require 'code_rep'
 
 QUARANTINE = opts[:quarantine] && opts[:type] == 'datamodel'
 DEFERRED_PATH = File.join(opts[:workdir], 'deferred-elements.json')
@@ -111,62 +112,30 @@ end
 # explicit --update-id (Phase 3 normally reuses a DM via the ref-dm path).
 update_id = opts[:update_id] || (prior_ids.last if opts[:type] == 'workbook' && prior_ids.any?)
 
+# Workbook code-rep nests non-metadata fields under `document`; data models
+# deliberately remain flat with pages[*].elements. Normalize the workbook body
+# once, before either POST or PUT, and require the authoritative layout the
+# released representation uses for page membership.
+spec_body =
+  if opts[:type] == 'workbook'
+    posting_doc = JSON.parse(File.read(opts[:spec]))
+    document = Sigma::CodeRep.document(posting_doc)
+    abort('workbook spec missing required document.layout') if document['layout'].to_s.strip.empty?
+    abort('workbook spec pages must be metadata-only') if Array(document['pages']).any? { |page| page.key?('elements') }
+    JSON.generate(Sigma::CodeRep.wrap(document, extra: Sigma::CodeRep.metadata(posting_doc)))
+  else
+    File.read(opts[:spec])
+  end
+
 if update_id
   warn "UPDATE mode: PUT #{opts[:type]} #{update_id} (no new #{opts[:type]} created)"
-  put_body = File.read(opts[:spec])
-  # Layout preservation (bead: layout-wipe-on-re-PUT). A workbook's applied layout
-  # lives at top-level spec['layout'] (put-layout.rb writes it there). PUTting a
-  # spec WITHOUT that field REPLACES the whole spec and wipes the layout, so the
-  # workbook falls back to a single-column stack. If the outgoing spec carries no
-  # layout, carry over the LIVE workbook's current layout so this PUT is
-  # layout-preserving. put-layout.rb (the intended LAST write) still overrides.
-  if opts[:type] == 'workbook'
-    out_spec = (YAML.safe_load(put_body, permitted_classes: [Date, Time]) rescue nil)
-    if out_spec.is_a?(Hash) && out_spec['layout'].to_s.strip.empty?
-      live = http(:get, format(GET_PATH, update_id))
-      live_spec = (YAML.safe_load(live.body, permitted_classes: [Date, Time]) rescue nil)
-      live_layout = live_spec.is_a?(Hash) ? live_spec['layout'].to_s : ''
-      unless live_layout.strip.empty?
-        # The layout XML references element ids. Banded layouts reference container
-        # + header elements that put-layout.rb injects from its `.elements.json`
-        # sidecar — they live in the LIVE spec's pages but NOT in this outgoing
-        # spec, so blindly copying the layout 400s ("Dependency not found"). Pull
-        # any layout-referenced elements this spec lacks from the live spec (match
-        # page by id, then name) so the refs resolve, then carry the layout.
-        ref_ids  = live_layout.scan(/elementId="([^"]+)"/).flatten.uniq
-        have_ids = (out_spec['pages'] || []).flat_map { |p| (p['elements'] || []).map { |e| e['id'] } }.compact
-        missing  = ref_ids - have_ids
-        if missing.any? && live_spec['pages'].is_a?(Array)
-          live_by_id = {}
-          live_spec['pages'].each { |p| (p['elements'] || []).each { |e| live_by_id[e['id']] = [p, e] } }
-          out_by_id  = (out_spec['pages'] || []).each_with_object({}) { |p, h| h[p['id']] = p }
-          missing.dup.each do |mid|
-            lp, le = live_by_id[mid]
-            next unless le
-            tgt = out_by_id[lp['id']] || (out_spec['pages'] || []).find { |p| p['name'] == lp['name'] } || (out_spec['pages'] || []).last
-            next unless tgt
-            (tgt['elements'] ||= []) << le
-            missing.delete(mid)
-          end
-        end
-        if missing.empty?
-          out_spec['layout'] = live_layout
-          put_body = JSON.generate(out_spec)
-          warn 'layout-preserve: carried the live workbook layout (+ its container/header elements) into the PUT.'
-        else
-          warn "layout NOT auto-preserved: #{missing.size} layout-referenced element(s) missing and unrecoverable " \
-               "(#{missing.first(3).join(', ')}) — run put-layout.rb AFTER this PUT or it renders single-column."
-        end
-      end
-    end
-  end
-  resp = http(:put, format(GET_PATH, update_id), put_body)
+  resp = http(:put, format(GET_PATH, update_id), spec_body)
   parsed = YAML.safe_load(resp.body, permitted_classes: [Date, Time])
   oid = parsed[ID_FIELD] || update_id
   abort("PUT failed (HTTP #{resp.code}): #{parsed.inspect}") unless resp.is_a?(Net::HTTPSuccess)
   warn "PUT ok: #{ID_FIELD}=#{oid}"
 else
-  resp = http(:post, POST_PATH, File.read(opts[:spec]))
+  resp = http(:post, POST_PATH, spec_body)
   parsed = YAML.safe_load(resp.body, permitted_classes: [Date, Time])
   oid = parsed.is_a?(Hash) ? parsed[ID_FIELD] : nil
   # Rec5 quarantine (opt-in): a POST killed by ONE broken element must not lose
@@ -217,7 +186,11 @@ columns_path = opts[:type] == 'datamodel' ?
   "/v2/dataModels/#{oid}/columns" :
   "/v2/workbooks/#{oid}/columns"
 readback = lambda do
-  spec = JSON.parse(http(:get, format(GET_PATH, oid), accept_json: true).body)
+  # Workbook code-rep responses nest non-metadata fields (pages/layout/
+  # schemaVersion/kind) under `document` (live since 2026-08); the DM
+  # readback is unchanged and stays flat.
+  raw_spec = JSON.parse(http(:get, format(GET_PATH, oid), accept_json: true).body)
+  spec = opts[:type] == 'workbook' ? Sigma::CodeRep.document(raw_spec) : raw_spec
   cols_res = http(:get, columns_path, accept_json: true)
   cols_json = cols_res.is_a?(Net::HTTPSuccess) ? (JSON.parse(cols_res.body) rescue { 'entries' => [] }) : nil
   labels_by_el = Hash.new { |h, k| h[k] = [] }
@@ -261,6 +234,20 @@ if QUARANTINE && $quarantined.nil? && cols_res.is_a?(Net::HTTPSuccess)
   end
 end
 
+page_elements =
+  if opts[:type] == 'workbook'
+    elements_by_id = Sigma::CodeRep.workbook_elements(spec).each_with_object({}) do |element, index|
+      index[element['id']] = element if element['id']
+    end
+    Sigma::CodeRep.workbook_page_element_ids(spec).transform_values do |ids|
+      ids.filter_map { |id| elements_by_id[id] }
+    end
+  else
+    spec.fetch('pages', []).each_with_object({}) do |page, pages|
+      pages[page['id']] = page['elements'] || []
+    end
+  end
+
 out = {
   ID_FIELD => oid,
   'pages'  => spec.fetch('pages', []).map do |p|
@@ -268,7 +255,7 @@ out = {
       'id'       => p['id'],
       'name'     => p['name'],
       'visibility' => p['visibility'],
-      'elements' => (p['elements'] || []).map do |e|
+      'elements' => Array(page_elements[p['id']]).map do |e|
         el = { 'id' => e['id'], 'kind' => e['kind'], 'name' => e['name'] }
         el['columnLabels'] = labels_by_el[e['id']] if labels_by_el.key?(e['id'])
         el

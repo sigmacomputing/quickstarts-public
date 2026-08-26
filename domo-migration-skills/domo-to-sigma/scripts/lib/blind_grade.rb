@@ -25,6 +25,7 @@
 
 require 'json'
 require 'digest'
+require_relative 'code_rep'
 
 module BlindGrade
   # The six checklist dimensions a visual verdict attests (kept in lockstep
@@ -134,22 +135,21 @@ module BlindGrade
     { 'doc' => doc, 'errors' => errors, 'source_path' => src, 'target_path' => tgt }
   end
 
-  # Chart-family census of the BUILT workbook, from the wb-readback spec
-  # ({pages:[{elements:[...]}]}, emitted by build-parity-plan.rb --emit-spec).
+  # Chart-family census of the BUILT workbook, from the wb-readback spec.
+  # Workbook elements are the flat document.elements collection; data-model
+  # pages[*].elements semantics are intentionally outside this workbook helper.
   # Returns an array of families (chart elements only), or nil when absent.
   def census_from_readback(path)
     return nil unless File.file?(path.to_s)
     doc = (JSON.parse(File.read(path)) rescue nil)
-    pages = doc.is_a?(Hash) ? Array(doc['pages']) : nil
-    return nil unless pages
+    return nil unless doc.is_a?(Hash)
+    inner = Sigma::CodeRep.document(doc)
+    return nil unless inner['elements'].is_a?(Array)
     fams = []
-    pages.each do |pg|
-      Array(pg.is_a?(Hash) ? pg['elements'] : nil).each do |el|
-        next unless el.is_a?(Hash)
-        next if el['visibleAsSource'] == false # hidden data-page master
-        f = family(el['kind'])
-        fams << f if chart_family?(f)
-      end
+    Sigma::CodeRep.workbook_elements(inner).each do |el|
+      next if el['visibleAsSource'] == false # hidden data-page master
+      f = family(el['kind'])
+      fams << f if chart_family?(f)
     end
     fams
   end

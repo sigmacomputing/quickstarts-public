@@ -14,9 +14,42 @@ module DomoSigma
            .gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
            .gsub(/([A-Za-z])([0-9])/, '\1_\2')
            .gsub(/([0-9])([A-Za-z])/, '\1_\2')
-    s.split(%r{[_\s/]+}).reject(&:empty?).map { |w|
-      (w =~ /\A[A-Z0-9]+\z/) ? w : w.capitalize
+    s.split(%r{[_\s/.]+}).reject(&:empty?).map { |w|
+      # Upcase the FIRST character only — never String#capitalize, which also
+      # LOWERCASES the remainder. A dot is not a split boundary, so a dotted
+      # column arrives as one token that still holds an internal capital:
+      #   'Account.BillingState' -> camel-split -> ['Account.Billing', 'State']
+      #   .capitalize            -> 'Account.billing State'   <- 'B' destroyed
+      #   first-char-only        -> 'Account.Billing State'   <- matches Sigma
+      # Sigma camel-splits the same way we do ('IsWon' -> 'Is Won' resolves
+      # fine), so the dotted case was the ONLY divergence — and it 400'd the
+      # data-model POST with "dependency not found: formula reference
+      # 'pdp_example_dataset/account.billing state'" on a live cold run
+      # (bead xo56). Column pre-flight could never catch it: it compares
+      # display_name to display_name on both sides, so the two agreed with
+      # each other while both disagreed with Sigma.
+      (w =~ /\A[A-Z0-9]+\z/) ? w : w.sub(/\A./) { |c| c.upcase }
     }.join(' ')
+  end
+
+  # Kept as the single named seam for "the name used INSIDE a formula
+  # reference", now that display_name itself can never emit a dot.
+  #
+  # Why the dot matters: Sigma resolves a reference case-insensitively and
+  # treats underscore and space as equivalent ('created_on' == 'Created On',
+  # '_BATCH_ID_' == 'BATCH ID' — both probed live), but a name carrying BOTH a
+  # dot AND a space does NOT resolve:
+  #   '[T/Account.Billing State]' -> 400 dependency not found
+  #   '[T/Account Billing State]' -> resolves
+  #   '[T/Account.BillingState]'  -> resolves
+  # display_name used to produce the first form for a dotted warehouse column
+  # like 'Account.BillingState', which 400'd BOTH the data-model POST (against
+  # the warehouse column) and then the workbook POST (against the master
+  # element's column of the same name). Splitting on '.' as well removes the
+  # dot entirely and yields the second, resolving form everywhere.
+  # Bead xo56, found on the 36-card cold run.
+  def column_ref_name(raw)
+    display_name(raw)
   end
 
   B62 = (('0'..'9').to_a + ('a'..'z').to_a + ('A'..'Z').to_a).freeze
@@ -40,18 +73,17 @@ module DomoSigma
   # (the same precedence the Tableau KPI emitter uses) ONLY to pick a category
   # (currency/percent/number) — never to build a format string.
   #
-  # Field-proven shape only: {kind:"number", decimalPlaces:N} POSTs cleanly
-  # (a d3/Excel formatString can 400). Sigma's documented format schema
-  # (sigma-workbooks/reference/specification/formatting.md) has no distinct
-  # currency/percent `kind` — just `kind: number` with an optional raw
-  # formatString or structured fields (currencySymbol, prefix, …) that have
-  # NOT been field-verified in combination with decimalPlaces. So currency
-  # and percent are classified (for future use) but, absent a documented/
-  # verified currency|percent shape, both fall back to the same proven
-  # {kind:"number", decimalPlaces:prec} rather than guessing.
+  # Sigma's released format schema uses d3 `formatString`; the old
+  # `decimalPlaces` field is not in the schema and was silently stripped on
+  # readback, leaving long raw decimals in every KPI. Preserve Domo's category,
+  # precision, grouping, currency/percent multiplier, and abbreviated display.
   def sigma_format(domo_fmt, name = nil)
-    prec = (domo_fmt.is_a?(Hash) && (domo_fmt['precision'] || domo_fmt['decimals'])) || 0
-    type = domo_fmt.is_a?(Hash) ? (domo_fmt['type'] || domo_fmt['format']).to_s.upcase : ''
+    raw_format = domo_fmt.is_a?(Hash) ? domo_fmt['format'].to_s : ''
+    explicit_prec = domo_fmt.is_a?(Hash) && (domo_fmt['precision'] || domo_fmt['decimals'])
+    inferred_prec = raw_format[/\.(0+)/, 1]&.length
+    prec = (explicit_prec || inferred_prec || 0).to_i
+    type = domo_fmt.is_a?(Hash) ? domo_fmt['type'].to_s.upcase : ''
+    abbreviated = type == 'ABBREVIATED'
     category =
       case type
       when 'CURRENCY', 'MONEY'                            then :currency
@@ -59,13 +91,30 @@ module DomoSigma
       when 'COMMA', 'NUMBER', 'DECIMAL', 'LONG', 'DOUBLE'  then :number
       else
         n = name.to_s.downcase
-        if    n =~ /revenue|sales|profit|cost|amount|budget|price|\$/ then :currency
+        if    raw_format.include?('$') || n =~ /revenue|sales|profit|cost|amount|budget|price|\$/ then :currency
         elsif n =~ /rate|percent|pct|%|margin|ratio|share/            then :percent
-        elsif !type.empty? || domo_fmt.is_a?(Hash)                    then :number
+        elsif abbreviated || !type.empty? || domo_fmt.is_a?(Hash)     then :number
         end
       end
     return nil unless category
-    { 'kind' => 'number', 'decimalPlaces' => prec }
+
+    if abbreviated
+      # Domo's 0.0 abbreviation keeps roughly four significant digits
+      # (950.9K); d3's SI formatter is the released Sigma equivalent.
+      sig = [prec + 3, 2].max
+      prefix = category == :currency ? (domo_fmt['currency'] || '$').to_s : ''
+      return { 'kind' => 'number', 'formatString' => "#{prefix}.#{sig}~s" }
+    end
+
+    format_string =
+      case category
+      when :percent then ",.#{prec}%"
+      when :currency
+        symbol = domo_fmt.is_a?(Hash) ? (domo_fmt['currency'] || '$').to_s : '$'
+        "#{symbol},.#{prec}f"
+      else ",.#{prec}f"
+      end
+    { 'kind' => 'number', 'formatString' => format_string }
   end
 
   # Does this column name look like a row-key / id (the Domo table-summary COUNT trap)?
@@ -107,11 +156,18 @@ module DomoSigma
   #                   An API-created page has collections: [] and just an
   #                   ordered `sizes[]` entry per card — no sections at all.
   #
-  # This method merges BOTH kinds of geometry onto each card record by id, and
-  # keeps them independent so either can be present, absent, or both:
+  # This method merges THREE kinds of geometry onto each card record by id, and
+  # keeps them independent so any can be present, absent, or combined:
   #
   #   - legacy 'x'/'y'/'w'/'h' (mason / Domo-App pages, pixel-ish grid coords)
   #     — sourced from `page_layout`, UNCHANGED behavior from before this fix.
+  #   - 'x'/'y'/'w'/'h' can ALSO come from the newer pageLayoutV4 pass (Track C,
+  #     refs/page-layout-v4.md), sourced from `stacks['pageLayoutV4']` via
+  #     `merge_pagelayoutv4_geometry` — scaled ×0.4 from Domo's 60-wide grid.
+  #     It is the more authoritative source and runs LAST among the two geometry
+  #     passes, so when both are present it wins outright (all 4 keys set
+  #     atomically together, never partially) over legacy `page_layout` geometry
+  #     for the same card id.
   #   - '_size'        — the T-shirt token, from `stacks['sizes']`, keyed by
   #                       card id.
   #   - '_collection'  — {'id','title','index'} for the collection (if any)
@@ -133,22 +189,103 @@ module DomoSigma
   # this — this method only DEFINES and documents the shape on discovery's
   # output; it does not lay anything out itself.
   #
-  # Pure/side-effect-free in both passes: returns a NEW array; a card with no
-  # matching entry in a given source is left unchanged by that source's pass —
-  # 'x'/'y'/'w'/'h' are OMITTED, never defaulted to 0 (0 is a valid top-left
+  # Pure/side-effect-free in all three passes: returns a NEW array; a card with
+  # no matching entry in a given source is left unchanged by that source's pass
+  # — 'x'/'y'/'w'/'h' are OMITTED, never defaulted to 0 (0 is a valid top-left
   # coordinate and must not be confused with "unknown").
   def merge_geometry(cards, page_layout, stacks: nil)
     out = Array(cards)
     out = merge_xywh_geometry(out, page_layout)
+    out = merge_pagelayoutv4_geometry(out, stacks)
     out = merge_stacks_geometry(out, stacks)
     out
+  end
+
+  # --- pageLayoutV4 pass (v4-inline pages) — Track C, refs/page-layout-v4.md ---
+  # stacks['pageLayoutV4'] (present once Domo.cards_for_page sends
+  # includeV4PageLayouts=true — see domo_rest.rb) carries two arrays that must
+  # be joined on contentKey: 'content' maps contentKey -> cardId (HEADER
+  # entries carry a 'text' field and NO cardId — they're section dividers, not
+  # cards, and are skipped here by the `next unless c['cardId']` guard).
+  # 'standard.template' maps contentKey -> x/y/width/height on Domo's 60-wide
+  # grid ('compact' is the 12-wide mobile grid — unused). PAGE_BREAK entries
+  # appear in 'standard.template' with no 'content' counterpart at all and are
+  # skipped the same way every unmatched contentKey is (`next unless card_id`).
+  # Domo 60-wide -> Sigma 24-wide grid is x0.4. build_dashboard (rung 1,
+  # build-domo-layout.rb) only ever consumes x/y/w/h as relative percentages
+  # of their own page's max, so this scale factor doesn't change its output —
+  # but storing genuinely Sigma-comparable units here keeps the record correct
+  # for any other consumer, and matches what was actually verified live.
+  def merge_pagelayoutv4_geometry(cards, stacks)
+    v4 = stacks.is_a?(Hash) ? stacks['pageLayoutV4'] : nil
+    return cards unless v4.is_a?(Hash)
+
+    content_map = {}
+    Array(v4['content']).each do |c|
+      next unless c.is_a?(Hash) && c['cardId']
+      content_map[c['contentKey'].to_s] = c['cardId'].to_s
+    end
+    return cards if content_map.empty?
+
+    geom_by_id = {}
+    Array(v4.dig('standard', 'template')).each do |t|
+      next unless t.is_a?(Hash)
+      card_id = content_map[t['contentKey'].to_s]
+      next unless card_id
+      next if [t['x'], t['y'], t['width'], t['height']].any?(&:nil?)
+      geom_by_id[card_id] = {
+        'x' => (t['x'].to_f     * 0.4).round(2),
+        'y' => (t['y'].to_f     * 0.4).round(2),
+        'w' => (t['width'].to_f  * 0.4).round(2),
+        'h' => (t['height'].to_f * 0.4).round(2),
+      }
+    end
+
+    cards.map do |card|
+      next card unless card.is_a?(Hash)
+      geom = geom_by_id[card['id'].to_s]
+      geom ? card.merge(geom) : card
+    end
+  end
+
+  # Preserve the non-card content PageLayoutV4 exposes. HEADER and PAGE_BREAK
+  # are real authored page semantics, not phantom cards: the workbook builder
+  # emits released `text` / `page-break` elements from these records and the
+  # Domo layout adapter places them at this geometry. Unknown v4 template
+  # types stay out until their meaning is grounded.
+  def pagelayoutv4_content(stacks, page_id)
+    v4 = stacks.is_a?(Hash) ? stacks['pageLayoutV4'] : nil
+    return [] unless v4.is_a?(Hash)
+
+    content_by_key = Array(v4['content']).each_with_object({}) do |content, out|
+      out[content['contentKey'].to_s] = content if content.is_a?(Hash)
+    end
+    Array(v4.dig('standard', 'template')).filter_map do |template|
+      next unless template.is_a?(Hash)
+      type = template['type'].to_s.upcase
+      next unless %w[HEADER PAGE_BREAK].include?(type)
+      next if [template['x'], template['y'], template['width'], template['height']].any?(&:nil?)
+
+      key = template['contentKey'].to_s
+      source = content_by_key[key] || {}
+      slug_type = type.downcase.tr('_', '-')
+      {
+        'id' => "domo-layout-#{page_id}-#{slug_type}-#{key}".gsub(/[^a-zA-Z0-9_-]/, '-')[0, 64],
+        'type' => slug_type,
+        'text' => source['text'],
+        'x' => (template['x'].to_f * 0.4).round(2),
+        'y' => (template['y'].to_f * 0.4).round(2),
+        'w' => (template['width'].to_f * 0.4).round(2),
+        'h' => (template['height'].to_f * 0.4).round(2)
+      }.compact
+    end
   end
 
   # --- x/y/w/h pass (mason / Domo-App pages) — unchanged from before Bug 5 --
   def merge_xywh_geometry(cards, page_layout)
     return cards unless page_layout.is_a?(Hash)
 
-    raw_cards = page_layout['cards'] || page_layout.dig('pageLayoutV4', 'cards') || []
+    raw_cards = page_layout['cards'] || []
     geom_by_id = {}
     Array(raw_cards).each do |c|
       next unless c.is_a?(Hash)

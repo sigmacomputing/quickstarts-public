@@ -77,6 +77,10 @@ MONTH_NUM = {
 def canonicalize_dim(v)
   return v unless v.is_a?(String)
   s = v.strip
+  # Domo serializes a blank categorical value as "", while Sigma's warehouse
+  # export serializes the same missing value as null. They are one semantic
+  # bucket, not a value divergence (live Top Performing Subjects gold run).
+  return nil if s.empty?
   # ISO datetime at midnight → day bucket (T or space separator)
   if (m = s.match(/\A(\d{4})-(\d{2})-(\d{2})[T ]00:00:00(?:\.0+)?(?:Z|[+-]\d{2}:?\d{2})?\z/))
     return "#{m[1]}-#{m[2]}-#{m[3]}"
@@ -357,13 +361,14 @@ results = plan.map do |p|
                   'then set "render_verified": true on this chart in the plan ' \
                   '(or replace the marker with actual rows) and re-run'] }
       end
-    next result.merge(chart: p['chart'], extract: this_extract, columns: [])
+    next result.merge(chart: p['chart'], element_id: p['sigma_element_id'],
+                      extract: this_extract, columns: [])
   end
 
   act = extract_rows(p['actual']).map { |r| round_row(r) }
 
   result = this_extract ? extract_compare(exp, act, tol: opts[:tol]) : strict_compare(exp, act)
-  result.merge(chart: p['chart'], extract: this_extract,
+  result.merge(chart: p['chart'], element_id: p['sigma_element_id'], extract: this_extract,
                columns: per_column_scores(exp, act, p['sigma_columns']))
 end
 
@@ -410,7 +415,13 @@ if opts[:score_out]
     'tiles_fail'          => failed,
     'value_parity_score'  => overall,
     'tiles'               => results.map { |r|
-      { 'chart' => r[:chart], 'status' => r[:status], 'extract' => r[:extract],
+      # element_id rides along so a DIVERGE can be localised. Domo reuses generic
+      # summary labels — 11 of the real 65 tiles share a display name with
+      # another — so a fail_names entry of "New Visits in Period" names FOUR
+      # possible elements and tells an operator nothing about which one broke.
+      # Nil for a hand-authored plan that carries no sigma_element_id.
+      { 'chart' => r[:chart], 'element_id' => r[:element_id],
+        'status' => r[:status], 'extract' => r[:extract],
         # PENDING (render-verify) tiles carry score:null — unscored, not zero.
         'score' => (r[:status] == 'PENDING' ? nil : (r[:score] || 0.0)),
         'n_expected' => r[:n_expected], 'n_actual' => r[:n_actual], 'n_matched' => r[:n_matched],

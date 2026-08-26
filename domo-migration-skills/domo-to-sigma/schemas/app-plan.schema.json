@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sigma.example/schemas/app-plan.schema.json",
+  "title": "Phase E application plan",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "selectedOptionId",
+    "archetype",
+    "confidence",
+    "evidence",
+    "unitOfWork",
+    "writeMode",
+    "userChoices",
+    "grain",
+    "editableSurface",
+    "modules",
+    "prerequisites",
+    "manualSteps",
+    "buildRefs",
+    "verificationGates"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "workbookId": { "type": ["string", "null"] },
+    "generatedAt": { "type": "string" },
+    "selectedOptionId": { "type": "string" },
+    "archetype": {
+      "enum": [
+        "scenario-planning",
+        "allocation-capacity",
+        "approval-workflow",
+        "exception-command-center"
+      ]
+    },
+    "score": { "type": "integer", "minimum": 0 },
+    "confidence": { "enum": ["low", "medium", "high"] },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "sourceSignals": { "type": "object" },
+    "unitOfWork": { "type": "string", "minLength": 1 },
+    "writeMode": { "enum": ["append", "overwrite"] },
+    "userChoices": {
+      "type": "object",
+      "required": ["editable", "approval", "scenarios", "agent", "writeMode"],
+      "properties": {
+        "editable": { "enum": ["drivers", "line-values", "both", "none"] },
+        "approval": { "type": "boolean" },
+        "scenarios": { "type": "boolean" },
+        "agent": {
+          "enum": ["analyze", "recommend", "write-after-approval", "none"]
+        },
+        "writeMode": { "enum": ["append", "overwrite"] }
+      },
+      "additionalProperties": false
+    },
+    "grain": {
+      "type": "object",
+      "required": [
+        "recommended",
+        "requiresUniquenessValidation",
+        "stableKeyCandidates"
+      ],
+      "properties": {
+        "recommended": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "requiresUniquenessValidation": { "const": true },
+        "stableKeyCandidates": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "editableSurface": {
+      "type": "object",
+      "required": ["mode", "suggestedColumns"],
+      "properties": {
+        "mode": { "enum": ["drivers", "line-values", "both", "none"] },
+        "suggestedColumns": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "modules": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "prerequisites": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "manualSteps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "buildRefs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "verificationGates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,103 @@
+{
+  "dimension": "workbook-feature",
+  "source_tool": "domo",
+  "authoritative_doc": "https://knowledge.domo.com/Visualize/Adding_Cards_to_Domo",
+  "on_unmapped_default": "record-explicit-gap",
+  "description": "Domo composition and interaction semantics mapped to the Aug-2026 Sigma workbook-as-code release. The converter emits a target only when discovery carries equivalent source intent; released Sigma capabilities are not evidence that a Domo artifact used them.",
+  "rows": [
+    {
+      "source": "waterfall-card",
+      "sigma": null,
+      "source_gap": true,
+      "converter_gap": true,
+      "sigma_verified": {"status": "n"},
+      "on_unmapped": "warn+reviewed-fallback",
+      "notes": "Sigma waterfall-chart is released, but this converter has no creation-probed or live-observed Domo chartType token and role payload for a waterfall. Do not substring-guess a token or emit waterfall-chart from PNG appearance alone."
+    },
+    {
+      "source": "card-legend-settings",
+      "sigma": null,
+      "converter_gap": true,
+      "sigma_verified": {"status": "n"},
+      "on_unmapped": "explicit-gap",
+      "notes": "Current normalized card discovery does not expose a grounded legend visibility/position path. Preserve the chart and Sigma default; do not invent element.legend or a standalone legend control."
+    },
+    {
+      "source": "allowTableDrill/drillPath",
+      "sigma": null,
+      "converter_gap": true,
+      "sigma_verified": {"status": "n"},
+      "on_unmapped": "warn+retain-base-chart",
+      "notes": "Discovery records drill intent, but not a complete validated ordered hierarchy with target wiring. The converter reports the gap and never emits dead controlType:drill UI."
+    },
+    {
+      "source": "page-list",
+      "sigma": "pages + navigation:auto",
+      "doc_ref": "https://knowledge.domo.com/Visualize/Managing_Domo_Pages",
+      "sigma_verified": {"status": "n"},
+      "on_unmapped": "single content page",
+      "notes": "Multiple discovered Domo pages become metadata-only document pages, one authoritative layout Page block each, auto navigation on every content page, and shown view-mode page tabs."
+    },
+    {
+      "source": "pageLayoutV4/PAGE_BREAK",
+      "sigma": "page-break",
+      "sigma_verified": {"status": "n"},
+      "on_unmapped": "explicit-gap",
+      "notes": "Only an authored PAGE_BREAK entry in pageLayoutV4.standard.template is emitted. Geometry alone is never interpreted as print pagination."
+    },
+    {
+      "source": "badge_filledgauge CURRENT+TARGET",
+      "sigma": "progress",
+      "sigma_verified": {"status": "n"},
+      "on_unmapped": "warn+kpi",
+      "notes": "Explicit CURRENT and TARGET role mappings ground value and maximum; the filled gauge maps to ring progress with zero minimum. Card-local filters/date windows force a loud KPI fallback because source-less progress cannot preserve them."
+    },
+    {
+      "source": "page-filter-bar-chrome",
+      "sigma": null,
+      "converter_gap": true,
+      "sigma_verified": {"status": "n"},
+      "on_unmapped": "explicit-gap",
+      "notes": "pageAnalyzerSettings.showFilterBar proves chrome exists but does not provide exported filter definitions or a published panel binding. document.panels stays empty; no panel or control is fabricated."
+    },
+    {
+      "source": "literal-layout-palette/canvas",
+      "sigma": "settings.theme.overrides",
+      "sigma_verified": {"status": "n"},
+      "on_unmapped": "preserve-Sigma-default",
+      "notes": "Only literal colors present in parsed layout signals map to backgroundCanvas/categoricalScheme. Dynamic CSS, card renderer internals, and inferred brand colors are not emitted."
+    },
+    {
+      "source": "pageLayoutV4/HEADER",
+      "sigma": "text + authoritative layout",
+      "sigma_verified": {"status": "n"},
+      "on_unmapped": "omit-empty-header",
+      "notes": "An authored non-empty header becomes a text element at the captured geometry. Empty or unknown layout content types are not fabricated."
+    },
+    {
+      "source": "tabbed-card-container",
+      "sigma": null,
+      "source_gap": true,
+      "sigma_verified": {"status": "n"},
+      "on_unmapped": "explicit-gap",
+      "notes": "The normalized Domo artifacts do not expose grounded tab labels plus child membership. Top-level pages map to navigation, not tabbed-container."
+    },
+    {
+      "source": "data-bound-repeating-region",
+      "sigma": null,
+      "source_gap": true,
+      "sigma_verified": {"status": "n"},
+      "on_unmapped": "explicit-gap",
+      "notes": "Ordinary Domo cards and collections are static layout, not row-card repeat semantics. Never synthesize repeated-container from duplicated cards."
+    },
+    {
+      "source": "box-and-whisker-card",
+      "sigma": null,
+      "release_gate": "box-chart workspace entitlement",
+      "converter_gap": true,
+      "sigma_verified": {"status": "n"},
+      "on_unmapped": "warn+reviewed-fallback",
+      "notes": "box-chart is workspace-gated. Domo box-plot source token/roles are also ungrounded here. Never emit box-chart until both source extraction and target entitlement/create-readback behavior are verified."
+    }
+  ]
+}

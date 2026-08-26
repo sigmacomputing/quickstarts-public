@@ -235,7 +235,8 @@ module Domo
   #    DomoSigma.merge_geometry. This method already existed; nothing called it
   #    until this fix.
   def cards_for_page(page_id, parts: 'metadata,datasources')
-    private_get("/api/content/v3/stacks/#{page_id}/cards", query: { parts: parts })
+    private_get("/api/content/v3/stacks/#{page_id}/cards",
+                query: { parts: parts, includeV4PageLayouts: true })
   end
 
   # 2. FALLBACK (private, instance-wide sweep). Paginates via QUERY params

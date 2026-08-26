@@ -70,6 +70,26 @@ require 'csv'
 require 'set'
 require 'optparse'
 require_relative 'lib/anchor_values'
+begin
+  require_relative 'lib/code_rep'
+rescue LoadError
+  require_relative '../lib/code_rep'
+end
+
+# Evidence ledger (PLAN-v4 E3.1) — optional: verdicts are appended to
+# <workdir>/evidence-ledger.jsonl when the lib is vendored; an older checkout
+# just skips the ledger line (stated, never fatal).
+EVIDENCE_LEDGER_LOADED = begin
+  require_relative 'lib/evidence_ledger'
+  true
+rescue LoadError
+  begin
+    require_relative '../lib/evidence_ledger'
+    true
+  rescue LoadError
+    false
+  end
+end
 
 # ---------------------------------------------------------------------------
 # Pure core — unit-tested offline in test-verify-anchors.rb.
@@ -565,6 +585,8 @@ export_status = {}   # live: element name => 'ok' | 'ok-truncated' | 'timeout' |
 truncated_names = [] # live: elements whose bounded export came back FULL (may be missing rows)
 deadline = nil       # live: whole-run wall-clock budget (ExportPool::Deadline)
 row_limit = nil
+export_cache = nil       # live: version-keyed RAW export cache (#7a; ExportPool::Cache)
+export_doc_version = nil # live: workbook latestDocumentVersion the payloads bind to
 
 if opts[:exports]
   spec_path = opts[:spec] || File.join(opts[:dir], 'wb-readback.json')
@@ -572,8 +594,8 @@ if opts[:exports]
     warn "FATAL: offline mode needs --workbook-spec (or <workdir>/wb-readback.json); #{spec_path} not found."
     exit 2
   end
-  spec = JSON.parse(File.read(spec_path))
-  elements = (spec['pages'] || []).flat_map { |p| p['elements'] || [] }
+  spec = Sigma::CodeRep.document(JSON.parse(File.read(spec_path)))
+  elements = Sigma::CodeRep.workbook_elements(spec)
   elements.each do |el|
     csv = File.join(opts[:exports], "#{el['id']}.csv")
     next unless File.exist?(csv)
@@ -592,30 +614,44 @@ else
   $LOAD_PATH.unshift File.expand_path('lib', __dir__)
   require 'sigma_rest'
   require 'export_pool'
+  require 'code_rep'
 
   # ONE deadline for the entire run (issue #416: --timeout used to bound only
   # the per-element poll wait, so total runtime was unbounded). Computed here,
   # before any export starts; every poll loop and download checks it.
   deadline = ExportPool::Deadline.new(opts[:timeout])
   # Bounded exports: anchors need only enough rows to find printed values —
-  # anchors×10k (min 50k) covers every field workbook while keeping a 5M-row
+  # anchors×10k, floored at the SHARED default (ExportPool::
+  # DEFAULT_EXPORT_ROW_LIMIT = collect-parity-actuals.rb's default; A3, wave-1
+  # review: rowLimit is part of the raw-export cache key, so a divergent
+  # default defeated every cross-script cache hit). Still keeps a 5M-row
   # detail grid from hanging the pool. --row-limit overrides; 0 = uncapped.
   row_limit =
     if opts.key?(:row_limit)
       opts[:row_limit].to_i.positive? ? [opts[:row_limit].to_i, ExportPool::SIGMA_EXPORT_HARD_CAP].min : nil
     else
-      [[anchors.length * 10_000, 50_000].max, ExportPool::SIGMA_EXPORT_HARD_CAP].min
+      [[anchors.length * 10_000, ExportPool::DEFAULT_EXPORT_ROW_LIMIT].max,
+       ExportPool::SIGMA_EXPORT_HARD_CAP].min
     end
 
   body = Sigma.request(:get, "/v2/workbooks/#{wb}/spec", accept: 'text/yaml')
-  spec = begin
+  raw_spec = begin
     JSON.parse(body)
   rescue JSON::ParserError, TypeError
     require 'yaml'
     require 'date'
     body.is_a?(Hash) ? body : (YAML.safe_load(body.to_s, permitted_classes: [Date, Time]) || {})
   end
-  elements = (spec['pages'] || []).flat_map { |p| p['elements'] || [] }
+  # Workbook code-rep nests pages/layout/schemaVersion/kind under a top-level
+  # `document` key (live since 2026-08-03/04). Flatten metadata (workbookId,
+  # latestDocumentVersion, ...) and document content onto one hash: this file
+  # reads BOTH off `spec` below (flat document elements, the doc version
+  # from spec['latestDocumentVersion'] via ExportPool.resolve_doc_version, the
+  # workbook id from spec['workbookId']) and mutates elements in place for the
+  # pivot-totals strip/restore bracket, so one flat hash keeps every existing
+  # read/mutation site below working unchanged. put_spec re-nests at the wire.
+  spec = Sigma::CodeRep.metadata(raw_spec).merge(Sigma::CodeRep.document(raw_spec))
+  elements = Sigma::CodeRep.workbook_elements(spec)
   queryable = elements.reject { |el| %w[control text image container].include?(el['kind'].to_s) }
 
   # v5.4 PIVOT-TOTALS CEILING: a pivot carrying a `totals` key 500s its CSV
@@ -629,7 +665,8 @@ else
   # step. Read-only spec fields are stripped before each PUT (Sigma rejects them).
   READONLY_SPEC_KEYS = %w[workbookId url ownerId createdBy updatedBy createdAt updatedAt latestDocumentVersion].freeze
   put_spec = lambda do |s|
-    body = s.reject { |k, _| READONLY_SPEC_KEYS.include?(k) }
+    meta = Sigma::CodeRep.metadata(s).reject { |k, _| READONLY_SPEC_KEYS.include?(k) }
+    body = Sigma::CodeRep.wrap(Sigma::CodeRep.document(s), extra: meta)
     Sigma.request(:put, "/v2/workbooks/#{wb}/spec", body: JSON.generate(body))
   end
   captured_totals = {}
@@ -652,11 +689,40 @@ else
     end
   end
 
+  # RAW export cache (#7a/#7d): one export per (workbook, latestDocumentVersion,
+  # element) shared with collect-parity-actuals.rb and across gate re-runs.
+  # RAW bodies only — every anchor/emptiness/truncation verdict below is still
+  # recomputed from the bytes on every run (the reconciled #7 red line). The
+  # cache is DISABLED when the totals strip/restore bracket is active: the
+  # strip PUT bumps the document version mid-run, so payloads exported inside
+  # the bracket cannot be strictly attributed to any stable version.
+  export_doc_version = captured_totals.any? ? nil : ExportPool.resolve_doc_version(spec)
+  export_cache = ExportPool::Cache.new(opts[:dir], workbook_id: wb.to_s,
+                                       doc_version: export_doc_version)
+  if export_cache.enabled?
+    warn "  [cache] raw export cache active (wb #{wb} @ doc v#{export_doc_version}; " \
+         'strict version keys, verdicts always recomputed)'
+  elsif captured_totals.any?
+    warn '  [cache] raw export cache OFF — pivot-totals strip/restore bumps the document version mid-run'
+  else
+    warn '  [cache] raw export cache OFF — spec carries no latestDocumentVersion (cannot version-key payloads)'
+  end
+
   # Export one element, bounded by row_limit and the shared deadline.
   # Returns [:ok | :ok_truncated, rows] | [:timeout, nil] | [:failed, nil].
   export_one = lambda do |el|
     name = el_display_name(el)
     t_el = Time.now
+    # Version-keyed raw-cache hit: skip the wire flow, reparse the recorded
+    # bytes, recompute truncation — never a recorded verdict (#7 red line).
+    if (cached = export_cache.fetch(el['id'], 'csv', row_limit))
+      rows = CSV.parse(cached)
+      trunc = ExportPool.truncated?(rows, row_limit)
+      ExportPool.progress(deadline, format('CACHED  %s — %d recorded row(s) @ doc v%s (verdicts recomputed)%s',
+                                           name.inspect, [rows.length - 1, 0].max, export_doc_version,
+                                           trunc ? " [TRUNCATED at --row-limit #{row_limit}]" : ''))
+      return [trunc ? :ok_truncated : :ok, rows]
+    end
     qid = ExportPool.start_csv_export(wb, el['id'], row_limit)
     unless qid
       warn "  [WARN] export POST returned no queryId for element #{name.inspect}"
@@ -673,6 +739,7 @@ else
       [:failed, nil]
     else
       rows = CSV.parse(body)
+      export_cache.store(el['id'], 'csv', row_limit, body)
       trunc = ExportPool.truncated?(rows, row_limit)
       ExportPool.progress(deadline, format('DONE    %s — %d row(s) in %.1fs%s', name.inspect,
                                            [rows.length - 1, 0].max, Time.now - t_el,
@@ -822,6 +889,12 @@ unless export_status.empty?
   verdict['export_timed_out'] = timed_out_elements
   verdict['partial'] = timed_out_elements.any?
 end
+# RAW-cache provenance (#7a): how many exports were served from the version-
+# keyed cache vs the wire. Payload reuse only — this verdict was recomputed
+# from the raw bytes either way.
+if export_cache && export_cache.enabled?
+  verdict['export_cache'] = export_cache.stats.merge('doc_version' => export_doc_version)
+end
 
 # W1.1/W1.2: dashboard-tile emptiness + anchor display scoping. `elements` is in
 # scope from whichever branch (offline spec / live REST) populated `exports`.
@@ -884,6 +957,26 @@ if uncovered.any?
 end
 
 File.write(out_path, JSON.pretty_generate(verdict))
+
+# Evidence ledger (E3.1): record this oracle run — verdict + where the raw
+# evidence lives, under the strict version key. The GATE (assert-phase6-ran
+# gate 13) still recomputes its own decision from anchors-verdict.json.
+if EVIDENCE_LEDGER_LOADED
+  el_wb = wb # nil on the offline (--exports-dir) branch
+  el_wb = spec['workbookId'] if el_wb.to_s.empty? && spec.is_a?(Hash) && spec['workbookId']
+  EvidenceLedger.append(
+    opts[:dir], gate: 'verify-anchors',
+    verdict: verdict['pass'] ? 'pass' : (Array(verdict['missing']).any? ? 'fail' : 'inconclusive'),
+    evidence_kind: 'anchors-verdict',
+    evidence_path: File.basename(out_path),
+    evidence_key: EvidenceLedger.key(workbook_id: el_wb.to_s.empty? ? '?' : el_wb,
+                                     doc_version: export_doc_version),
+    evidence_sha256: EvidenceLedger.sha256_file(out_path),
+    detail: { 'checked' => verdict['checked'], 'matched' => verdict['matched'],
+              'missing' => Array(verdict['missing']).map { |m| m['id'] },
+              'export_cache' => (export_cache && export_cache.enabled? ? export_cache.stats : nil) }.compact
+  )
+end
 
 # Stamp the summary into parity-final.json when Phase 6 already finalized —
 # the anchors result travels with the parity verdict the final gate reads.

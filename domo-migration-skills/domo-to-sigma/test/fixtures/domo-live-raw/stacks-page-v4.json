@@ -1,0 +1,35 @@
+{
+  "id": 90210002,
+  "page": { "pageId": 90210002, "title": "Sample V4 Metrics Page" },
+  "type": "page",
+  "title": "Sample V4 Metrics Page",
+  "cards": [
+    { "id": 700000010, "urn": "700000010", "type": "kpi", "title": "Metric Zeta",
+      "metadata": { "chartType": "badge_map" } },
+    { "id": 700000011, "urn": "700000011", "type": "chart", "title": "Metric Eta",
+      "metadata": { "chartType": "column" } },
+    { "id": 700000012, "urn": "700000012", "type": "table", "title": "Metric Theta",
+      "metadata": { "chartType": "table" } }
+  ],
+  "pageLayoutV4": {
+    "layoutId": 1044455566,
+    "isDynamic": false,
+    "content": [
+      { "contentKey": 0, "cardId": 700000010, "type": "CARD" },
+      { "contentKey": 1, "cardId": 700000011, "type": "CARD" },
+      { "contentKey": 2, "cardId": 700000012, "type": "CARD" },
+      { "contentKey": 3, "type": "HEADER", "text": "Sample Section" }
+    ],
+    "standard": {
+      "width": 60,
+      "template": [
+        { "contentKey": 3, "x": 0,  "y": 0,  "width": 60, "height": 3,  "type": "HEADER" },
+        { "contentKey": 0, "x": 0,  "y": 5,  "width": 11, "height": 14, "type": "CARD" },
+        { "contentKey": 1, "x": 11, "y": 5,  "width": 8,  "height": 14, "type": "CARD" },
+        { "contentKey": 2, "x": 0,  "y": 19, "width": 30, "height": 20, "type": "CARD" },
+        { "contentKey": 4, "x": 0,  "y": 39, "width": 60, "height": 1,  "type": "PAGE_BREAK" }
+      ]
+    },
+    "compact": { "width": 12, "template": [] }
+  }
+}

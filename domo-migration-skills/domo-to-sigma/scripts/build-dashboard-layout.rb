@@ -49,6 +49,7 @@
 require 'json'
 require 'optparse'
 require_relative 'lib/layout'
+require_relative 'lib/code_rep'
 require_relative 'lib/zone_census'
 include SigmaLayout
 
@@ -170,6 +171,8 @@ def chart_pos(z, opts)
   row_start = [[row_start, opts[:chart_row0]].max, max_row - 1].min
   row_end   = [[row_end,   row_start + 1].max,      max_row].min
   row_end   = row_start + 1 if row_end <= row_start
+  # Released page-break elements are fixed to exactly one grid row.
+  row_end = row_start + 1 if z['chart_kind'] == 'page-break'
   col_start = [1,  (1 + (z['x_pct'] || 0) / 100.0 * opts[:page_cols]).round].max
   col_end   = [opts[:page_cols] + 1, (1 + ((z['x_pct'] || 0) + (z['w_pct'] || 0)) / 100.0 * opts[:page_cols]).round].min
   col_end   = col_start + 1 if col_end <= col_start
@@ -177,7 +180,7 @@ def chart_pos(z, opts)
 end
 
 # ---- Faithful container-tree layout (preferred when a control rail exists) --
-# Mirror Tableau's nested zone tree as nested Sigma GridContainers so each
+# Mirror Tableau's nested zone tree as nested Sigma Containers so each
 # filter / parameter / chart lands INSIDE the container it lives in — preserving
 # the left-rail / sidebar idiom and arbitrary nesting — instead of re-banding by
 # raw geometry (which lumps every control into one top strip). Activates only
@@ -229,7 +232,10 @@ def resolve_leaf(node, ctx)
   case node['kind']
   when 'chart'
     name = ctx[:renames][node['caption']] || node['caption']
-    el = ctx[:els_by_name][name]
+    # Builder-synthesized content (v4 HEADER/PAGE_BREAK) carries the final
+    # element id as its zone id. Ordinary Domo card zones still resolve by
+    # display name because their source card id differs from `el-<cardId>`.
+    el = ctx[:els_by_id][node['id'].to_s] || ctx[:els_by_name][name]
     el && el['id']
   when 'filter', 'parameter'
     # Pre-assigned by build_page_from_tree (caption match, then rail-fill) so a
@@ -249,7 +255,7 @@ def resolve_leaf(node, ctx)
 end
 
 # Recursively emit a zone node as Sigma layout XML at grid cell (c0,c1,r0,r1)
-# RELATIVE to its parent container. Container nodes become GridContainers whose
+# RELATIVE to its parent container. Container nodes become Containers whose
 # children are placed in the container's own 24-col internal grid; empty
 # containers (no resolvable children) are dropped. Appends new container spec
 # placeholders to ctx[:extra]; records placed element ids in ctx[:placed].
@@ -416,7 +422,8 @@ end
 def safety_net_band(page, placed, extra_els, children, prefix, below_row, page_rows)
   placeable = lambda do |e|
     k = e['kind'].to_s
-    k.end_with?('-chart') || %w[table pivot-table control text].include?(k)
+    k.end_with?('-chart') ||
+      %w[table pivot-table control text image divider embed navigation progress page-break].include?(k)
   end
   unplaced = page['elements'].select { |e| placeable.call(e) && !placed.include?(e['id']) }
   return nil if unplaced.empty?
@@ -545,12 +552,12 @@ end
 #   header band (rows 1..3) — title text full-width; colored only when the
 #                             source has a band-like fill (header_from_source);
 #                             detected source header text zones join the band
-#   sidebar rail            — one vertical GridContainer (repeat(1,1fr)) of
+#   sidebar rail            — one vertical Container (repeat(1,1fr)) of
 #                             stacked controls at the page edge; the content
 #                             grid gets the remaining columns
 #   control band            — non-rail controls side-by-side under the header
-#   KPI rows                — ONE GridContainer per detected row, inner
-#                             LayoutElements at equal spans, inner gridRow
+#   KPI rows                — ONE Container per detected row, inner
+#                             Elements at equal spans, inner gridRow
 #                             matching the container span (the KPI-sliver
 #                             rule: gridTemplateRows="auto" does NOT stretch
 #                             short children — see refs/workbook-layout.md)
@@ -611,7 +618,13 @@ def build_page_synthesized(dashboard, page, opts, structure)
   minexp      = 0
   prefix      = "syn-#{page['id']}"
 
-  header_zones = structure[:header]
+  # Screenshot-transcribed collection headers are section separators, never
+  # page-title chrome. Keep them in the content flow even when the first one
+  # sits at y≈0; otherwise Salesforce + Google Analytics get packed side by
+  # side into the single page-header band and every later section shifts.
+  header_zones = Array(structure[:header]).reject {
+    |z| z['id'].to_s.start_with?('observed-section-')
+  }
   kpi_rows     = structure[:kpi_rows]
   rail         = structure[:sidebar]
 
@@ -688,7 +701,17 @@ def build_page_synthesized(dashboard, page, opts, structure)
   resolve_zone_el = lambda do |z|
     case z['kind'].to_s
     when 'chart'
-      el = els_by_name[zone_el_name(z, opts[:renames])]
+      # Screenshot-observed layouts can carry the exact workbook element id
+      # (notably companion KPIs whose human labels repeat: "Change over 7
+      # Days", "New Visits in Period"). Prefer that exact join before the
+      # legacy name fallback, which can map every duplicate label to one tile
+      # and strand the others in the generic bottom band.
+      zid = z['id'].to_s
+      el = els_by_id[zid] || els_by_id["el-#{zid}"] ||
+           els_by_id.values.find { |candidate|
+             candidate['id'].to_s.start_with?("el-#{zid}-plugin-")
+           } ||
+           els_by_name[zone_el_name(z, opts[:renames])]
       el && el['id']
     when 'text', 'title'
       el = els_by_id["text-#{z['id']}"]
@@ -729,7 +752,13 @@ def build_page_synthesized(dashboard, page, opts, structure)
   # layout_lint checks); the zone (chart_kind + plot signals) is the fallback.
   min_for = lambda do |z, eid|
     el = els_by_id[eid]
-    el && el['kind'] ? SigmaLayout.min_rows_for(el['kind']) : SigmaLayout.min_rows_for_zone(z)
+    base = el && el['kind'] ? SigmaLayout.min_rows_for(el['kind']) : SigmaLayout.min_rows_for_zone(z)
+    if z['_source'].to_s.start_with?('observed-from-screenshot') &&
+       z['chart_kind'].to_s != 'kpi'
+      [base, 10].max
+    else
+      base
+    end
   end
 
   # --- units: KPI rows, section text separators, section panels ---------------
@@ -1029,8 +1058,11 @@ def build_page_for_dashboard(dashboard, page, opts)
    census, min_exp]
 end
 
-data_page_xml = page_xml('page-data',
-                         le(master_el['id'], 1, opts[:page_cols] + 1, 1, 21))
+data_children = Array(data_page['elements']).each_with_index.map do |element, index|
+  row = index * 12 + 1
+  le(element['id'], 1, opts[:page_cols] + 1, row, row + 11)
+end
+data_page_xml = page_xml('page-data', *data_children)
 
 page_xmls = [data_page_xml]
 sidecar = {}
@@ -1082,10 +1114,15 @@ dash_layout.each do |d|
   min_row_expansions += n_minexp.to_i
 end
 
-layout_out = assemble(*page_xmls) + "\n"
+# The vendored geometry helper still accepts its historical layout vocabulary
+# internally. Canonicalize at this Domo-owned emission boundary: Sigma's live
+# workbook verify/write endpoints accept only Element/Container.
+layout_out = Sigma::CodeRep.canonicalize_layout(assemble(*page_xmls)) + "\n"
 # Documented output-shape guard: an empty elementId is always a builder bug
 # and makes Sigma reject the whole layout PUT.
 abort 'FATAL: empty elementId in generated layout XML — builder bug' if layout_out.include?('elementId=""')
+abort 'FATAL: legacy layout tag escaped canonicalization — builder bug' \
+  if layout_out.match?(%r{</?(?:LayoutElement|GridContainer)\b})
 File.write(opts[:out], layout_out)
 File.write("#{opts[:out]}.elements.json", JSON.pretty_generate(sidecar))
 

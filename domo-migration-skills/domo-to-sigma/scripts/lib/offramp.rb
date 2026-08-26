@@ -21,6 +21,21 @@
 #   loop-stop            the loop breaker tripped (verbatim signature repeat, same
 #                        failure MODE with no measured progress, or the attempt
 #                        cap) — hard STOP
+#   mission-scope        mission.json stated scope applied (E9.6 — informational)
+#   scope-mismatch-stop  a scoped dashboard name matched nothing in the workbook (exit 19)
+#   gap-out-of-scope     an ❌-unhandled gap attributed entirely to out-of-scope
+#                        worksheets was ledgered instead of stopped for (E9.6/A2)
+#   png-read-stale       a png-read.json predating this run's discovery fetch was
+#                        set aside (no stale-seed reuse — wave-1 #2a)
+#   png-wait-timeout     the Phase-1d dashboard-read WAIT-GATE deadline passed (exit 18)
+#   finalize-chained     pass 1 chained --finalize in-process (empty agent-mediated
+#                        actuals list — wave-1 #2b)
+#   triage-retire-override  intake converted a RETIRE-tagged workbook on an
+#                        attributable operator override (front-door triage #6a)
+#   tier-assigned        the wave-2 tier ratchet decision (W2.1) — detail names
+#                        the resolved tier + tier_basis (vocabulary below)
+#   punchlist-emitted    factory mode rendered <WORK>/PUNCHLIST.md +
+#                        punchlist.json from the ledgers (W2.2)
 #
 # Never fatal: bookkeeping must not break a run.
 
@@ -29,6 +44,106 @@ require 'digest' # failure_signature hashes the normalized error line
 
 module Offramp
   module_function
+
+  # ── Authorization-provenance vocabulary (E3.6, vocab half) ─────────────────
+  # The ONE shared constant for the manual-path authorization `via` tokens
+  # (manual-path-authorized.json 'via' — written by the orchestrator at every
+  # designed judgment STOP) and the manual-spec off-ramp `reason` tokens.
+  # Baseline §3 vocabulary. Single vocabulary point by the binding conflict
+  # resolution: E5.7's dm-post-failure re-entry EXTENDS this constant (and the
+  # route-switch admit set) rather than minting strings at its call site — new
+  # stops add their token HERE first, then use it.
+  AUTHORIZATION_VIA = %w[
+    converter-stop converter-empty-model gap-scan-stop decisions-stop
+    workbook-handoff loop-stop
+  ].freeze
+  # manual-spec off-ramp reasons: the record of WHY --dm-spec/--wb-spec was
+  # admitted. 'waiver' is recorded as "waiver: <operator text>" — the constant
+  # names the stable prefix.
+  MANUAL_SPEC_REASON_STOP   = 'authorized-by-stop'  # STOP token on record (E3.6 renames this later — single point)
+  MANUAL_SPEC_REASON_REUSE  = 'reuse-dm-id'         # explicit --reuse-dm <id> (documented exit-4 re-entry)
+  MANUAL_SPEC_REASON_WAIVER = 'waiver'              # --allow-manual-spec "<reason>"
+  MANUAL_SPEC_REASONS = [MANUAL_SPEC_REASON_STOP, MANUAL_SPEC_REASON_REUSE,
+                         MANUAL_SPEC_REASON_WAIVER].freeze
+
+  # decided_by provenance vocabulary (E3.6; extended per PR #509 review R4) —
+  # the CLOSED token set for decision() records AND consent-answer.json:
+  #   'relayed'         — an agent relayed --answers operator text (NOT
+  #                       first-hand consent)
+  #   'relayed-absent'  — an --answers set was supplied but OMITTED this key;
+  #                       the honest default was recorded unattended (the
+  #                       consent chokepoint's no-response marker)
+  #   'unattended-flag' — --yes/--force defaults, nobody asked
+  #   'user'            — reserved for a first-hand orchestrator stdin read
+  #                       (E3.6's later half)
+  # New writers add their token HERE first, then use it (same single-point
+  # rule as AUTHORIZATION_VIA).
+  DECIDED_BY = %w[relayed relayed-absent unattended-flag user].freeze
+
+  # ── Wave-2 tier + factory-attestation vocabulary (W2.1/W2.2/W2.3) ──────────
+  # The ONE vocabulary point for the wave-2 tier ratchet and factory-mode
+  # verdict labeling (merged plan §3 contract 7: every new offramp/decision
+  # token lands HERE first, in one lane-B commit — the 'relayed-absent'
+  # lesson). Consumers use these names VERBATIM:
+  #   migrate-tableau.rb (lane A)   — resolves --tier {auto|S|M|full}, writes
+  #     migrate-state.json 'tier'/'tier_basis', logs the tier-assigned /
+  #     punchlist-emitted off-ramps;
+  #   assert-phase6-ran.rb (lane B) — reads 'tier' for the Tier-S waiver-budget
+  #     scale + the gate-18 valued-anchors acceptance; stamps 'verdict_by' and
+  #     the labeled factory verdict;
+  #   verify-complete.rb            — reconciles labeled verdict claims offline.
+  # The canonical example state lane A writes and lane B reads is pinned in
+  # shared/lib/testdata/wave2-tier-state.json (both lanes' tests load it —
+  # cross-lane contract 4).
+  TIER_VALUES = %w[S M full].freeze # migrate-state.json 'tier' — RESOLVED tier only
+  TIER_AUTO   = 'auto'              # CLI-only sentinel (--tier auto); never written to state
+  # migrate-state.json 'tier_basis' — HOW the tier was decided:
+  #   auto-predicate     mechanical predicate over on-disk artifacts (never an
+  #                      agent-supplied count — the anti-gaming guard)
+  #   operator-override  --tier S|M|full was passed (itself a ledgered decision)
+  #   fail-closed        predicate inputs missing/unreadable → 'full' battery
+  TIER_BASIS = %w[auto-predicate operator-override fail-closed].freeze
+  OFFRAMP_KIND_TIER_ASSIGNED     = 'tier-assigned'     # offramps.jsonl kind at the tier decision
+  OFFRAMP_KIND_PUNCHLIST_EMITTED = 'punchlist-emitted' # offramps.jsonl kind when the punch list renders
+  # Verdict attestation provenance — 'verdict_by' in parity-final.json /
+  # phase6-success.json (W2.3). 'verifier' matches the existing batch-line
+  # vocabulary (refs/orchestration.md O3 artifacts table); the gate stamps
+  # 'builder-self-attested' whenever no verifier countersignature evidence
+  # exists (no VERIFIER:-prefixed pass notes, no verification-result.json).
+  VERDICT_BY_BUILDER  = 'builder-self-attested'
+  VERDICT_BY_VERIFIER = 'verifier'
+  VERDICT_BY = [VERDICT_BY_BUILDER, VERDICT_BY_VERIFIER].freeze
+  # The labeled factory verdict (W2.3): a Tier-S factory run that ends GREEN
+  # without a countersignature must NEVER emit the bare string 'GREEN' — the
+  # suffix is the greppable discriminator a customer-facing report carries in
+  # its headline (orchestration.md O3/O4 tier-S carve-out; base verdict
+  # derivation is unchanged and verify-complete.rb re-checks the label).
+  FACTORY_VERDICT_SUFFIX = ' (factory, self-attested)'
+
+  # ── decisions.jsonl (E3.6, vocab half) ─────────────────────────────────────
+  # Append-only record of operator decisions taken at the consolidated
+  # pre-build checkpoint (and any later decision surface): one JSON line per
+  # decision — {kind, question, answer, decided_by, at}. decided_by comes from
+  # the DECIDED_BY vocabulary above. LOCAL workdir artifact, never sent
+  # anywhere. Never fatal.
+  def decision(work, kind:, question: nil, answer: nil, decided_by: nil)
+    return unless work && Dir.exist?(work.to_s)
+    rec = { 'kind' => kind.to_s, 'question' => question, 'answer' => answer,
+            'decided_by' => decided_by,
+            'at' => Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ') }.reject { |_, v| v.nil? }
+    File.open(File.join(work, 'decisions.jsonl'), 'a') { |f| f.puts(JSON.generate(rec)) }
+  rescue StandardError
+    # bookkeeping only — never fail the run
+  end
+
+  # decisions.jsonl entries (oldest first). Empty on any error.
+  def decisions(work)
+    path = File.join(work.to_s, 'decisions.jsonl')
+    return [] unless File.exist?(path)
+    File.readlines(path).map { |l| JSON.parse(l) rescue nil }.compact
+  rescue StandardError
+    []
+  end
 
   def log(work, kind:, reason: nil, detail: nil)
     return unless work && Dir.exist?(work.to_s)

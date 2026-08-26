@@ -45,25 +45,30 @@ collection; treat it as real but unverified until we see one.
   `standard`. Domo 60 → Sigma 24 is **×0.4**.
 - `content[]` entries with `type: "HEADER"` carry a `text` field and NO `cardId` —
   these are Domo's named section dividers, and they get x/y/w/h in
-  `standard.template` like anything else. They map onto the section-title concept the
-  layout builder currently *infers* from `collections[]`; with v4 we get the titles
-  AND their real positions.
-- `PAGE_BREAK` entries also appear in `standard.template`.
+  `standard.template` like anything else. `pagelayoutv4_content` preserves them
+  as authored text elements at their real positions.
+- `PAGE_BREAK` entries also appear in `standard.template`; they map to the
+  released Sigma `page-break` element and are fixed to one grid row in the
+  authoritative layout. No page break is inferred from geometry alone.
 
-## Two defects in our current code
+## Two defects — fixed
 
-Both verified by reading the source, not assumed:
+Both verified by reading the source, not assumed, and now fixed (`Domo.cards_for_page`
+requests `includeV4PageLayouts=true`; `DomoSigma.merge_pagelayoutv4_geometry` performs the
+join below):
 
-1. **`scripts/lib/domo_rest.rb:238`** — `cards_for_page` sends only `parts`. Without
-   `includeV4PageLayouts=true` a v4-inline page returns no `pageLayoutV4` at all, so
-   every such page falls through to the default-composition rung unnecessarily.
+1. **`scripts/lib/domo_rest.rb`, `cards_for_page`** — used to send only `parts`.
+   Without `includeV4PageLayouts=true` a v4-inline page returned no `pageLayoutV4`
+   at all, so every such page fell through to the default-composition rung
+   unnecessarily.
 
-2. **`scripts/lib/domo_sigma_util.rb:151`** — reads
+2. **`scripts/lib/domo_sigma_util.rb`, was at the top of what is now
+   `merge_xywh_geometry`** — used to read
    `page_layout['cards'] || page_layout.dig('pageLayoutV4', 'cards')`.
    There is no `cards` key under `pageLayoutV4`; the geometry is under
-   `standard.template`. **This dig can never match**, so the v4 branch is dead code
-   that silently yields nothing. It also reads from the separate layout endpoint's
-   response, whereas the v4 data arrives on the *stacks* response.
+   `standard.template`. **That dig could never match**, so the v4 branch was dead
+   code that silently yielded nothing. It also read from the separate layout
+   endpoint's response, whereas the v4 data arrives on the *stacks* response.
 
 The join, once both are fixed:
 
@@ -95,7 +100,7 @@ GET /api/content/v4/pages/layouts/{layoutId}/sectionState     # seen in HAR; pur
 
 ## Why this matters
 
-Pages that fall through to kind-aware default composition today would get real
-coordinates, real widths, and exact section-header positions instead. The
-screenshot / `layout-observed.json` rung stays — but it becomes the fallback for
+Pages that would otherwise fall through to kind-aware default composition get
+real coordinates, widths, section headers, and authored print breaks. The
+screenshot / `layout-observed.json` rung stays, but becomes the fallback for
 genuinely legacy pages rather than the only route to fidelity.

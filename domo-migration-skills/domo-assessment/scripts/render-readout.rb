@@ -53,7 +53,9 @@ plan      = read_json(File.join(options[:in], 'migration-plan.json'), {})
 audit     = File.exist?(File.join(options[:in], 'usage.json'))
 
 template_path = options[:template] || File.expand_path('../refs/readout-template.md', __dir__)
-tpl = File.read(template_path)
+# encoding: 'UTF-8' — the template is gsub'd below and ships prose (em-dashes,
+# arrows), so a raw read crashes under an unset/C locale. F5 crash class, #752.
+tpl = File.read(template_path, encoding: 'UTF-8')
 
 # ---- helpers (md_table/md_cell/section_block -- same pattern as the other
 # *-assessment renderers, kept vendor-agnostic on purpose) --------------------

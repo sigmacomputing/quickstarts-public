@@ -164,6 +164,8 @@ class TestScoring(FixtureMixin, unittest.TestCase):
     def test_identical_scores_near_one(self):
         res = VS.compare(self.paths["source"], self.paths["identical"])
         self.assertTrue(res["pass"])
+        self.assertEqual(res["source_health"]["status"], "PASS")
+        self.assertEqual(res["render_health"]["status"], "PASS")
         self.assertGreaterEqual(res["score_overall"], 0.98)
         self.assertGreaterEqual(res["score_ink"], 0.98)
         self.assertGreaterEqual(res["score_layout"], 0.98)
@@ -179,6 +181,7 @@ class TestScoring(FixtureMixin, unittest.TestCase):
     def test_blank_render_fails(self):
         res = VS.compare(self.paths["source"], self.paths["blank"])
         self.assertFalse(res["pass"])
+        self.assertEqual(res["render_health"]["status"], "FAIL")
         self.assertLessEqual(res["score_overall"], res["threshold"] - 0.05)
 
     def test_half_empty_render_fails(self):
@@ -198,6 +201,8 @@ class TestScoring(FixtureMixin, unittest.TestCase):
 
     def test_symmetric_blank_source_noted(self):
         res = VS.compare(self.paths["blank"], self.paths["blank"])
+        self.assertFalse(res["pass"])
+        self.assertEqual(res["source_health"]["status"], "FAIL")
         self.assertTrue(any("source appears blank" in n for n in res["notes"]))
 
 
@@ -209,7 +214,8 @@ class TestCLIContract(FixtureMixin, unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         for key, typ in (("score_layout", float), ("score_ink", float),
                          ("score_overall", float), ("pass", bool),
-                         ("threshold", float), ("notes", list)):
+                         ("threshold", float), ("notes", list),
+                         ("source_health", dict), ("render_health", dict)):
             self.assertIn(key, data)
             self.assertIsInstance(data[key], typ)
         for key in ("score_layout", "score_ink", "score_overall"):

@@ -14,12 +14,15 @@ $fail = 0
 def ok(name, cond); puts((cond ? "  ok  " : "FAIL  ") + name); $fail += 1 unless cond; end
 
 SPEC = {
-  'pages' => [{ 'elements' => [
+  'pages' => [{ 'id' => 'p1', 'name' => 'P1' }],
+  'elements' => [
     { 'id' => 'el-rev',   'columns' => [{ 'id' => 'c-m', 'name' => 'Month' }, { 'id' => 'c-r', 'name' => 'Net Revenue' }] },
     { 'id' => 'el-empty', 'columns' => [{ 'id' => 'c-x', 'name' => 'Region' }, { 'id' => 'c-y', 'name' => 'Sales' }] },
     { 'id' => 'el-piv',   'columns' => [{ 'id' => 'c-a', 'name' => 'A' }] },
     { 'id' => 'el-blank', 'columns' => [{ 'id' => 'c-b', 'name' => 'B' }] },
-  ] }],
+  ],
+  'layout' => '<Page id="p1"><Element elementId="el-rev"/><Element elementId="el-empty"/>' \
+              '<Element elementId="el-piv"/><Element elementId="el-blank"/></Page>'
 }
 
 def run(dir, charts, fixture)

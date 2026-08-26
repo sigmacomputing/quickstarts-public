@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Domo visual families</title>
+<style>
+  html,body,#root{margin:0;width:100%;height:100%;overflow:hidden;background:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#545b62}
+  *{box-sizing:border-box}.fill{width:100%;height:100%;padding:6px}
+  .treemap{display:flex;flex-wrap:wrap;align-content:stretch;gap:2px}
+  .tile{min-width:42px;min-height:28px;padding:4px;overflow:hidden;color:#fff;
+    display:flex;align-items:flex-end;font-size:11px;line-height:1.1}
+  .cloud{display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:8px 12px;padding:10px}
+  .word{color:#f28e2b;line-height:1;white-space:nowrap}
+  .calendar{display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;gap:2px;padding:8px}
+  .day{border-radius:2px;min-width:10px;min-height:10px;position:relative}
+  .day span{position:absolute;left:3px;top:2px;font-size:8px;color:#4b5563}
+  .empty{display:flex;align-items:center;justify-content:center;height:100%;color:#9ca3af}
+</style>
+</head>
+<body><div id="root"></div>
+<script src="./react.production.min.js"></script>
+<script src="./sigma-plugin-sdk.umd.js"></script>
+<script>
+(function(){
+  "use strict";
+  var root=document.getElementById("root"), last={mode:"treemap",labels:[],values:[],dates:[]};
+  var palette=["#5da5da","#8bc34a","#f28e2b","#c9302c","#b6df8a","#74c0e3","#f7c66b","#59a14f"];
+  function nums(a){return (a||[]).map(function(v){var n=Number(v);return isFinite(n)?n:0})}
+  function safe(a){return (a||[]).map(function(v){return v==null?"":String(v)})}
+  function color(v,min,max){var t=max>min?(v-min)/(max-min):.5;var light=96-Math.round(t*48);
+    return "hsl(207,58%,"+light+"%)"}
+  function renderTreemap(labels,values){
+    var rows=labels.map(function(l,i){return {l:l,v:Math.max(0,values[i]||0)}})
+      .sort(function(a,b){return b.v-a.v}).slice(0,80), total=rows.reduce(function(s,r){return s+r.v},0)||1;
+    root.className="fill treemap"; root.innerHTML=rows.map(function(r,i){
+      var grow=Math.max(.2,r.v/total*30), title=r.l.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+      return '<div class="tile" title="'+title+': '+r.v+'" style="flex:'+grow+' 1 70px;background:'+palette[i%palette.length]+'">'+title+'</div>'
+    }).join("")
+  }
+  function renderCloud(labels,values){
+    var max=Math.max.apply(null,values.concat([1])),min=Math.min.apply(null,values.concat([0]));
+    root.className="fill cloud";root.innerHTML=labels.slice(0,100).map(function(l,i){
+      var t=max>min?((values[i]||0)-min)/(max-min):.5,size=12+Math.round(30*Math.sqrt(Math.max(0,t)));
+      var title=l.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+      return '<span class="word" title="'+title+': '+(values[i]||0)+'" style="font-size:'+size+'px">'+title+'</span>'
+    }).join("")
+  }
+  function renderCalendar(dates,values){
+    var parsed=dates.map(function(d,i){var x=new Date(d);return {d:x,v:values[i]||0}})
+      .filter(function(x){return !isNaN(x.d.getTime())}).sort(function(a,b){return a.d-b.d});
+    if(!parsed.length){root.className="empty";root.textContent="No calendar data";return}
+    var first=parsed[0].d,lead=first.getDay(),max=Math.max.apply(null,parsed.map(function(x){return x.v}).concat([1]));
+    var cells=[];for(var i=0;i<lead;i++)cells.push('<div></div>');
+    parsed.forEach(function(x){cells.push('<div class="day" title="'+x.d.toLocaleDateString()+': '+x.v+
+      '" style="background:'+color(x.v,0,max)+'"><span>'+x.d.getDate()+'</span></div>')});
+    root.className="fill calendar";root.innerHTML=cells.join("")
+  }
+  function draw(x){last=x;var labels=safe(x.labels),values=nums(x.values),dates=safe(x.dates);
+    if(x.mode==="wordcloud")renderCloud(labels,values);
+    else if(x.mode==="calendar")renderCalendar(dates.length?dates:labels,values);
+    else renderTreemap(labels,values)}
+  function demo(mode){var labels=["Alpha","Beta","Gamma","Delta","Epsilon","Zeta","Eta","Theta"];
+    var values=[92,76,61,49,38,30,22,15],dates=[];for(var i=1;i<=28;i++)dates.push("2026-07-"+String(i).padStart(2,"0"));
+    draw({mode:mode||"treemap",labels:labels,values:values,dates:dates})}
+  demo("treemap");
+  var client=(window.SigmaPlugin&&window.SigmaPlugin.client)||(window.Sigma&&window.Sigma.client);
+  if(client){
+    client.config.configureEditorPanel([
+      {name:"source",type:"element"},
+      {name:"label",type:"column",source:"source",allowMultiple:false},
+      {name:"value",type:"column",source:"source",allowMultiple:false},
+      {name:"date",type:"column",source:"source",allowMultiple:false},
+      {name:"mode",type:"text"}
+    ]);
+    var unsub=null;
+    function bindConfig(cfg){
+      if(unsub){unsub();unsub=null}
+      var sourceId=cfg&&cfg.source;
+      if(sourceId&&typeof sourceId==="object")sourceId=sourceId.elementId;
+      if(!sourceId){demo(cfg&&cfg.mode);return}
+      function columnId(binding){
+        return binding&&typeof binding==="object"?binding.columnId:binding;
+      }
+      unsub=client.elements.subscribeToElementData(sourceId,function(data){
+        try{draw({mode:cfg.mode||"treemap",labels:data&&data[columnId(cfg.label)],
+          values:data&&data[columnId(cfg.value)],dates:data&&data[columnId(cfg.date)]})}catch(e){demo(cfg.mode)}
+      })
+    }
+    client.config.subscribe(bindConfig);
+    Promise.resolve(client.config.get()).then(bindConfig).catch(function(){});
+  }
+  var resizeFrame=null;
+  new ResizeObserver(function(){
+    if(resizeFrame)cancelAnimationFrame(resizeFrame);
+    resizeFrame=requestAnimationFrame(function(){resizeFrame=null;draw(last)});
+  }).observe(root);
+})();
+</script>
+</body>
+</html>

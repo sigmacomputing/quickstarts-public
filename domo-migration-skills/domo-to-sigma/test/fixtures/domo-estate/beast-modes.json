@@ -1,0 +1,8 @@
+[
+  { "id": "calculation_e2e-1", "name": "Total Net Revenue", "scope": "dataset", "class": null,
+    "sql": "SUM(`Net Revenue`)" },
+  { "id": "calculation_e2e-2", "name": "Gross Margin Pct", "scope": "dataset", "class": null,
+    "sql": "CASE WHEN SUM(`Net Revenue`) = 0 THEN 0 ELSE SUM(`Gross Profit`)/SUM(`Net Revenue`) END" },
+  { "id": "calculation_e2e-3", "name": "US Customers", "scope": "dataset", "class": null,
+    "sql": "LOWER(`Country`) LIKE 'usa'" }
+]
