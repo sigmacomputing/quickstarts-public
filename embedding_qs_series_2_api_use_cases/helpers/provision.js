@@ -44,7 +44,7 @@ async function getTeamIdByName(teamName) {
  */
 async function lookupMemberId(email) {
   const token = await getBearerToken();
-  const url = `${SIGMA_API_BASE}/members?search=${encodeURIComponent(email)}`;
+  const url = `${SIGMA_API_BASE}/members?email=${encodeURIComponent(email)}`;
 
   try {
     const response = await axios.get(url, {
