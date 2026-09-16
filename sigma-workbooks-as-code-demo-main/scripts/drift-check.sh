@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Compare the live Sigma workbook spec against the git spec.
+# Compare the live Sigma workbook contents against the git spec.
 # Exits 0 if in sync, 1 if drift is detected.
 #
 # Requires:
 #   SIGMA_API_HOST  — e.g. https://aws-api.sigmacomputing.com
 #   SIGMA_API_TOKEN — a valid bearer token
+#
+# GET /v2/workbooks/{id}?includeContents=true replaces the old
+# GET /v2/workbooks/{id}/spec endpoint. Comparison is JSON-structural (jq -S
+# on both sides), not a text/YAML diff - this avoids false "drift detected"
+# results from cosmetic re-serialization differences (key order, quote
+# style, whitespace) that don't reflect an actual content change.
 
 SPEC_FILE="${1:-workbook.yaml}"
 WORKBOOK_ID="${2:-}"
@@ -22,29 +28,22 @@ if [[ -z "$WORKBOOK_ID" ]]; then
   exit 1
 fi
 
-echo "Pulling live spec for workbook $WORKBOOK_ID..."
+echo "Pulling live contents for workbook $WORKBOOK_ID..."
 
-HTTP_CODE=$(curl -s -o /tmp/drift-check-response.yaml -w "%{http_code}" \
+HTTP_CODE=$(curl -s -o /tmp/drift-check-response.json -w "%{http_code}" \
   -X GET \
   -H "Authorization: Bearer $SIGMA_API_TOKEN" \
-  -H "Accept: application/yaml" \
-  "$SIGMA_API_HOST/v2/workbooks/$WORKBOOK_ID/spec")
+  -H "Accept: application/json" \
+  "$SIGMA_API_HOST/v2/workbooks/$WORKBOOK_ID?includeContents=true")
 
 if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
-  echo "FAIL: fetching live spec returned HTTP $HTTP_CODE"
-  cat /tmp/drift-check-response.yaml
+  echo "FAIL: fetching live workbook returned HTTP $HTTP_CODE"
+  cat /tmp/drift-check-response.json
   exit 1
 fi
 
-LIVE_SPEC=$(cat /tmp/drift-check-response.yaml)
-
-# Strip server-generated metadata for comparison
-LIVE_NORMALIZED=$(echo "$LIVE_SPEC" | yq -P 'del(.workbookId, .url, .documentVersion, .latestDocumentVersion, .ownerId, .createdBy, .updatedBy, .createdAt, .updatedAt)')
-GIT_NORMALIZED=$(yq -P '.' "$SPEC_FILE")
-
-# Compare the document sections (where actual workbook content lives)
-LIVE_DOC=$(echo "$LIVE_NORMALIZED" | yq -P '.document')
-GIT_DOC=$(echo "$GIT_NORMALIZED" | yq -P '.document')
+LIVE_DOC=$(jq -S '.contents' /tmp/drift-check-response.json)
+GIT_DOC=$(yq -o=json '.contents' "$SPEC_FILE" | jq -S '.')
 
 if [[ "$LIVE_DOC" == "$GIT_DOC" ]]; then
   echo "IN SYNC: live workbook matches git spec"

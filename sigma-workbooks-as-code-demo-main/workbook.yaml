@@ -1,7 +1,7 @@
 name: "Plugs Electronics — Sales Overview"
 folderId: "YOUR-FOLDER-ID-HERE"
 description: "Sales performance dashboard managed via GitHub. Source: sample data via custom SQL."
-document:
+contents:
   schemaVersion: 1
   elements:
     - id: header-container
@@ -68,7 +68,7 @@ document:
         text: Total Revenue
         fontSize: 16
       layout:
-        anchor: middle
+        anchor: center
       comparison:
         colorGood: '#16a34a'
         colorBad: '#dc2626'
@@ -97,7 +97,7 @@ document:
         text: Total Profit
         fontSize: 16
       layout:
-        anchor: middle
+        anchor: center
       comparison:
         colorGood: '#16a34a'
         colorBad: '#dc2626'
@@ -126,7 +126,7 @@ document:
         text: Total Orders
         fontSize: 16
       layout:
-        anchor: middle
+        anchor: center
       comparison:
         colorGood: '#16a34a'
         colorBad: '#dc2626'
@@ -157,7 +157,7 @@ document:
         text: Total Units Sold
         fontSize: 16
       layout:
-        anchor: middle
+        anchor: center
       comparison:
         colorGood: '#16a34a'
         colorBad: '#dc2626'
@@ -180,12 +180,12 @@ document:
             kind: number
             formatString: $,.0f
       color:
-        id: rp-type
+        columnId: rp-type
         sort:
           by: rp-revenue
           direction: descending
       value:
-        id: rp-revenue
+        columnId: rp-revenue
       name: Revenue by Product Type
       dataLabel:
         labels: shown

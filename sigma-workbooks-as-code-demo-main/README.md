@@ -24,8 +24,8 @@ Sigma's Workbooks as Code API lets you define an entire workbook — pages, elem
 |------|---------|
 | `workbook.yaml` | The workbook spec — single source of truth for the entire workbook |
 | `sigma.config.yaml` | Config: target workbook ID and API host |
-| `scripts/validate.sh` | Validates the spec against Sigma's API (`POST /v2/workbooks/spec/verify`) |
-| `scripts/deploy.sh` | Deploys the spec to update the live workbook (`PUT /v2/workbooks/{id}/spec`) |
+| `scripts/validate.sh` | Validates the spec against Sigma's API (`POST /v2/workbooks` with `dryRun: true`) |
+| `scripts/deploy.sh` | Deploys the spec to update the live workbook (`PUT /v2/workbooks/{id}/contents`) |
 | `scripts/drift-check.sh` | Compares the live workbook against the git spec — detects out-of-band UI edits |
 | `.github/workflows/validate.yml` | Runs on every PR — blocks merge if the spec is invalid |
 | `.github/workflows/deploy.yml` | Runs on merge to `main` — deploys the updated spec to Sigma |
@@ -46,13 +46,13 @@ Sigma's Workbooks as Code API lets you define an entire workbook — pages, elem
 
 ### 1. PR opens — spec is validated
 
-When a pull request is opened (or updated), the **Validate Workbook Spec** workflow runs automatically. It authenticates with Sigma's API using client credentials and calls the [spec verify endpoint](https://help.sigmacomputing.com/reference/verifyspec) to check that the YAML compiles correctly — valid element references, valid formulas, valid layout.
+When a pull request is opened (or updated), the **Validate Workbook Spec** workflow runs automatically. It authenticates with Sigma's API using client credentials and calls [Create a workbook](https://help.sigmacomputing.com/reference/create-workbook) with `dryRun: true` to check that the YAML compiles correctly — valid element references, valid formulas, valid layout — without actually creating anything.
 
 If validation fails, the PR is blocked from merging.
 
 ### 2. PR merges — workbook is deployed
 
-When the PR merges to `main`, the **Deploy Workbook** workflow runs. It calls the [spec update endpoint](https://help.sigmacomputing.com/reference/updateworkbookspec) to push the new spec to the live Sigma workbook. The published workbook updates in place — same URL, same embeds, same permissions.
+When the PR merges to `main`, the **Deploy Workbook** workflow runs. It calls [Update a workbook's contents](https://help.sigmacomputing.com/reference/update-workbook-contents) to push the new spec to the live Sigma workbook. The published workbook updates in place — same URL, same embeds, same permissions.
 
 ### 3. Making a change
 
@@ -186,50 +186,56 @@ source:
 ```yaml
 name: "My Workbook"
 description: "Managed via GitHub"
-document:
+contents:
   kind: workbook
   schemaVersion: 1
   pages:
     - id: page-data
       name: Data
-      visibility: hidden          # Hidden pages hold source tables
-      elements:
-        - id: my-source
-          kind: table
-          name: My Data
-          source:
-            kind: sql             # Custom SQL — runs on any warehouse connection
-            connectionId: "..."   # Your Sigma connection UUID
-            statement: |
-              SELECT DATE '2024-01-01' AS "Date", 100.00 AS "Revenue"
-              UNION ALL SELECT DATE '2024-02-01', 200.00
-          columns:
-            - id: col-revenue
-              name: Revenue
-              formula: "[Custom SQL/Revenue]"  # SQL sources use [Custom SQL/...] prefix
-
+      visibility: hidden          # Hidden pages hold source tables - just metadata, no elements nested here
     - id: page-main
       name: Dashboard
-      elements:
-        - id: revenue-kpi
-          kind: kpi-chart
-          name: Total Revenue
-          source:
-            kind: table
-            elementId: my-source    # References the hidden source table
-          columns:
-            - id: kpi-val
-              name: Revenue
-              formula: "Sum([My Data/Revenue])"  # Downstream elements use [ElementName/...]
-              format:
-                kind: number
-                formatString: "$,.0f"
-          value: { columnId: kpi-val }
+
+  # Every element in the workbook lives in this one flat array, regardless of
+  # which page it ends up on - page membership is decided entirely by `layout`
+  # below, not by anything on the element itself.
+  elements:
+    - id: my-source
+      kind: table
+      name: My Data
+      source:
+        kind: sql             # Custom SQL — runs on any warehouse connection
+        connectionId: "..."   # Your Sigma connection UUID
+        statement: |
+          SELECT DATE '2024-01-01' AS "Date", 100.00 AS "Revenue"
+          UNION ALL SELECT DATE '2024-02-01', 200.00
+      columns:
+        - id: col-revenue
+          name: Revenue
+          formula: "[Custom SQL/Revenue]"  # SQL sources use [Custom SQL/...] prefix
+
+    - id: revenue-kpi
+      kind: kpi-chart
+      name: Total Revenue
+      source:
+        kind: table
+        elementId: my-source    # References the hidden source table
+      columns:
+        - id: kpi-val
+          name: Revenue
+          formula: "Sum([My Data/Revenue])"  # Downstream elements use [ElementName/...]
+          format:
+            kind: number
+            formatString: "$,.0f"
+      value: { columnId: kpi-val }
 
   layout: |
     <?xml version="1.0" encoding="utf-8"?>
+    <Page type="grid" gridTemplateColumns="repeat(24, 1fr)" id="page-data">
+      <Element elementId="my-source" gridColumn="1 / 25" gridRow="1 / 17"/>
+    </Page>
     <Page type="grid" gridTemplateColumns="repeat(24, 1fr)" id="page-main">
-      <LayoutElement elementId="revenue-kpi" gridColumn="1 / 13" gridRow="1 / 6"/>
+      <Element elementId="revenue-kpi" gridColumn="1 / 13" gridRow="1 / 6"/>
     </Page>
 ```
 
@@ -240,8 +246,9 @@ document:
 | **Data source** | Use `kind: sql` with a `connectionId` and `statement` for custom SQL, or `kind: data-model` to reference an existing Sigma data model |
 | **SQL column formulas** | On the SQL source element itself, reference columns with `[Custom SQL/ColumnName]` |
 | **Cross-element formulas** | Downstream elements reference the source by name: `[ElementName/ColumnName]` |
+| **Page assignment** | `contents.elements` is one flat array - nesting an `<Element>` inside a given `<Page>` in `contents.layout` is what assigns it there, not anything on the element itself. Every element needs a placement, including ones on hidden pages. |
 | **Layout grid** | 24-column grid. `gridColumn: "1 / 13"` = left half, `"13 / 25"` = right half |
-| **Containers** | Use `kind: container` + `GridContainer` in layout XML to group elements |
+| **Containers** | Use `kind: container` + `<Container>` in layout XML to group elements. Legacy `<GridContainer>`/`<LayoutElement>` tags are no longer accepted. |
 | **Controls** | `kind: control` for filters — supports `date-range`, `list`, `text`, `boolean` types |
 | **Hidden pages** | Set `visibility: hidden` on data pages so end users only see dashboards |
 
@@ -278,7 +285,8 @@ The included spec works out of the box with any Snowflake connection — the sam
 
 ## Resources
 
-- [Workbooks as Code documentation](https://help.sigmacomputing.com/docs/workbooks-as-code)
+- [Manage workbooks as code](https://help.sigmacomputing.com/docs/manage-workbooks-as-code)
 - [Sigma REST API reference](https://help.sigmacomputing.com/reference)
 - [Sigma CLI](https://help.sigmacomputing.com/docs/sigma-cli)
 - [API authentication](https://help.sigmacomputing.com/reference/token)
+- [Sigma agent skills](https://help.sigmacomputing.com/docs/install-skills-for-ai-assistants) — if you're editing `workbook.yaml` with an AI coding assistant (Claude Code, Cursor, Codex, Cortex), the official `sigma-workbooks` skill adds schema-aware authoring help on top of this repo's git/CI workflow

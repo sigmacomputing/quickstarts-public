@@ -58,13 +58,21 @@ jobs:
           WORKBOOK_ID=$(yq -r '.workbook_id' sigma.config.yaml)
           BRANCH="drift/sync-$(date +%Y%m%d-%H%M%S)"
 
-          # Pull the live spec and strip server-generated metadata
+          # Pull the live contents and merge into workbook.yaml, leaving
+          # name/folderId/description untouched - those live on the workbook
+          # resource itself, not in the contents this endpoint returns, and
+          # keeping them as-is avoids the cosmetic top-level diffs that a
+          # full-file overwrite used to produce on every drift PR.
           curl -sf -X GET \
             -H "Authorization: Bearer $SIGMA_API_TOKEN" \
-            -H "Accept: application/yaml" \
-            "$SIGMA_API_HOST/v2/workbooks/$WORKBOOK_ID/spec" \
-          | yq -P 'del(.workbookId, .url, .documentVersion, .latestDocumentVersion, .ownerId, .createdBy, .updatedBy, .createdAt, .updatedAt)' \
-          > workbook.yaml
+            "$SIGMA_API_HOST/v2/workbooks/$WORKBOOK_ID?includeContents=true" \
+          | jq '.contents' > /tmp/live-contents.json
+
+          yq -o=json '.' workbook.yaml \
+          | jq --slurpfile c /tmp/live-contents.json '.contents = $c[0]' \
+          | yq -P -o=yaml - \
+          > workbook.yaml.new
+          mv workbook.yaml.new workbook.yaml
 
           # Check if there are actual changes
           if git diff --quiet workbook.yaml; then
