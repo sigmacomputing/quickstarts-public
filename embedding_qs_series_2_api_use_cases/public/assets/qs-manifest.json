@@ -10,5 +10,6 @@
   { "slug": "api-embed-filters", "label": "Custom Filters" },
   { "slug": "api-embed-hide-menu-page-nav", "label": "Hide Sigma Menus / Page Nav" },
   { "slug": "api-embed-default-workbook-users", "label": "Set Default Workbook" },
-  { "slug": "api-embed-carousel", "label": "Custom Workbook List" }
+  { "slug": "api-embed-carousel", "label": "Custom Workbook List" },
+  { "slug": "api-embed-agents", "label": "Calling Sigma Agents" }
 ]

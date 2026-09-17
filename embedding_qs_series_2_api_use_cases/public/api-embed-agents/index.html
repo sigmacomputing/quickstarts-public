@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Calling Sigma Agents QuickStart</title>
+    <link rel="stylesheet" href="/styles/main.css" />
+    <link rel="icon" href="data:," />
+  </head>
+
+  <body>
+    <!-- === Topbar === -->
+    <header class="layout-topbar">
+      <div style="display: flex; align-items: center; gap: 0.5rem">
+        <button class="home-button" onclick="location.href='/'">
+          ← Back to Landing Page
+        </button>
+        <span class="header-title">API Calling Sigma Agents QuickStart</span>
+      </div>
+
+      <div class="control-panel">
+        <div class="control-group">
+          <label for="workbookSelect">Workbook:</label>
+          <select id="workbookSelect">
+            <option value="" disabled selected style="color: gray; font-style: italic">
+              Select a workbook
+            </option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="agentSelect">Agent:</label>
+          <select id="agentSelect" disabled>
+            <option value="" disabled selected style="color: gray; font-style: italic">
+              Select a workbook first
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div style="white-space: nowrap;">
+        <button onclick="window.open('/api-embed-agents/README.md', '_blank')" style="display: inline-block;">README</button>
+      </div>
+    </header>
+
+    <!-- === Main Layout === -->
+    <div class="main">
+      <main class="content">
+        <div class="form-section">
+          <h3>All Agents Across the Org</h3>
+          <p>Calls <code>GET /v2/workbookAgents</code> — every agent you can access, regardless of workbook.</p>
+          <button class="btn btn-secondary" onclick="loadAllAgents()">List All Agents</button>
+          <pre id="allAgentsOutput" style="background:#f5f5f5; padding:0.75rem; border-radius:4px; max-height:150px; overflow:auto;">Click "List All Agents" to load.</pre>
+        </div>
+
+        <div class="form-section">
+          <h3>Call an Agent</h3>
+
+          <div class="form-group">
+            <label for="messageInput">Message</label>
+            <textarea id="messageInput" rows="3" style="width:100%;" placeholder="Ask the agent a question about its data sources...">Summarize this dataset.</textarea>
+          </div>
+
+          <div class="form-row" style="gap: 2rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal;">
+              <input type="checkbox" id="streamToggle" style="width: auto;" /> Stream response
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal;">
+              <input type="checkbox" id="structuredToggle" onchange="toggleSchemaBox()" style="width: auto;" /> Use structured output (responseFormat)
+            </label>
+          </div>
+
+          <div class="form-group" id="schemaBoxWrapper" style="display:none;">
+            <label for="schemaInput">JSON Schema for responseFormat.jsonSchema</label>
+            <textarea id="schemaInput" rows="6" style="width:100%; font-family: monospace;">{
+  "type": "object",
+  "properties": {
+    "summary": { "type": "string" },
+    "keyMetrics": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["summary"]
+}</textarea>
+          </div>
+
+          <button class="btn btn-primary" id="sendBtn" onclick="callAgent()">Send</button>
+
+          <h3 style="margin-top:1.5rem;">Response</h3>
+          <pre id="responseOutput" style="background:#f5f5f5; padding:0.75rem; border-radius:4px; min-height:120px; white-space:pre-wrap;">No response yet.</pre>
+        </div>
+      </main>
+    </div>
+
+    <footer class="layout-footer">Sigma &copy; 2026</footer>
+  </body>
+  <script>
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+    let DEBUG = false;
+    let selectedWorkbookId = "";
+    let selectedAgentId = "";
+
+    // ============================================================================
+    // ENVIRONMENT
+    // ============================================================================
+    async function loadEnv() {
+      try {
+        const res = await fetch("/env.json");
+        const env = await res.json();
+        DEBUG = String(env.DEBUG).toLowerCase() === "true";
+        if (DEBUG) console.log("DEBUG mode enabled via /env.json");
+      } catch (err) {
+        if (DEBUG) console.warn("Failed to load /env.json config");
+      }
+    }
+
+    // ============================================================================
+    // DATA LOADING
+    // ============================================================================
+
+    // Reuses the existing GET /api/workbooks route (same one every other
+    // sample page uses) — returns { id, urlId, name, url, path } per workbook.
+    // `id` is the full workbookId the agent endpoints require.
+    async function loadWorkbooks() {
+      const select = document.getElementById("workbookSelect");
+      try {
+        const res = await fetch("/api/workbooks");
+        const { workbooks } = await res.json();
+
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select a workbook</option>`;
+        workbooks.forEach((wb) => {
+          const opt = document.createElement("option");
+          opt.value = wb.id;
+          opt.textContent = wb.name;
+          select.appendChild(opt);
+        });
+
+        select.addEventListener("change", () => {
+          selectedWorkbookId = select.value;
+          loadWorkbookAgents(selectedWorkbookId);
+        });
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load workbooks:", err);
+        select.innerHTML = `<option value="">Error loading workbooks</option>`;
+      }
+    }
+
+    // GET /v2/workbooks/{workbookId}/agents — agents scoped to one workbook
+    async function loadWorkbookAgents(workbookId) {
+      const select = document.getElementById("agentSelect");
+      select.disabled = true;
+      select.innerHTML = `<option value="" disabled selected>Loading agents...</option>`;
+
+      try {
+        const res = await fetch(`/api/agents/workbook/${encodeURIComponent(workbookId)}`);
+        const data = await res.json();
+        const agents = data.entries || data.agents || [];
+
+        if (!agents.length) {
+          select.innerHTML = `<option value="" disabled selected>No agents found on this workbook</option>`;
+          return;
+        }
+
+        select.innerHTML = `<option value="" disabled selected style="color:gray;font-style:italic">Select an agent</option>`;
+        agents.forEach((agent) => {
+          const opt = document.createElement("option");
+          opt.value = agent.agentId;
+          opt.textContent = agent.agentName || agent.agentId;
+          select.appendChild(opt);
+        });
+        select.disabled = false;
+
+        select.addEventListener("change", () => {
+          selectedAgentId = select.value;
+        });
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load workbook agents:", err);
+        select.innerHTML = `<option value="">Error loading agents</option>`;
+      }
+    }
+
+    // GET /v2/workbookAgents — every agent accessible across the org
+    async function loadAllAgents() {
+      const out = document.getElementById("allAgentsOutput");
+      out.textContent = "Loading...";
+      try {
+        const res = await fetch("/api/agents/all");
+        const data = await res.json();
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        if (DEBUG) console.error("Failed to load all agents:", err);
+        out.textContent = "Error loading agents — see console.";
+      }
+    }
+
+    // ============================================================================
+    // STREAM PARSING
+    // ============================================================================
+    // Parses the agent's SSE stream and renders a readable live view instead of
+    // dumping raw "event: ...\ndata: ..." text. Event shapes seen in practice:
+    //   text-delta          { delta, channel: "reasoning" | "answer" }
+    //   tool-call           { callId, name }
+    //   tool-call-args-delta{ callId, delta }  (partial JSON args, ignored here)
+    //   tool-result         { callId, name, output, isError }
+    async function renderAgentStream(body, outputEl) {
+      const reader = body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let reasoning = "";
+      let answer = "";
+      const activity = [];
+
+      const render = () => {
+        const parts = [];
+        if (activity.length) parts.push(activity.join("\n"));
+        if (reasoning) parts.push("Reasoning:\n" + reasoning);
+        parts.push("Answer:\n" + (answer || "..."));
+        outputEl.textContent = parts.join("\n\n");
+      };
+      render();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const messages = buffer.split("\n\n");
+        buffer = messages.pop(); // last chunk may be incomplete — keep for next read
+
+        for (const message of messages) {
+          const dataLine = message.split("\n").find((l) => l.startsWith("data:"));
+          if (!dataLine) continue;
+
+          let payload;
+          try {
+            payload = JSON.parse(dataLine.slice(5).trim());
+          } catch (err) {
+            continue;
+          }
+
+          if (payload.type === "text-delta") {
+            if (payload.channel === "reasoning") reasoning += payload.delta;
+            else answer += payload.delta;
+          } else if (payload.type === "tool-call") {
+            activity.push(`→ Calling ${payload.name}...`);
+          } else if (payload.type === "tool-result") {
+            activity.push(`✓ ${payload.name} returned${payload.isError ? " an error" : " a result"}`);
+          }
+
+          render();
+        }
+      }
+    }
+
+    // ============================================================================
+    // CALL AN AGENT
+    // ============================================================================
+    function toggleSchemaBox() {
+      const wrapper = document.getElementById("schemaBoxWrapper");
+      wrapper.style.display = document.getElementById("structuredToggle").checked ? "block" : "none";
+    }
+
+    async function callAgent() {
+      const responseOutput = document.getElementById("responseOutput");
+
+      if (!selectedWorkbookId || !selectedAgentId) {
+        responseOutput.textContent = "Select a workbook and an agent first.";
+        return;
+      }
+
+      const message = document.getElementById("messageInput").value.trim();
+      if (!message) {
+        responseOutput.textContent = "Enter a message to send to the agent.";
+        return;
+      }
+
+      const stream = document.getElementById("streamToggle").checked;
+      const useStructured = document.getElementById("structuredToggle").checked;
+
+      const body = {
+        messages: [{ role: "user", content: message }],
+        stream,
+      };
+
+      if (useStructured) {
+        try {
+          const schema = JSON.parse(document.getElementById("schemaInput").value);
+          body.responseFormat = { type: "json_schema", jsonSchema: schema };
+        } catch (err) {
+          responseOutput.textContent = "Invalid JSON in the schema box — fix it and try again.";
+          return;
+        }
+      }
+
+      responseOutput.textContent = stream ? "" : "Loading...";
+
+      const url = `/api/agents/${encodeURIComponent(selectedWorkbookId)}/${encodeURIComponent(selectedAgentId)}/run`;
+
+      try {
+        if (stream) {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+
+          if (!res.ok || !res.body) {
+            const text = await res.text();
+            responseOutput.textContent = `Error: ${text}`;
+            return;
+          }
+
+          await renderAgentStream(res.body, responseOutput);
+        } else {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json();
+          responseOutput.textContent = JSON.stringify(data, null, 2);
+        }
+      } catch (err) {
+        if (DEBUG) console.error("Agent call failed:", err);
+        responseOutput.textContent = `Request failed: ${err.message}`;
+      }
+    }
+
+    // ============================================================================
+    // INITIALIZATION
+    // ============================================================================
+    (async () => {
+      await loadEnv();
+      await loadWorkbooks();
+    })();
+  </script>
+</html>

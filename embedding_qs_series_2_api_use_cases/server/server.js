@@ -31,6 +31,7 @@ app.use("/api/exports", require("../routes/api/exports"));
 app.use("/api/default-workbook", require("../routes/api/default-workbook"));
 app.use("/api/workbook-descriptions", require("../routes/api/workbook-descriptions"));
 app.use("/api/workbook-copy-create", require("../routes/api/workbook-copy-create"));
+app.use("/api/agents", require("../routes/api/agents"));
 
 // GET /provision-users — One-time provisioning for build/view users
 // Creates embed users with specified permissions and returns their member IDs
