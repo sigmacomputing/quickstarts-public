@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deploy a workbook spec to Sigma by updating an existing workbook.
+# Deploy a workbook spec to Sigma by updating an existing workbook's contents.
 # Usage: ./scripts/deploy.sh [spec-file] [workbook-id]
 #
 # Requires:
 #   SIGMA_API_HOST  — e.g. https://aws-api.sigmacomputing.com
 #   SIGMA_API_TOKEN — a valid bearer token
+#
+# PUT /v2/workbooks/{id}/contents replaces the old PUT /v2/workbooks/{id}/spec
+# endpoint. It expects a body of exactly {"contents": <the contents object>} -
+# name/folderId/description live on the workbook resource itself and aren't
+# part of this call.
 
 SPEC_FILE="${1:-workbook.yaml}"
 WORKBOOK_ID="${2:-}"
@@ -29,13 +34,15 @@ fi
 
 echo "Deploying $SPEC_FILE to workbook $WORKBOOK_ID..."
 
+BODY=$(yq -o=json '.' "$SPEC_FILE" | jq '{contents: .contents}')
+
 HTTP_CODE=$(curl -s -o /tmp/deploy-response.json -w "%{http_code}" \
   -X PUT \
   -H "Authorization: Bearer $SIGMA_API_TOKEN" \
-  -H "Content-Type: application/yaml" \
+  -H "Content-Type: application/json" \
   -H "Accept: application/json" \
-  --data-binary @"$SPEC_FILE" \
-  "$SIGMA_API_HOST/v2/workbooks/$WORKBOOK_ID/spec")
+  --data-binary "$BODY" \
+  "$SIGMA_API_HOST/v2/workbooks/$WORKBOOK_ID/contents")
 
 if [[ "$HTTP_CODE" -ge 200 && "$HTTP_CODE" -lt 300 ]]; then
   echo "SUCCESS: workbook updated (HTTP $HTTP_CODE)"
