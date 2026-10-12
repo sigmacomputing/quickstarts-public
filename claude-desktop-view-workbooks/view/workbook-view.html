@@ -5,19 +5,23 @@
     <title>Sigma workbook</title>
     <style>
       html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+      body { display: flex; flex-direction: column; }
       #status { padding: 12px; font-size: 14px; color: #555; }
-      #workbook { display: none; border: 0; width: 100%; height: 100%; }
+      #workbook { display: none; border: 0; width: 100%; flex: 1; }
+      #note { padding: 2px 8px; font-size: 11px; color: #666; }
     </style>
   </head>
   <body>
     <div id="status">Loading workbook...</div>
     <iframe id="workbook" allow="clipboard-write"></iframe>
+    <div id="note"></div>
     <script>
       // Minimal MCP Apps view: complete the ui/initialize handshake with the
       // host, then show the workbook URL delivered in the tool result.
       const VIEW_HEIGHT = 720;
       const status = document.getElementById("status");
       const frame = document.getElementById("workbook");
+      const note = document.getElementById("note");
       const pending = new Map();
       let nextId = 1;
 
@@ -33,12 +37,28 @@
         });
       }
 
+      // Reports what happens to the Sigma frame, because a blocked or failed
+      // frame is otherwise just a blank box.
+      document.addEventListener("securitypolicyviolation", (event) => {
+        note.textContent = "Blocked by the host's content security policy: " +
+          event.violatedDirective + " (" + event.blockedURI + ")";
+      });
+      frame.addEventListener("load", () => {
+        const loaded = new URL(frame.src);
+        note.textContent = "Loaded " + loaded.host + loaded.pathname;
+      });
+
       function showWorkbook(result) {
-        const url = result && result.structuredContent && result.structuredContent.embedUrl;
+        const content = result && result.structuredContent;
+        const url = content && content.embedUrl;
         if (!url) {
           status.textContent = "No workbook was returned.";
           return;
         }
+        note.textContent = "Loading " + new URL(url).host + new URL(url).pathname + " ...";
+        setTimeout(() => {
+          if (note.textContent.startsWith("Loading")) note.textContent = "Still waiting for the workbook to load.";
+        }, 15000);
         frame.src = url;
         frame.style.display = "block";
         status.style.display = "none";

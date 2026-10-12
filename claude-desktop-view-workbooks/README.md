@@ -26,13 +26,13 @@ It exposes two tools and one view:
    npm test
    ```
 
-5. Add the server to Claude Desktop's `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`), using the full path to `server.js`:
+5. Add the server to Claude Desktop's `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`), using the full path to `server.js`. Use the full path to Node.js as well (run `which node` to find it), because Claude Desktop may not see the same PATH as your terminal:
 
    ```json
    {
      "mcpServers": {
        "sigma-workbooks": {
-         "command": "node",
+         "command": "/full/path/to/node",
          "args": ["/full/path/to/claude-desktop-view-workbooks/server.js"]
        }
      }
@@ -43,7 +43,8 @@ It exposes two tools and one view:
 
 ## Notes
 
+- Workbooks open in Claude's built-in browser pane, which is available in `Cowork` (choose it next to the message box).
 - Each signed link works once. If a workbook fails to load with "The JWT has already been used", ask Claude to open it again for a new link.
-- Search and view both run as the default embed user (`EMAIL` in `.env`), so results match what that user can open.
+- Each workbook opens as the default embed user (`EMAIL` in `.env`). Search lists the workbooks your client credentials can see, so a result may not open if that user lacks access. Set `CLAUDE_DESKTOP_SEARCH_PATH_PREFIX` to limit search to a workspace the user can open.
 - The server writes only to stderr. Anything written to stdout would break the connection to Claude Desktop.
 - Pass the workbook slug or URL, never Sigma's internal workbook ID.

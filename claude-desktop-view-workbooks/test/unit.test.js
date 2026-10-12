@@ -4,7 +4,6 @@ import { readdirSync, readFileSync } from "node:fs";
 import jwt from "jsonwebtoken";
 import { searchWorkbooks, hasClearMatch } from "../lib/search.js";
 import { getConfig, requireConfig } from "../lib/config.js";
-import { createApiAssertion } from "../lib/jwt.js";
 import { parseWorkbookRef, buildEmbedUrl } from "../lib/embed-url.js";
 import { clearTokenCache, getBearerToken, listWorkbooks, slugFromUrl } from "../lib/sigma.js";
 
@@ -21,9 +20,6 @@ const config = {
   embedParameters: { hide_menu: "true", theme: "Lite" },
   pageId: "",
   sessionLength: 3600,
-  searchAuth: "user",
-  apiClientId: "",
-  apiClientSecret: "",
   searchPathPrefix: "",
   defaultWorkbookUrl: "",
   debug: false,
@@ -92,16 +88,18 @@ test("buildEmbedUrl signs a single-use JWT and appends the embed parameters", ()
   assert.notEqual(claims.jti, secondClaims.jti);
 });
 
+test("embed user claims are left out when they are not set", () => {
+  const url = buildEmbedUrl(
+    { orgSlug: "acme", slug: "Sales-abc123" },
+    { ...config, accountType: "", teams: [], userAttributes: {} },
+  );
+  const claims = jwt.decode(new URL(url).searchParams.get(":jwt"));
+  assert.deepEqual(Object.keys(claims).sort(), ["exp", "iat", "iss", "jti", "sub"]);
+});
+
 test("buildEmbedUrl can open a specific page", () => {
   const url = new URL(buildEmbedUrl({ orgSlug: "acme", slug: "Sales-abc123" }, { ...config, pageId: "p9" }));
   assert.equal(url.pathname, "/acme/workbook/Sales-abc123/page/p9");
-});
-
-test("the API assertion is short-lived and scoped to view", () => {
-  const claims = jwt.verify(createApiAssertion(config), config.embedClientSecret, { algorithms: ["HS256"] });
-  assert.equal(claims.sub, "viewer@example.com");
-  assert.equal(claims.exp - claims.iat, 300);
-  assert.deepEqual(claims.embed.permissions, ["view"]);
 });
 
 test("getConfig reads the shared and CLAUDE_DESKTOP_ settings", () => {
@@ -132,6 +130,7 @@ test("getConfig reads the shared and CLAUDE_DESKTOP_ settings", () => {
     assert.equal(result.sessionLength, 2592000);
     assert.equal(result.embedParameters.hide_menu, "true");
     assert.equal(result.embedParameters.theme, "Dark");
+    assert.equal(result.display, "pane");
   } finally {
     for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
     Object.assign(process.env, saved);
@@ -163,6 +162,21 @@ afterEach(() => {
 });
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status });
+
+test("sign-in uses the client credentials grant with the Client ID and Secret", async () => {
+  let request;
+  globalThis.fetch = async (url, init) => {
+    request = { url, init };
+    return json({ access_token: "tok", expires_in: 3600 });
+  };
+  await getBearerToken(config);
+  assert.equal(request.url, "https://api.example.com/v2/auth/token");
+  assert.equal(request.init.headers["Content-Type"], "application/x-www-form-urlencoded");
+  const form = new URLSearchParams(request.init.body);
+  assert.equal(form.get("grant_type"), "client_credentials");
+  assert.equal(form.get("client_id"), "client-id");
+  assert.equal(form.get("client_secret"), "a-test-secret-value");
+});
 
 test("the access token is cached and reused", async () => {
   globalThis.fetch = async (url) => {

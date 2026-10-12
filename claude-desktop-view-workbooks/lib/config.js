@@ -72,10 +72,8 @@ export function getConfig() {
     userAttributes,
     embedParameters,
     pageId: pick("page_id"),
+    display: ["inline", "auto"].includes(env[`${MODE}_DISPLAY`]) ? env[`${MODE}_DISPLAY`] : "pane",
     sessionLength: Math.min(parseInt(env.SESSION_LENGTH) || 3600, 2592000),
-    searchAuth: env[`${MODE}_SEARCH_AUTH`] === "client" ? "client" : "user",
-    apiClientId: env[`${MODE}_API_CLIENT_ID`],
-    apiClientSecret: env[`${MODE}_API_CLIENT_SECRET`],
     searchPathPrefix: env[`${MODE}_SEARCH_PATH_PREFIX`] || "",
     debug: env.DEBUG === "true",
   };
@@ -88,8 +86,6 @@ const ENV_NAMES = {
   embedClientId: "CLIENT_ID",
   embedClientSecret: "SECRET",
   embedUserEmail: "EMAIL",
-  apiClientId: `${MODE}_API_CLIENT_ID`,
-  apiClientSecret: `${MODE}_API_CLIENT_SECRET`,
 };
 
 // Fails with the names of the missing .env settings so Claude can relay them.

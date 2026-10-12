@@ -18,8 +18,21 @@ before(async () => {
   api = http.createServer((req, res) => {
     res.setHeader("Content-Type", "application/json");
     if (req.method === "POST" && req.url === "/v2/auth/token") {
-      tokenRequests++;
-      return res.end(JSON.stringify({ access_token: "fake-token", expires_in: 3600 }));
+      let body = "";
+      req.on("data", (chunk) => (body += chunk));
+      return req.on("end", () => {
+        const form = new URLSearchParams(body);
+        const valid =
+          form.get("grant_type") === "client_credentials" &&
+          form.get("client_id") === "client-id" &&
+          form.get("client_secret") === "a-test-secret-value";
+        if (!valid) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error_description: `Invalid grant type. Got '${form.get("grant_type")}'` }));
+        }
+        tokenRequests++;
+        res.end(JSON.stringify({ access_token: "fake-token", expires_in: 3600 }));
+      });
     }
     if (req.url.startsWith("/v2/workbooks") && req.headers.authorization === "Bearer fake-token") {
       return res.end(JSON.stringify({ entries }));
@@ -40,8 +53,7 @@ const BLANK_SETTINGS = [
   "hide_page_controls", "hide_reload_button", "hide_title", "hide_tooltip",
   "hide_view_select", "lng", "menu_position", "responsive_height", "theme", "view_id",
   "CLAUDE_DESKTOP_EMAIL", "CLAUDE_DESKTOP_ACCOUNT_TYPE", "CLAUDE_DESKTOP_TEAMS",
-  "CLAUDE_DESKTOP_SEARCH_PATH_PREFIX", "CLAUDE_DESKTOP_SEARCH_AUTH",
-  "CLAUDE_DESKTOP_API_CLIENT_ID", "CLAUDE_DESKTOP_API_CLIENT_SECRET",
+  "CLAUDE_DESKTOP_SEARCH_PATH_PREFIX", "CLAUDE_DESKTOP_DISPLAY",
 ];
 
 const serverEnv = () => ({
@@ -53,13 +65,13 @@ const serverEnv = () => ({
   CLAUDE_DESKTOP_API_URL: apiUrl,
 });
 
-async function connect(capabilities = {}) {
+async function connect(capabilities = {}, extraEnv = {}) {
   const client = new Client({ name: "test-client", version: "1.0.0" }, { capabilities });
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: ["server.js"],
     cwd: fileURLToPath(new URL("..", import.meta.url)),
-    env: serverEnv(),
+    env: { ...serverEnv(), ...extraEnv },
     stderr: "ignore",
   });
   await client.connect(transport);
@@ -67,7 +79,7 @@ async function connect(capabilities = {}) {
 }
 
 test("lists both tools and the view resource", async () => {
-  const client = await connect();
+  const client = await connect({}, { CLAUDE_DESKTOP_DISPLAY: "auto" });
   try {
     const { tools } = await client.listTools();
     assert.deepEqual(tools.map((tool) => tool.name).sort(), ["search_workbooks", "show_sigma_workbook"]);
@@ -79,7 +91,10 @@ test("lists both tools and the view resource", async () => {
     const view = await client.readResource({ uri: "ui://sigma-workbooks/workbook-view" });
     assert.equal(view.contents[0].mimeType, "text/html;profile=mcp-app");
     assert.match(view.contents[0].text, /ui\/initialize/);
-    assert.deepEqual(view.contents[0]._meta.ui.csp.frameDomains, ["https://app.sigmacomputing.com"]);
+    const origin = ["https://app.sigmacomputing.com"];
+    for (const csp of [view.contents[0]._meta.ui.csp, resources.find((r) => r.uri === "ui://sigma-workbooks/workbook-view")._meta.ui.csp]) {
+      assert.deepEqual(csp, { frameDomains: origin, connectDomains: origin, resourceDomains: origin });
+    }
   } finally {
     await client.close();
   }
@@ -101,7 +116,7 @@ test("search finds a workbook by approximate name", async () => {
 });
 
 test("a host without MCP Apps gets a single-use URL to open in the browser pane", async () => {
-  const client = await connect();
+  const client = await connect({}, { CLAUDE_DESKTOP_DISPLAY: "auto" });
   try {
     const result = await client.callTool({ name: "show_sigma_workbook", arguments: { workbookSlug: "Revenue-Forecast-bbb222" } });
     assert.ok(!result.isError);
@@ -113,15 +128,35 @@ test("a host without MCP Apps gets a single-use URL to open in the browser pane"
   }
 });
 
-test("a host with MCP Apps gets the URL as structured content for the inline view", async () => {
-  const client = await connect({
-    extensions: { "io.modelcontextprotocol/ui": { mimeTypes: ["text/html;profile=mcp-app"] } },
-  });
+test("with display auto, a host with MCP Apps gets the URL as structured content for the inline view", async () => {
+  const client = await connect(
+    { extensions: { "io.modelcontextprotocol/ui": { mimeTypes: ["text/html;profile=mcp-app"] } } },
+    { CLAUDE_DESKTOP_DISPLAY: "auto" },
+  );
   try {
     const result = await client.callTool({ name: "show_sigma_workbook", arguments: { workbookSlug: "Revenue-Forecast-bbb222" } });
     assert.ok(!result.isError);
     assert.match(result.content[0].text, /displayed inline/);
     assert.match(result.structuredContent.embedUrl, /:jwt=/);
+  } finally {
+    await client.close();
+  }
+});
+
+test("by default the pane is used: no inline view, and Claude is told to use the browser", async () => {
+  const client = await connect(
+    { extensions: { "io.modelcontextprotocol/ui": { mimeTypes: ["text/html;profile=mcp-app"] } } },
+  );
+  try {
+    const { tools } = await client.listTools();
+    const show = tools.find((tool) => tool.name === "show_sigma_workbook");
+    assert.equal(show._meta?.ui, undefined);
+    assert.match(show.description, /built-in browser pane/);
+
+    const result = await client.callTool({ name: "show_sigma_workbook", arguments: { workbookSlug: "Revenue-Forecast-bbb222" } });
+    assert.match(result.content[0].text, /built-in browser/);
+    assert.match(result.content[0].text, /:jwt=/);
+    assert.equal(result.structuredContent, undefined);
   } finally {
     await client.close();
   }
