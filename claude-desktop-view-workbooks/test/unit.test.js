@@ -49,6 +49,20 @@ test("search with no query lists the newest workbooks first and honours limit", 
   assert.deepEqual(results.map((workbook) => workbook.slug), ["a2", "a1"]);
 });
 
+test("search does not depend on word order", () => {
+  const results = searchWorkbooks(workbooks, "forecast revenue");
+  assert.equal(results[0].slug, "b1");
+});
+
+test("search ignores filler words around the name", () => {
+  const results = searchWorkbooks(workbooks, "show me the revenue forecast in sigma please");
+  assert.equal(results[0].slug, "b1");
+});
+
+test("search returns nothing when too few words match", () => {
+  assert.deepEqual(searchWorkbooks(workbooks, "quarterly board presentation"), []);
+});
+
 test("a single result counts as a clear match", () => {
   assert.equal(hasClearMatch(searchWorkbooks(workbooks, "revenue forecast")), true);
 });
