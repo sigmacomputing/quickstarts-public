@@ -1,4 +1,3 @@
-import { createApiAssertion } from "./jwt.js";
 import { requireConfig } from "./config.js";
 import { debug } from "./log.js";
 
@@ -22,42 +21,19 @@ async function readError(response) {
   }
 }
 
-// By default search runs as the embed user (JWT-bearer exchange), so results
-// match what that user can open. SEARCH_AUTH=client uses API client
-// credentials instead, which see whatever that client can see.
+// Search signs in with the client credentials (the REST API capability of the
+// same Client ID and Secret used to sign workbook links).
 async function requestToken(config) {
-  const url = `${config.apiUrl}/v2/auth/token`;
-  let response;
-
-  if (config.searchAuth === "client") {
-    requireConfig(config, ["apiUrl", "apiClientId", "apiClientSecret"]);
-    response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "client_credentials",
-        client_id: config.apiClientId,
-        client_secret: config.apiClientSecret,
-      }),
-    });
-  } else {
-    requireConfig(config, [
-      "orgSlug",
-      "apiUrl",
-      "embedClientId",
-      "embedClientSecret",
-      "embedUserEmail",
-    ]);
-    const assertion = createApiAssertion(config);
-    response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-        assertion,
-      }),
-    });
-  }
+  requireConfig(config, ["apiUrl", "embedClientId", "embedClientSecret"]);
+  const response = await fetch(`${config.apiUrl}/v2/auth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: config.embedClientId,
+      client_secret: config.embedClientSecret,
+    }),
+  });
 
   if (!response.ok) {
     throw new Error(
@@ -122,7 +98,7 @@ function toWorkbook(entry) {
   };
 }
 
-// Lists workbooks the signed-in identity can see, a page at a time.
+// Lists the workbooks the client credentials can see, a page at a time.
 export async function listWorkbooks(config) {
   requireConfig(config, ["apiUrl"]);
   const workbooks = [];

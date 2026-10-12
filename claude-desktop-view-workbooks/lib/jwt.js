@@ -11,39 +11,22 @@ const sign = (payload, config) =>
 // once, so a fresh one is made for every request.
 export function createEmbedJwt(config) {
   const now = Math.floor(Date.now() / 1000);
-  return sign(
-    {
-      sub: config.embedUserEmail,
-      iss: config.embedClientId,
-      jti: randomUUID(),
-      iat: now,
-      exp: now + config.sessionLength,
-      account_type: config.accountType || undefined,
-      teams: config.teams,
-      user_attributes: config.userAttributes,
-    },
-    config,
-  );
-}
+  const claims = {
+    sub: config.embedUserEmail,
+    iss: config.embedClientId,
+    jti: randomUUID(),
+    iat: now,
+    exp: now + config.sessionLength,
+  };
 
-// The assertion exchanged for an API token that acts as the embed user.
-// It is used immediately, so it expires quickly.
-export function createApiAssertion(config) {
-  const now = Math.floor(Date.now() / 1000);
-  return sign(
-    {
-      iss: config.embedClientId,
-      sub: config.embedUserEmail,
-      aud: "https://sigmacomputing.com/iam",
-      iat: now,
-      exp: now + 300,
-      jti: randomUUID(),
-      scope: "embed",
-      embed: {
-        url: `${config.appUrl}/${config.orgSlug}/workbook/search`,
-        permissions: ["view"],
-      },
-    },
-    config,
-  );
+  // These claims describe embed users. Sigma rejects them for existing Sigma
+  // users ("Cannot update user attributes for internal users"), so they are
+  // sent only when set.
+  if (config.accountType) claims.account_type = config.accountType;
+  if (config.teams.length) claims.teams = config.teams;
+  if (Object.keys(config.userAttributes).length) {
+    claims.user_attributes = config.userAttributes;
+  }
+
+  return sign(claims, config);
 }
