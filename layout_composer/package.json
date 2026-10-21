@@ -1,0 +1,18 @@
+{
+  "name": "layout_composer",
+  "version": "1.0.0",
+  "description": "Sigma Layout Composer: pick library elements, place them on a canvas, and generate a workbook with workbook as code",
+  "scripts": {
+    "start": "nodemon server/server.js",
+    "start:prod": "node server/server.js"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "dotenv": "^10.0.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
