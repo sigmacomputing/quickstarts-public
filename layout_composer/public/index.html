@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Layout Composer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="images/favicon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="layout-topbar">
+    <div class="control-group" id="savedGroup" hidden>
+      <label for="savedSelect">Saved Workbooks:</label>
+      <select id="savedSelect"></select>
+    </div>
+    <span class="header-title">Layout Composer</span>
+  </header>
+
+  <main id="compose" class="panel">
+    <aside>
+      <h2>Layout</h2>
+      <div id="presets" class="presets"></div>
+      <h2>Elements</h2>
+      <p class="hint">Drag an element onto the canvas, or click an element and then a zone.</p>
+      <div id="library"></div>
+    </aside>
+    <section>
+      <div id="canvas" class="canvas"></div>
+      <div class="actions">
+        <button id="generate">Generate</button>
+        <button id="clear" class="secondary">Clear</button>
+        <span id="status" class="status"></span>
+      </div>
+    </section>
+  </main>
+
+  <main id="result" class="panel" hidden>
+    <div id="previewMessage" class="message" hidden></div>
+    <div id="saveBar" class="actions" hidden>
+      <button id="back" class="secondary">Back to layout</button>
+      <span id="saveControls">
+        <input id="saveName" type="text" placeholder="Name your workbook" autocomplete="off" aria-label="Workbook name">
+        <button id="save">Save as my workbook</button>
+      </span>
+      <span id="saveStatus" class="status"></span>
+    </div>
+    <iframe id="previewFrame" title="Generated workbook" hidden></iframe>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
