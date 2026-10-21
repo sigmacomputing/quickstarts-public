@@ -1,12 +1,15 @@
 const { presets } = require('./presets');
 
+// A styled title comes back as { text, fontWeight, fontSize } instead of a plain string.
+const elementName = (el) => (typeof el.name === 'string' ? el.name : (el.name && el.name.text) || el.id);
+
 // Library elements are the elements placed on the first page of the library workbook.
 function listLibraryElements(doc) {
   const firstPage = doc.layout.split('<Page ')[1];
   const ids = [...firstPage.matchAll(/elementId="([^"]+)"/g)].map((m) => m[1]);
   return ids.map((id) => {
     const el = doc.elements.find((e) => e.id === id);
-    return { id, name: el.name, kind: el.kind };
+    return { id, name: elementName(el), kind: el.kind };
   });
 }
 
@@ -53,15 +56,22 @@ function buildDocument(libraryDoc, presetId, placements) {
   const canvasOpen = canvasBlock.match(/<Page [^>]*>/)[0];
 
   const canvasPageId = canvasOpen.match(/id="([^"]+)"/)[1];
-  const pages = libraryDoc.pages.map((pg) =>
-    pg.id === canvasPageId ? { ...pg, name: 'Layout Composer' } : { ...pg, visibility: 'hidden' }
+
+  // Keep a supporting page (such as Source) only if every element on it is kept;
+  // a layout that references a removed element is rejected.
+  const keptBlocks = otherBlocks.filter((block) =>
+    [...block.matchAll(/elementId="([^"]+)"/g)].every((m) => keep.has(m[1]))
   );
+  const keptPageIds = new Set(keptBlocks.map((block) => block.match(/id="([^"]+)"/)[1]));
+  const pages = libraryDoc.pages
+    .filter((pg) => pg.id === canvasPageId || keptPageIds.has(pg.id))
+    .map((pg) => (pg.id === canvasPageId ? { ...pg, name: 'Layout Composer' } : { ...pg, visibility: 'hidden' }));
 
   return {
     ...libraryDoc,
     pages,
     elements: libraryDoc.elements.filter((e) => keep.has(e.id)),
-    layout: ['<?xml version="1.0" encoding="utf-8"?>', `${canvasOpen}\n${leaves}\n</Page>`, ...otherBlocks].join('\n'),
+    layout: ['<?xml version="1.0" encoding="utf-8"?>', `${canvasOpen}\n${leaves}\n</Page>`, ...keptBlocks].join('\n'),
   };
 }
 
