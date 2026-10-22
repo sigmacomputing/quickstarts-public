@@ -1,0 +1,35 @@
+{
+  "kind": "source-bound-native-presentation-contract-not-executable",
+  "sourceSha256": "461bee7b71f30822ea4d263ef529723d89dc9f11e7365e6434cefe89619c2f7e",
+  "basSha256": "181ff80f68b9924844cea64d3c964f36a720bc2944e3566dbde2395946428ae0",
+  "defaultNavigation": {
+    "sourceProcedure": "ReplenishmentMacros.Workbook_Open",
+    "targetPage": "Projection",
+    "calculation": "live native formula bindings",
+    "actualPageId": null,
+    "status": "NEEDS_ACTUAL_PAGE_AND_FORMULA_BINDINGS"
+  },
+  "goToProjection": {
+    "sourceProcedure": "ReplenishmentMacros.GoToProjection_Click",
+    "trigger": "on-click",
+    "targetPage": "Projection",
+    "sourceFocus": "A3",
+    "actualPageId": null,
+    "actualElementIdForFocus": null,
+    "status": "NEEDS_ACTUAL_NATIVE_NAVIGATION_BINDING"
+  },
+  "tidyLayout": {
+    "sourceProcedure": "ReplenishmentMacros.TidyLayout",
+    "trigger": "on-click",
+    "sourceColumnWidth": {"sheet": "Projection", "columns": "B:M", "width": 9},
+    "sourceHeaderBold": {"sheet": "Projection", "range": "A3:P3", "bold": true},
+    "nativeTargetElementIds": null,
+    "status": "NEEDS_ACTUAL_NATIVE_LAYOUT_AND_RENDER_PROOF"
+  },
+  "emailBuyers": {
+    "sourceProcedure": "ReplenishmentMacros.EmailBuyers_Click",
+    "sourceExternalSideEffect": "Outlook m.Send to buyers@example.com",
+    "status": "UNEXECUTED_EXTERNAL_DELIVERY_UNRESOLVED"
+  },
+  "productionStatus": "BLOCKED"
+}

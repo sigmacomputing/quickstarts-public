@@ -1,0 +1,198 @@
+{
+  "kind": "inventory-source-behavior-port-coverage-not-staging-receipt",
+  "sourceSha256": "461bee7b71f30822ea4d263ef529723d89dc9f11e7365e6434cefe89619c2f7e",
+  "basSha256": "181ff80f68b9924844cea64d3c964f36a720bc2944e3566dbde2395946428ae0",
+  "procedureCount": 9,
+  "procedures": [
+    {
+      "procedureId": "ReplenishmentMacros.Workbook_Open",
+      "procedureSha256": "3c0e9c92c61eed7f6eca4d3374dd026192bb6cd9ba1ce9d65f2aac6656527d9d",
+      "bodySha256": "bd9dfe20aeaa687d0375960dcf621168f8bdecd8531b25e99edb6c73117b10d9",
+      "startLine": 5,
+      "endLine": 8,
+      "helperDefinitions": [],
+      "sourceAnalyzerStatus": "AUTO",
+      "route": "native-presentation",
+      "inputs": [],
+      "guard": "automatic workbook-open event",
+      "affectedRows": [],
+      "sideEffects": [
+        "activate Projection",
+        "full recalculation"
+      ],
+      "status": "NEEDS_ACTUAL_NATIVE_PAGE_BINDING_AND_LIVE_PROOF"
+    },
+    {
+      "procedureId": "ReplenishmentMacros.RefreshOnHand_Click",
+      "procedureSha256": "ebae383d94b40957e9082adcb8e3bbb3e211863d3d15504b4f6f02b206dfebe2",
+      "bodySha256": "ebfc7b1503b590668d2ced79140b7aa1819763a32b420aa30902242e56b8ee6e",
+      "startLine": 11,
+      "endLine": 19,
+      "helperDefinitions": [],
+      "sourceAnalyzerStatus": "UNRESOLVED",
+      "route": "reviewed-repair-isolated-erp",
+      "inputs": [
+        "synthetic ERP snapshot_date=current-date SKU/on_hand",
+        "current SKUs physical rows"
+      ],
+      "guard": "source has no SKU/key guard; replacement requires exact six-key match, unique keys, finite values, current ID/binding",
+      "affectedRows": [
+        "SKUs!A2:B7 source bad write",
+        "replacement SKUs!C2:C7 On Hand only"
+      ],
+      "sideEffects": [
+        "source reads ERP_PROD via ODBC; forbidden in replacement",
+        "recalculate"
+      ],
+      "status": "OFFLINE_PORT_NEEDS_ISOLATED_PROVISION_AND_LIVE_PROOF"
+    },
+    {
+      "procedureId": "ReplenishmentMacros.CommitForecast_Click",
+      "procedureSha256": "e72da04245a9a1b54105d5476bcf68ab9266bb4f2b773bb1d9f0a4284c09469b",
+      "bodySha256": "d9981486022af3ac39b277b020e30d7ed0afc4e89fd07109265e261640fade10",
+      "startLine": 22,
+      "endLine": 35,
+      "helperDefinitions": [],
+      "sourceAnalyzerStatus": "UNRESOLVED",
+      "route": "guarded-append",
+      "inputs": [
+        "all 72 tblDemand rows in list order",
+        "Now",
+        "authenticated user"
+      ],
+      "guard": "source has no row filter; replacement binds one intent and serialized retry",
+      "affectedRows": [
+        "Snapshots append 72 rows, columns A:E; operation ID/fingerprint added for retry"
+      ],
+      "sideEffects": [
+        "source MsgBox success",
+        "replacement success gated by exact persisted readback"
+      ],
+      "status": "OFFLINE_PORT_NEEDS_ACTUAL_BINDING_AND_LIVE_PROOF"
+    },
+    {
+      "procedureId": "ReplenishmentMacros.ApplyDemandAdjustment",
+      "procedureSha256": "323707271a0f897de80047a7ddb4fa9cfbe678a72562749b1bf82f5ae96915af",
+      "bodySha256": "c542d83b7df2b731669a3be2cc27f4a2711c88c8dd7b634fd5e0280f9e72964c",
+      "startLine": 38,
+      "endLine": 44,
+      "helperDefinitions": [],
+      "sourceAnalyzerStatus": "UNRESOLVED",
+      "route": "pure-python-and-guarded-native-update",
+      "inputs": [
+        "CDbl(InputBox) one percentage",
+        "all 72 Demand Forecast Units"
+      ],
+      "guard": "source no bounds or validation; replacement rejects invalid/nonfinite/overflow before writes",
+      "affectedRows": [
+        "Demand!C2:C73 all rows"
+      ],
+      "sideEffects": [
+        "in-place worksheet mutation; VBA.Round ties-to-even"
+      ],
+      "status": "OFFLINE_PORT_NEEDS_ACTUAL_BINDING_AND_LIVE_PROOF"
+    },
+    {
+      "procedureId": "ReplenishmentMacros.CreatePurchaseOrders_Click",
+      "procedureSha256": "aa93c33a78104e282505e1cdc623f7e62603af21a35e6db6c99f9047d74fd986",
+      "bodySha256": "b692a94cb855dd46df00e6337c89ace4095d620dce78a71414324c96dd78e61d",
+      "startLine": 47,
+      "endLine": 57,
+      "helperDefinitions": [],
+      "sourceAnalyzerStatus": "UNRESOLVED",
+      "route": "isolated-typed-procedure",
+      "inputs": [
+        "Projection rows 4..9 column O literal ORDER",
+        "same-row SKU column A",
+        "same-row quantity column P"
+      ],
+      "guard": "case-sensitive exact ORDER; no source quantity validation; typed whole-quantity isolated contract",
+      "affectedRows": [
+        "only matching Projection rows 4..9 stage synthetic PO rows"
+      ],
+      "sideEffects": [
+        "source calls ERP_PROD purchasing.stage_po; replacement isolated staging only"
+      ],
+      "status": "OFFLINE_PORT_NEEDS_SQL_REVIEW_AND_LIVE_PROOF"
+    },
+    {
+      "procedureId": "ReplenishmentMacros.EmailBuyers_Click",
+      "procedureSha256": "de5bccc2e24bc721afdff7fcd7f3ea1aa5159c44801eb122d912a57ffca9ced1",
+      "bodySha256": "965e4645a9ae538f38e24d32593e2eb99dfec45aa25cdd5008c4d152d5f57300",
+      "startLine": 60,
+      "endLine": 68,
+      "helperDefinitions": [],
+      "sourceAnalyzerStatus": "UNRESOLVED",
+      "route": "external-delivery-unexecuted",
+      "inputs": [
+        "static buyers@example.com, subject Reorder list, body See attached reorder list."
+      ],
+      "guard": "none",
+      "affectedRows": [],
+      "sideEffects": [
+        "Outlook m.Send external email"
+      ],
+      "status": "UNEXECUTED_EXTERNAL_DELIVERY_UNRESOLVED"
+    },
+    {
+      "procedureId": "ReplenishmentMacros.ReforecastExpSmoothing",
+      "procedureSha256": "c524a152643368515156da085a123197c97a0d7e1cf99fa50f4da058033ddc48",
+      "bodySha256": "6468e9a76931235054f59becaaea5e6e2fb96d355a275faa90467bd9c3a51c3b",
+      "startLine": 71,
+      "endLine": 81,
+      "helperDefinitions": [],
+      "sourceAnalyzerStatus": "UNRESOLVED",
+      "route": "pure-python-and-guarded-native-update",
+      "inputs": [
+        "Demand rows 3..73 in physical worksheet order",
+        "alpha=0.3",
+        "previous row UPDATED Forecast Units"
+      ],
+      "guard": "adjacent SKU equality only; first row of each contiguous block unchanged",
+      "affectedRows": [
+        "Demand!C3:C73 conditional rows"
+      ],
+      "sideEffects": [
+        "in-place worksheet mutation; VBA.Round ties-to-even"
+      ],
+      "status": "OFFLINE_PORT_NEEDS_ACTUAL_BINDING_AND_LIVE_PROOF"
+    },
+    {
+      "procedureId": "ReplenishmentMacros.GoToProjection_Click",
+      "procedureSha256": "978141eed8103e4a930c852c16377735a6930d977b5ece84b5189d679d3660d7",
+      "bodySha256": "50fadcc157c7ac59f1bb7ec10940a8e92ef609d77216910379ed01e272981690",
+      "startLine": 84,
+      "endLine": 87,
+      "helperDefinitions": [],
+      "sourceAnalyzerStatus": "UNRESOLVED",
+      "route": "native-navigation",
+      "inputs": [],
+      "guard": "on-click",
+      "affectedRows": [],
+      "sideEffects": [
+        "activate Projection",
+        "select A3"
+      ],
+      "status": "NEEDS_ACTUAL_NATIVE_PAGE_BINDING_AND_LIVE_PROOF"
+    },
+    {
+      "procedureId": "ReplenishmentMacros.TidyLayout",
+      "procedureSha256": "4dd7288168bc11fe785245c0361215517d08631a9238c43b55ebc0a20072b892",
+      "bodySha256": "e0d2545e7d7b1b1ba1714d0a2c0db8201eeff3ca195867035e016fd08e30debf",
+      "startLine": 90,
+      "endLine": 93,
+      "helperDefinitions": [],
+      "sourceAnalyzerStatus": "UNRESOLVED",
+      "route": "native-layout",
+      "inputs": [],
+      "guard": "on-click",
+      "affectedRows": [],
+      "sideEffects": [
+        "Projection B:M width 9",
+        "Projection A3:P3 bold"
+      ],
+      "status": "NEEDS_ACTUAL_NATIVE_LAYOUT_BINDING_AND_RENDER_PROOF"
+    }
+  ],
+  "completionStatus": "BLOCKED_PENDING_ACTUAL_BINDINGS_PUBLISHED_ACTIONS_PERSISTENCE_ROLES_RESTORATION"
+}
