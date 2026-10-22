@@ -1,8 +1,8 @@
 {
  "name": "FP&A Monthly P&L (built)",
  "intent": "what-if",
- "connectionId": "cb2f5180-641f-47bd-8efa-da9d590d855a",
- "folderId": "57e59735-86b9-40b0-b029-217205406f57",
+ "connectionId": "{your-connection-id}",
+ "folderId": "{your-folder-id}",
  "currencyFormat": "$,.0f",
  "pctFormat": ".1%",
  "actualMonths": [

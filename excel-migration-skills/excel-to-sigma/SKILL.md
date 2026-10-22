@@ -160,7 +160,6 @@ bash -c 'source ~/.sigma-migration/env; TOKEN=$(curl -s -X POST "$SIGMA_BASE_URL
 ```
 The **data-entry half requires a write-enabled connection** (input tables write
 back to a `SIGDS_` schema). Confirm via `GET /v2/connections` → `writeAccess: true`.
-Verified write connection on tj-wells-1989: `cb2f5180-…` (Snowflake ymb68310).
 
 ### Python
 From this skill directory, install its pinned dependencies:
