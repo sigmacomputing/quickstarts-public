@@ -105,8 +105,8 @@ DATABRICKS_OAUTH_ACCOUNT_TYPE=View
 DATABRICKS_OAUTH_TEAMS=
 
 # Databricks OAuth Configuration
-DATABRICKS_HOST=https://adb-1234567890123456.2.azuredatabricks.net
-DATABRICKS_ACCOUNT_ID=
+DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
+DATABRICKS_ACCOUNT_ID=your-account-id
 DATABRICKS_OAUTH_CLIENT_ID=your-oauth-client-id
 DATABRICKS_OAUTH_CLIENT_SECRET=your-oauth-client-secret
 DATABRICKS_REDIRECT_URI=http://localhost:3000/auth/databricks/callback
@@ -116,7 +116,7 @@ DATABRICKS_AUTH_LEVEL=workspace
 DATABRICKS_CONNECTION_ID=your-connection-id
 
 # Session Secret
-DATABRICKS_SESSION_SECRET=change-this-to-random-string-in-production
+DATABRICKS_SESSION_SECRET=your-session-secret
 
 # Optional: Save token to file in CLI mode
 DATABRICKS_SAVE_TOKEN_TO_FILE=false
